@@ -156,6 +156,24 @@ export class ProxmoxExecution extends EventEmitter {
           );
         }
       }
+      if( tmplCommand.type === "command" ) {
+        // For 'command' type, we do not expect JSON output
+        msg.command = tmplCommand.name;
+        msg.result = stdout;
+        msg.exitCode = exitCode;
+        if (exitCode === 0) {
+          msg.index = index++;
+          this.emit("message", msg);
+          return msg;
+        } else {
+          msg.index = index;
+          this.emit("message", msg);
+          throw new Error(
+            `Command "${tmplCommand.name}" failed with exit code ${exitCode}: ${stderr}`,
+          );
+        }
+      }
+      else
       try {
         const outputsJson = this.validator.serializeJsonWithSchema<
           IOutput[] | IOutput

@@ -19,14 +19,14 @@
   "commands": [
     {
       "type": "command",
-      "name": "Debugg",
-      "execute": "uname -n",
-      "description": "Check where we are"
+      "name": "Download Package",
+      "execute": "wget {{ packageurl }} -O packagefile.apk",
+      "description": "Download package to the LXC container"
     },
     {
       "type": "command",
       "name": "Install Package",
-      "execute": "apk add --allow-untrusted --key \"$(wget -qO- '{{ packagerpubkeyurl }}')\" packagefile",
+      "execute": "apk add --allow-untrusted --key \"$(wget -qO- '{{ packagerpubkeyurl }}')\" ./packagefile.apk",
       "description": "Verify and install package on the LXC container"
     }
   ]
