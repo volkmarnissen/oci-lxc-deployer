@@ -16,7 +16,7 @@ describe("ProxmoxWebApp", () => {
   beforeAll(() => {
     schemaPath = path.join(__dirname, "../schemas");
     jsonPath = path.join(__dirname, "../json");
-    jsonTestPath = path.join(__dirname, "../../local/json");
+    jsonTestPath = path.join(__dirname, "../local/json");
     app = new ProxmoxWebApp(schemaPath, jsonPath, jsonTestPath).app;
   });
 
