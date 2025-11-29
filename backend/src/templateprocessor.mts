@@ -47,13 +47,14 @@ export class TemplateProcessor {
   ): ITemplateProcessorLoadResult {
     const readOpts: IReadApplicationOptions = {
       applicationHierarchy: [],
-      error: new ProxmoxConfigurationError(applicationName),
+      error: new ProxmoxConfigurationError("",applicationName),
       taskTemplates: [],
     };
     const appLoader = new ApplicationLoader(this.pathes);
     appLoader.readApplicationJson(applicationName, readOpts);
     if (readOpts.error.details && readOpts.error.details.length > 0) {
       throw new ProxmoxLoadApplicationError(
+        "Load Application error",
         applicationName,
         task,
         readOpts.error.details,
@@ -61,13 +62,15 @@ export class TemplateProcessor {
     }
     const appEntry = readOpts.taskTemplates.find((t) => t.task === task);
     if (!appEntry) {
-      throw new ProxmoxLoadApplicationError(applicationName, task, [
-        new JsonError(`Task ${task} not found in application.json`),
+      const message = `Task ${task} not found in application.json`
+      throw new ProxmoxLoadApplicationError(message,applicationName, task, [
+        new JsonError(message),
       ]);
     }
     if (!readOpts.application) {
-      throw new ProxmoxLoadApplicationError(applicationName, task, [
-        new JsonError(`Application data not found for ${applicationName}`),
+      const message = `Application data not found for ${applicationName}`;
+      throw new ProxmoxLoadApplicationError(message, applicationName, task, [
+        new JsonError(message),
       ]);
     }
     let application = readOpts.application;
@@ -131,7 +134,7 @@ export class TemplateProcessor {
         // Only one error: throw it directly (as string or error object)
         throw errors[0];
       } else {
-        const err = new ProxmoxConfigurationError(applicationName, errors);
+        const err = new ProxmoxConfigurationError("Template processing error",applicationName, errors);
         throw err;
       }
     }

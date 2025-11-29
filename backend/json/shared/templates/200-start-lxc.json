@@ -4,14 +4,14 @@
   "description": "Start existing LXC container on Proxmox host",
   "parameters": [
     {
-      "name": "vm_id",
+      "id": "vm_id",
+      "name": "VM ID",
       "type": "number",
       "description": "ID of the virtual machine"
     }
   ],
   "commands": [
     {
-      "type": "command",
       "command": "pct start {{ vm_id }} 1>&2"
     }
   ]

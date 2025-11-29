@@ -66,7 +66,13 @@ function validateTemplates() {
         console.error(`✖ Invalid: ${relPath} [${schemaName}]`);
         if (err && err.details) {
           for (const detail of err.details) {
-            console.error(`  - ${detail.message}${detail.line ? ' (line ' + detail.line + ')' : ''}`);
+            const isAdditional =
+              detail.message && detail.message.includes('must NOT have additional properties');
+            if (isAdditional && detail.params && detail.params.additionalProperty) {
+              console.error(`  - ${detail.message} (property: '${detail.params.additionalProperty}')${detail.line ? ' (line ' + detail.line + ')' : ''}`);
+            } else {
+              console.error(`  - ${detail.message}${detail.line ? ' (line ' + detail.line + ')' : ''}`);
+            }
           }
         } else {
           console.error(err);

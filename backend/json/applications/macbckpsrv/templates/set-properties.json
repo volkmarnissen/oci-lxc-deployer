@@ -1,8 +1,7 @@
 {
-  "name": "001-set-properties",
+  "name": "set-properties",
   "execute_on": "proxmox",
+  "commands": [{ "script": "set-properties.sh"}],
   "description": "Sets default values for username, mountpoint, uid, and gid for the backup application.",
-  "commands": [{ "script": "scripts/set-properties.sh"}],
-  "outputs": ["username", "mountpoint", "uid", "gid"],
-  "notes": "This template outputs the default values as outputs in JSON format."
+  "outputs": ["username", "mountpoint", "uid", "gid"]
 }

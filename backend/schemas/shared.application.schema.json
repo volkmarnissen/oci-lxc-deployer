@@ -9,6 +9,7 @@
     "initialization": { "$ref": "#/$defs/templates" },
     "finalization": { "$ref": "#/$defs/templates" }
   },
+  "additionalProperties": false,
   "$defs": {
     "templates": {
       "type": "array",

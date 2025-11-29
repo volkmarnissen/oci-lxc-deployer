@@ -6,6 +6,5 @@
     {
       "script": "reenable-vga-console.sh"
     }
-  ],
-  "notes": "Run this template to restore console output to the VGA/graphics card. A reboot is required for changes to take effect."
+  ]
 }

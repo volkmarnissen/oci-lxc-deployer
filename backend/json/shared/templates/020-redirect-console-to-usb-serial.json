@@ -6,6 +6,5 @@
     {
        "script": "redirect-console-to-usb-serial.sh"
     }
-  ],
-  "notes": "After running this template, reboot the Proxmox host for changes to take effect. Make sure to connect to the correct serial device (e.g. /dev/ttyUSB0) with the configured baud rate (e.g. 115200)."
+  ]
 }

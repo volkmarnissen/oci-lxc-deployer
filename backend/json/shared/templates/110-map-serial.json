@@ -5,21 +5,24 @@
   "description": "Map serial device to VM",
   "parameters": [
     {
-      "name": "usb",
+      "id": "usb",
+      "name": "Enable USB Serial Device",
       "type": "boolean",
       "default": false,
       "description": "Enable serial device assignment",
       "required": false
     },
     {
-      "name": "serial_host",
+      "id": "serial_host",
+      "name": "Path to USB Serial Device",
       "type": "string",
       "required": false,
       "default": "/dev/ttyUSB0",
       "description": "Path to the USB device on the Proxmox host"
     },
     {
-      "name": "vm_id",
+      "id": "vm_id",
+      "name": "ID of the VM",
       "type": "string",
       "required": true,
       "description": "ID of the VM to which the USB device will be assigned"

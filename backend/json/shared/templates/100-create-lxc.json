@@ -4,40 +4,46 @@
   "description": "Create LXC container on Proxmox host",
   "parameters": [
     {
-      "name": "vm_id",
+      "id": "vm_id",
+      "name": "ID of the virtual machine",
       "type": "number",
       "default": "",
       "description": "ID of the virtual machine"
     },
     {
-      "name": "template_path",
+      "id": "template_path",
+      "name": "Path to the LXC template",
       "type": "string",
       "required": true,
       "description": "Path to the LXC template (e.g. local:vztmpl/alpine-3.19-default_20231107_amd64.tar.xz)"
     },
     {
-      "name": "disk_size",
+      "id": "disk_size",
+      "name": "Disk size",
       "type": "string",
       "required": true,
       "default": "4",
       "description": "Disk size for the container in GB"
     },
     {
-      "name": "memory",
+      "id": "memory",
+      "name": "Memory in MB", 
       "type": "number",
       "required": true,
       "default": 512,
       "description": "Memory for the container in MB"
     },
     {
-      "name": "bridge",
+      "id": "bridge",
+      "name": "Network bridge",
       "type": "string",
       "required": true,
       "default": "vmbr0",
       "description": "Network bridge to use"
     },
     {
-      "name": "hostname",
+      "id": "hostname",
+      "name": "Hostname",
       "type": "string",
       "required": true,
       "description": "Hostname for the LXC container"

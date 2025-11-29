@@ -11,7 +11,7 @@ export class JsonError extends Error implements IJsonError {
   public details: IJsonError[] | undefined;
   public filename?: string | undefined;
 
-  constructor(filename: string| undefined, details?: IJsonError[]) {
+  constructor(private passed_message: string, details?: IJsonError[], filename?: string | undefined) {
     super();
     this.name = "JsonError";
     this.filename = filename;
@@ -20,7 +20,7 @@ export class JsonError extends Error implements IJsonError {
   get message(): string {
     const rel = this.filename !== undefined ? path.relative(JsonError.baseDir, this.filename) : "";
     return (
-      rel +
+      rel +this.passed_message +( this.details && this.details.length ==0? this.passed_message : "") +
       (this.details && this.details.length > 1
         ? ` See details for ${this.details.length} errors.`
         : "")
@@ -137,7 +137,9 @@ export class JsonValidator {
       sourceMap = (jsonData as any).__sourceMap;
     }
     try {
-      const result = validate(jsonData);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { __sourceMapText, __sourceMap, ...dataToValidate } = jsonData as any;
+      const result = validate(dataToValidate);
       if (result instanceof Promise) {
         throw new Error(
           "Async schemas are not supported in serializeJsonWithSchema",
@@ -170,7 +172,8 @@ export class JsonValidator {
       } else {
         details = [new JsonError("Unknown error")];
       }
-      throw new JsonError(undefined, details);
+      
+      throw new JsonError("Validation error", details);
     }
     return jsonData as T;
   }

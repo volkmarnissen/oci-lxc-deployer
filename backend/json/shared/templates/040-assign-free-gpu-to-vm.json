@@ -9,8 +9,10 @@
   ],
   "parameters": [
     {
-      "name": "vm_id",
-      "description": "The numeric ID of the Proxmox VM to which the GPU should be assigned.",
+      "id": "vm_id",
+      "type": "number",
+      "name": "ID of the VM",
+      "description": "The numeric ID of the Proxmox VM.",
       "required": true
     }
   ]

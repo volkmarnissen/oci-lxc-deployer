@@ -11,7 +11,8 @@
           "before": { "type": "string" },
           "after": { "type": "string" }
         },
-        "required": ["name"]
+        "required": ["name"],
+        "additionalProperties": false
       },
       { "type": "string" }
     ]

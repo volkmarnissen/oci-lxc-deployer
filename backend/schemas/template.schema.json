@@ -23,12 +23,14 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
+          "id": { "type": "string" }, 
           "type": { "enum": ["string", "number", "enum", "boolean"] },
           "description": { "type": "string" },
           "required": { "type": "boolean", "default": false },
           "secure": { "type": "boolean", "default": false },
           "default": { "type": ["string", "number", "boolean"] }
         },
+        "required": ["name","id","type"],
         "if": { "properties": { "type": { "const": "enum" } } },
         "then": {
           "properties": {
@@ -57,12 +59,14 @@
   },
   "then": { "properties": { "enumValues": { "type": "string" } } },
   "required": ["commands", "execute_on", "name"],
+  "additionalProperties": false,
   "$defs": {
     "command": {
       "type": "object",
       "properties": {
         "name": { "type": "string", "maxLength": 30 },
         "description": { "type": "string" },
+        "if": { "type": "string" },
         "command": { "type": "string" },
         "script": { "type": "string" },
         "schema": { "type": "string" },
@@ -76,7 +80,8 @@
       ],
       "errorMessage": {
         "oneOf": "Exactly one of 'command', 'script' or 'schema' must be present."
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

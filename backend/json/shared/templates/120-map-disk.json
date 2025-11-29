@@ -4,38 +4,44 @@
   "execute_on": "proxmox",
   "parameters": [
     {
-      "name": "vm_id",
+      "id": "vm_id",
+      "name": "ID of the LXC Container",
       "type": "string",
       "required": true,
       "description": "ID of the LXC container to which the disk will be mapped."
     },
     {
-      "name": "host_device_uuid",
+      "id": "host_device_uuid",
+      "name": "UUID of the block device",
       "type": "string",
       "required": true,
       "description": "UUID of the block device to be mounted."
     },
     {
-      "name": "disk_size",
+      "id": "disk_size",
+      "name": "Disk size",
       "type": "string",
       "required": true,
       "description": "Disk size (for documentation/logging only, not used for mounting)."
     },
     {
-      "name": "mountpoint",
+      "id": "mountpoint",
+      "name": "Mount point host & container",
       "type": "string",
       "required": true,
       "default": "/mnt/backupdisk",
       "description": "Mount point on the Proxmox host and inside the container."
     },
     {
-      "name": "uid",
+      "id": "uid",
+      "name": "UID for mount directory",
       "type": "string",
       "required": true,
       "description": "UID to set for the mount directory and bind mount."
     },
     {
-      "name": "gid",
+      "id": "gid",
+      "name": "GID for mount directory",
       "type": "string",
       "required": true,
       "description": "GID to set for the mount directory and bind mount."

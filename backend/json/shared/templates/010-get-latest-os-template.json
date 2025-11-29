@@ -4,10 +4,11 @@
   "description": "Download latest operating system template for Proxmox",
   "parameters": [
     {
-      "name": "ostype",
+      "id": "ostype",
+      "name": "Operating System Type",
       "type": "enum",
       "default": "alpine",
-      "description": "Base template to download",
+      "description": "One of alpine, debian, ubuntu. Base template to download",
       "enumValues": ["alpine", "debian", "ubuntu"]
     }
   ],

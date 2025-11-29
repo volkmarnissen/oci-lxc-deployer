@@ -10,24 +10,25 @@
   ],
   "parameters": [
     {
-      "name": "mountpoint",
+      "id": "mountpoint",
+      "name": "Mountpoint",
       "type": "string",
       "description": "The mountpoint to share via Samba.",
       "required": true
     },
     {
-      "name": "username",
+      "id": "username",
+      "name": "Username",
       "type": "string",
       "description": "The username for Samba access.",
       "required": true
     },
     {
-      "name": "password",
+      "id": "password",
+      "name": "Password",
       "type": "string",
       "description": "The password for the Samba user.",
       "required": true
     }
-  ],
-  "required": ["mountpoint", "username", "password"],
-  "notes": "All parameters must be set and not empty. The script is idempotent, configures Time Machine support, and outputs errors to stderr."
+  ]
 }

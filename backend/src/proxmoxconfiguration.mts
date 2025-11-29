@@ -6,6 +6,7 @@ import {
   ProxmoxConfigurationError,
 } from "@src/proxmoxconftypes.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { JsonError } from "./jsonvalidator.mjs";
 
 export interface IApplicationBase {
   name: string;
@@ -34,11 +35,12 @@ export interface IReadApplicationOptions {
 
 export class ProxmoxLoadApplicationError extends ProxmoxConfigurationError {
   constructor(
+    message: string,
     application: string,
     private task?: string,
     details?: IJsonError[],
   ) {
-    super(application, details);
+    super(message,application, details);
     this.name = "ProxmoxApplicationError";
     this.filename = application;
   }
@@ -105,15 +107,26 @@ export class ProxmoxConfiguration implements IConfiguredPathes {
           });
         } catch (err) {
           // On error: attach application object with errors
-          if (err instanceof ProxmoxConfigurationError && err.details) {
+          if ((err instanceof ProxmoxConfigurationError || err instanceof JsonError) ) {
+            if( err.details !== undefined && err.details!.length >0)
             applications.push({
               name: appData.name,
               description: appData.description,
               icon: appData.icon,
               iconContent: iconBase64,
               id: appName,
-              errors: err.details,
-            });
+              errors: [err.toJSON()],
+            })
+            else {
+              applications.push({
+                name: appData.name,
+                description: appData.description,
+                icon: appData.icon,
+                iconContent: iconBase64,
+                id: appName,
+                errors: [err.toJSON()],
+              });
+            }
           } else {
             // Error loading application.json or other error
             const errorApp = (err as any).application || {

@@ -4,13 +4,15 @@
   "description": "Install modbus2mqtt on lxc container",
   "parameters": [
     {
-      "name": "packageurl",
+      "id": "packageurl",
+      "name": "URL of the Modbus2Mqtt package",
       "type": "string",
       "required": true,
       "description": "URL of the Modbus2Mqtt package to be installed"
     },
     {
-      "name": "packagerpubkeyurl",
+      "id": "packagerpubkeyurl",
+      "name": "Public key URL for verifying the package",
       "type": "string",
       "required": true,
       "description": "Public key for verifying the package"
@@ -18,13 +20,11 @@
   ],
   "commands": [
     {
-      "type": "command",
       "name": "Download Package",
       "command": "wget {{ packageurl }} -O packagefile.apk 1>&2",
       "description": "Download package to the LXC container"
     },
     {
-      "type": "command",
       "name": "Install Package",
       "command": "apk add --allow-untrusted --key \"$(wget -qO- '{{ packagerpubkeyurl }}')\" ./packagefile.apk 1>&2",
       "description": "Verify and install package on the LXC container"

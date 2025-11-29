@@ -10,29 +10,31 @@
   ],
   "parameters": [
     {
-      "name": "username",
+      "id": "username",
+      "name": "Username",
       "type": "string",
       "description": "The username to create inside the LXC container.",
       "required": true
     },
     {
-      "name": "uid",
+      "id": "uid",
+      "name": "UID",
       "type": "string",
       "description": "The UID for the user",
       "required": true
     },
     {
-      "name": "gid",
+      "id": "gid",
+      "name": "GID",
       "type": "string",
       "description": "The GID for the user",
       "required": true
     },
     {
-      "name": "mountpoint",
+      "id": "mountpoint",
+      "name": "Mountpoint",
       "type": "string",
       "description": "Optional: The mountpoint to check for write access. Can be empty if not needed."
     }
-  ],
-  "required": ["username", "uid", "gid"],
-  "notes": "All parameters except mountpoint must be set and not empty. The script is idempotent and outputs errors to stderr."
+  ]
 }
