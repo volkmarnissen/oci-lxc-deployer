@@ -115,7 +115,9 @@ export class TemplateProcessor {
     const scriptPathes = readOpts.applicationHierarchy.map((appDir) =>
       path.join(appDir, "scripts"),
     );
+    templatePathes.push(path.join(this.pathes.localPath, "shared", "templates"));
     templatePathes.push(path.join(this.pathes.jsonPath, "shared", "templates"));
+    scriptPathes.push(path.join(this.pathes.localPath, "shared", "scripts"));
     scriptPathes.push(path.join(this.pathes.jsonPath, "shared", "scripts"));
     // 5. Process each template
     const errors: IJsonError[] = [];

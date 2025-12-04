@@ -1,6 +1,6 @@
 {
   "execute_on": "proxmox",
-  "name": "Compute static IPs from prefixes",
+  "name": "Compute Static IPs",
   "description": "Optional step: Derive static IPv4/IPv6 from prefixes and VMID, emitting parameter overrides. Set prefixes in a shared previous step. This can take over the complete Ip configuration when used with the 'Static IP Address for LXC Container' template.",
   "parameters": [
     { "name": "vm_id", "id": "vm_id", "type": "string", "description": "VMID of the container." },

@@ -37,7 +37,7 @@ function findTemplateDirs(dir) {
 function validateTemplates() {
   let validator;
   try {
-    validator = JsonValidator.getInstance(path.join(rootDir, "schemas"));
+    validator = new JsonValidator(path.join(rootDir, "schemas"));
   } catch (err) {
     console.error("Schema validation failed during validator initialization:");
     if (err && err.details) {

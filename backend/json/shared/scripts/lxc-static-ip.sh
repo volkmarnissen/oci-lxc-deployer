@@ -34,37 +34,45 @@ fi
 
 ipv6_ok=true
 
-if [ -n "$static_ip" ] && [ -n "{{ static_gw }}" ]; then
+if [ -n "$static_ip" ]; then
   ipv4_ok=true
 else
-  if [ -n "$static_ip" ] || [ -n "{{ static_gw }}" ]; then
-    echo "Both static_ip and static_gw must be set for IPv4!" >&2
+  # If gateway is provided without IP, that's invalid
+  if [ -n "{{ static_gw }}" ]; then
+    echo "IPv4 gateway provided without IPv4 address!" >&2
     exit 2
   fi
   ipv4_ok=false
 fi
 
-if [ -n "$static_ip6" ] && [ -n "{{ static_gw6 }}" ]; then
+if [ -n "$static_ip6" ]; then
   ipv6_ok=true
 else
-  if [ -n "$static_ip6" ] || [ -n "{{ static_gw6 }}" ]; then
-    echo "Both static_ip6 and static_gw6 must be set for IPv6!" >&2
+  # If gateway is provided without IP, that's invalid
+  if [ -n "{{ static_gw6 }}" ]; then
+    echo "IPv6 gateway provided without IPv6 address!" >&2
     exit 2
   fi
   ipv6_ok=false
 fi
 
 if [ "$ipv4_ok" = false ] && [ "$ipv6_ok" = false ]; then
-  echo "No valid static IP configuration provided!" >&2
+  echo "No static IP (IPv4 or IPv6) provided!" >&2
   exit 2
 fi
 
 NET_OPTS="name=eth0,bridge={{ bridge }}"
 if [ "$ipv4_ok" = true ]; then
-  NET_OPTS="$NET_OPTS,ip=$static_ip,gw={{ static_gw }}"
+  NET_OPTS="$NET_OPTS,ip=$static_ip"
+  if [ -n "{{ static_gw }}" ]; then
+    NET_OPTS="$NET_OPTS,gw={{ static_gw }}"
+  fi
 fi
 if [ "$ipv6_ok" = true ]; then
-  NET_OPTS="$NET_OPTS,ip6=$static_ip6,gw6={{ static_gw6 }}"
+  NET_OPTS="$NET_OPTS,ip6=$static_ip6"
+  if [ -n "{{ static_gw6 }}" ]; then
+    NET_OPTS="$NET_OPTS,gw6={{ static_gw6 }}"
+  fi
 fi
 pct set {{ vm_id }} --net0 "$NET_OPTS" >&2
 RC=$?
