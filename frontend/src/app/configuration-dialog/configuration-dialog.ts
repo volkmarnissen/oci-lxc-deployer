@@ -40,7 +40,7 @@ export class ConfigurationDialog implements OnInit {
   }
 
   addSsh() {
-    // Wenn die Liste leer ist, wird die erste Konfiguration als current markiert
+    // If list is empty, mark the first configuration as current
     this.ssh.push({ host: '', port: 22, current: this.ssh.length === 0 });
   }
 
@@ -67,7 +67,7 @@ export class ConfigurationDialog implements OnInit {
   }
 
   get canSave(): boolean {
-    // Save ist nur erlaubt, wenn mindestens eine SSH-Konfiguration existiert
+    // Saving is allowed only if at least one SSH configuration exists
     return this.ssh.length > 0 && !this.loading;
   }
 

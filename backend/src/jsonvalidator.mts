@@ -84,7 +84,7 @@ export class JsonValidator {
     const files = fs
       .readdirSync(schemasDir)
       .filter((f) => extname(f) === ".json");
-    // 1. Basis-Schemas zuerst
+    // 1. Add base schemas first
     for (const file of baseSchemas) {
       if (files.includes(file)) allFiles.push(file);
     }

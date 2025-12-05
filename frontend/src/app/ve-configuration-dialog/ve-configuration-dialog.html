@@ -1,6 +1,8 @@
 
 <div class="dialog-header">
-	<img *ngIf="data.app.iconContent" class="app-icon" [src]="'data:image/png;base64,' + data.app.iconContent" alt="App Icon" />
+	@if (data.app.iconContent) {
+		<img class="app-icon" [src]="'data:image/png;base64,' + data.app.iconContent" alt="App Icon" />
+	}
 	<div class="header-text">
 		<h2>Configuration for {{ data.app.name }}</h2>
 		<p>{{ data.app.description }}</p>

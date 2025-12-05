@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Create @PKGNAME@ user with dialout as primary group for serial port access
+adduser -S -D -u 1000 -h /var/lib/@PKGNAME@ -s /sbin/nologin -G dialout -g @PKGNAME@ @PKGNAME@ 2>/dev/null
+mkdir -p /var/lib/@PKGNAME@/.config/git
+chown -R @PKGNAME@:dialout /var/lib/@PKGNAME@
+
+exit 0

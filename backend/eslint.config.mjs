@@ -2,7 +2,7 @@ import vitestPlugin from "eslint-plugin-vitest";
 import prettierConfig from "eslint-config-prettier";
 
 export default [
-  // Vitest-Regeln für Testdateien
+  // Vitest rules for test files
   {
     files: ["tests/**/*.mts"],
     plugins: { vitest: vitestPlugin },
@@ -11,7 +11,7 @@ export default [
       "vitest/no-disabled-tests": "warn",
       "vitest/expect-expect": "warn",
       "vitest/no-identical-title": "error",
-      // ...weitere Vitest-Regeln nach Bedarf...
+      // ...additional Vitest rules as needed...
     },
     languageOptions: {
       parserOptions: {
@@ -20,11 +20,11 @@ export default [
       },
     },
   },
-  // Prettier-Konfiguration für alle Dateien
+  // Prettier configuration for all files
   {
     ...prettierConfig,
   },
-  // Allgemeine TypeScript/ESM-Regeln für das Projekt
+  // General TypeScript/ESM rules for the project
   {
     files: ["**/*.ts", "**/*.mts"],
     ignores: ["vitest.config.mts", "vite.config.*", "eslint.config.*"],
@@ -43,7 +43,7 @@ export default [
     rules: {
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/explicit-function-return-type": "off",
-      // ...weitere TypeScript-Regeln nach Bedarf...
+      // ...additional TypeScript rules as needed...
     },
   },
 ];

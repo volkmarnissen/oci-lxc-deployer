@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('serves index.html at /', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('body')).toBeVisible();
-  // Optional: prüfe Titel oder sichtbare UI-Struktur
+  // Optional: check title or visible UI structure
   // await expect(page).toHaveTitle(/LXC|Manager/i);
 });
 

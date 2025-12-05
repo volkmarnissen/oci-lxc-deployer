@@ -1,0 +1,106 @@
+# shellcheck shell=sh 
+# shellcheck disable=SC2034
+# shellcheck disable=SC2154
+# Contributor: Modbus2mqtt <info@carcam360.de>
+# Maintainer: Modbus2mqtt <info@carcam360.de>
+pkgname=modbus2mqtt
+# Version comes from package.json or the PKG_VERSION environment variable
+pkgver=0.16.57
+pkgrel=0
+pkgdesc="Modbus to MQTT bridge"
+url="https://github.com/modbus2mqtt/server"
+arch="$CARCH"
+license="MIT"
+depends="nodejs npm s6-overlay git openssh-server"
+makedepends="npm alpine-sdk shadow rsync py3-psutil make build-base linux-headers udev"
+# Install scripts are generated from generic templates in prepare()
+install="$pkgname.pre-install $pkgname.post-install"
+# No subpackages - integrate OpenRC scripts into main package
+
+# Disable the abuild check phase: tests are executed in the GitHub workflow
+# (before creating the npm artifacts and after installing the produced APK),
+# so running the check() step inside the APK build would be redundant and
+# may run at the wrong moment. Use the options variable to skip it.
+options="!check"
+# Note: The service/install files are generated from generic templates
+# (files/*.in) in prepare(). The previous specific files remain for now
+# until checksums are updated.
+source="
+    $pkgname.initd
+    $pkgname.confd
+    "
+builddir="$srcdir/$pkgname-$pkgver"
+npmpackage="${pkgname}"
+prepare() {
+    # Generate package-specific files from generic templates
+    mkdir -p "$srcdir/files"
+    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/service.initd.in" > "$srcdir/files/service.initd"
+    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/service.confd.in" > "$srcdir/files/service.confd"
+    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/pre-install.in" > "$srcdir/files/pre-install"
+    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/post-install.in" > "$srcdir/files/post-install"
+    cp "$srcdir/files/pre-install" "$srcdir/$pkgname.pre-install"
+    cp "$srcdir/files/post-install" "$srcdir/$pkgname.post-install"
+    chmod +x "$srcdir/$pkgname.pre-install" "$srcdir/$pkgname.post-install" "$srcdir/files/service.initd"
+}
+build() {
+    # Build modbus2mqtt within the abuild build environment so native
+    # modules are compiled for the target architecture.
+    mkdir -p "$builddir"
+    cd "$builddir" || exit 1
+    # Copy package.json from the repository so npm can install the
+    # published package into the builddir. abuild typically cleans
+    # $srcdir before running build(), so prefer the checkout at the
+    # parent of the packaging dir (startdir/../package.json) when
+    # available. Fall back to $srcdir/package.json and finally to a
+    # minimal package.json.
+    npm init -y >/dev/null 2>&1 || true
+    
+    # Install main package with suppressed output (show only on error)
+    npmpackagev="${npmpackage}@${pkgver}"
+
+    echo "Installing ${npmpackage}..."
+    npm_log=$(mktemp)
+    if ! npm install --force --no-audit --no-fund --omit=dev "${npmpackagev}" >"$npm_log" 2>&1; then
+        echo "ERROR: npm install failed" >&2
+        cat "$npm_log" >&2
+        rm -f "$npm_log"
+        exit 1
+    fi
+    rm -f "$npm_log"
+    
+    # Module-specific Node rebuild moved to generic helper script
+    . "$startdir/../common/node-build.sh"
+    node_rebuild_native "$builddir"
+}
+
+package() {
+    # Install application files
+    install -d "$pkgdir"/usr/lib/$pkgname
+    # Copy the node_modules package from the builddir (ensures target-arch binaries)
+    mkdir -p "$pkgdir"/usr/lib
+    rsync -au "$builddir"/node_modules "$pkgdir"/usr/lib
+   
+    # Create symlink to the executable (assumes bin/$pkgname exists)
+    install -d "$pkgdir"/usr/bin
+    ln -s /usr/lib/node_modules/$npmpackage/bin/$pkgname "$pkgdir"/usr/bin/$pkgname
+    
+    # Create config directory
+    install -d "$pkgdir"/etc/$pkgname
+    # create homeassistant addon directories (permissions set in post-install)
+    install -d -m 755 "$pkgdir"/config
+    install -d -m 755 "$pkgdir"/data
+    install -d -m 755 "$pkgdir"/ssl
+    
+    # Install OpenRC init script and config directly into main package
+    # Note: This will trigger a warning "Found OpenRC directory but name doesn't end with -openrc"
+    # We intentionally accept this warning because we want to provide a single APK package
+    # that includes both the application and OpenRC support, rather than forcing users
+    # to install separate modbus2mqtt and modbus2mqtt-openrc packages.
+    # Install files generated from templates (see prepare())
+    install -m755 -D "$srcdir"/files/service.initd "$pkgdir"/etc/init.d/$pkgname
+    install -m644 -D "$srcdir"/files/service.confd "$pkgdir"/etc/conf.d/$pkgname
+}
+sha512sums="
+d03c77fda1d53d8f7fa43eac4366d34c5dad06e0feb81b3e99c3a0e6c84b7043b1987fc6f7b0273816134eccd9b8d4040cb3be23e5eb5aee898a686f9355adc6  modbus2mqtt.initd
+14e6c4eaf90a9f75504bcf7da6253240a58dae0098a3acc26a391e28a0a8be6200adf13a108f8260eaec88a1bcd0de4c8afa492c86f7d030ecb6db845bc7aa41  modbus2mqtt.confd
+"
