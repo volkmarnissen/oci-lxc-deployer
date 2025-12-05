@@ -1,10 +1,13 @@
 {
   "name": "lxc-manager",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Packaged web UI and backend for LXC Manager",
   "type": "module",
   "draft": true,
-  "author": {"email": "volkmar.nissen@gmail.com" , "name": "Volkmar Nissen"},
+  "author": {
+    "email": "volkmar.nissen@gmail.com",
+    "name": "Volkmar Nissen"
+  },
   "scripts": {
     "build": "npm run build:backend --silent && npm run build:frontend --silent",
     "build:backend": "cd backend && npm run build",
