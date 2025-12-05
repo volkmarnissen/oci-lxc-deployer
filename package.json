@@ -1,6 +1,6 @@
 {
   "name": "lxc-manager",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Packaged web UI and backend for LXC Manager",
   "private": false,
   "type": "module",
