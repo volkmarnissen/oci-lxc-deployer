@@ -149,6 +149,11 @@ mkdir -p "$OUT_DIR"
 mkdir -p "$OUT_DIR/files"
 cp "$TPL_DIR/files"/*.in "$OUT_DIR/files/"
 
+# Render service files ahead of time (avoid sed in APKBUILD)
+sed "s/@PKGNAME@/$PKGNAME/g" "$TPL_DIR/files/service.initd.in" > "$OUT_DIR/files/service.initd"
+sed "s/@PKGNAME@/$PKGNAME/g" "$TPL_DIR/files/service.confd.in" > "$OUT_DIR/files/service.confd"
+chmod +x "$OUT_DIR/files/service.initd"
+
 # Render APKBUILD from template
 sed \
   -e "s/@PKGNAME@/$PKGNAME/g" \

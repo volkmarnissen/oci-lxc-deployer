@@ -22,10 +22,7 @@ POST_INSTALL_EXTRA='@POST_INSTALL_EXTRA@'
 POST_NPM_SCRIPT='@POST_NPM_SCRIPT@'
 
 prepare() {
-    mkdir -p "$srcdir/files"
-    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/service.initd.in" > "$srcdir/files/service.initd"
-    sed "s/@PKGNAME@/$pkgname/g" "$startdir/files/service.confd.in" > "$srcdir/files/service.confd"
-    chmod +x "$srcdir/files/service.initd"
+    # No-op: all files are pre-rendered by generate-ap.sh
 }
 
 build() {
@@ -68,7 +65,7 @@ package() {
     install -d -m 755 "$pkgdir"/config
     install -d -m 755 "$pkgdir"/data
     install -d -m 755 "$pkgdir"/ssl
-    install -m755 -D "$srcdir"/files/service.initd "$pkgdir"/etc/init.d/$pkgname
-    install -m644 -D "$srcdir"/files/service.confd "$pkgdir"/etc/conf.d/$pkgname
+    install -m755 -D "$startdir"/files/service.initd "$pkgdir"/etc/init.d/$pkgname
+    install -m644 -D "$startdir"/files/service.confd "$pkgdir"/etc/conf.d/$pkgname
 }
 sha512sums=""
