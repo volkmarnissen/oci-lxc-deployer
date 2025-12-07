@@ -23,6 +23,7 @@ POST_NPM_SCRIPT='@POST_NPM_SCRIPT@'
 
 prepare() {
     # No-op: all files are pre-rendered by generate-ap.sh
+    :
 }
 
 build() {
