@@ -34,7 +34,62 @@ fi
 
 ipv6_ok=true
 
+is_valid_ipv4_cidr() {
+  case "$1" in
+    [0-9]*.[0-9]*.[0-9]*.[0-9]*/[0-9]*)
+      ip_part=${1%/*}
+      prefix=${1#*/}
+      # Check prefix range 0-32
+      if [ "$prefix" -ge 0 ] 2>/dev/null && [ "$prefix" -le 32 ] 2>/dev/null; then
+        # Check each octet 0-255
+        IFS='.' read o1 o2 o3 o4 <<EOF
+$ip_part
+EOF
+        for o in "$o1" "$o2" "$o3" "$o4"; do
+          case "$o" in
+            ''|*[!0-9]) return 1 ;;
+          esac
+          if [ "$o" -lt 0 ] || [ "$o" -gt 255 ]; then return 1; fi
+        done
+        return 0
+      fi
+      return 1 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_valid_ipv6_cidr() {
+  case "$1" in
+    */*)
+      ip_part=${1%/*}
+      prefix=${1#*/}
+      # prefix 0-128
+      if ! [ "$prefix" -ge 0 ] 2>/dev/null || ! [ "$prefix" -le 128 ] 2>/dev/null; then
+        return 1
+      fi
+      # Rough IPv6 check: hex groups separated by ':' (allow :: abbreviation)
+      case "$ip_part" in
+        *::*) ;; # allow compressed
+        *)
+          IFS=':' read -r g1 g2 g3 g4 g5 g6 g7 g8 <<EOF
+$ip_part
+EOF
+          ;;
+      esac
+      # Basic pattern: only hex digits and colons
+      case "$ip_part" in
+        *[!0-9a-fA-F:]* ) return 1 ;;
+      esac
+      return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ -n "$static_ip" ]; then
+  if ! is_valid_ipv4_cidr "$static_ip"; then
+    echo "Invalid IPv4 CIDR: '$static_ip'. Expected format a.b.c.d/prefix (e.g. 192.168.1.10/24)." >&2
+    exit 2
+  fi
   ipv4_ok=true
 else
   # If gateway is provided without IP, that's invalid
@@ -46,6 +101,10 @@ else
 fi
 
 if [ -n "$static_ip6" ]; then
+  if ! is_valid_ipv6_cidr "$static_ip6"; then
+    echo "Invalid IPv6 CIDR: '$static_ip6'. Expected format ip/prefix (e.g. fd00::10/64)." >&2
+    exit 2
+  fi
   ipv6_ok=true
 else
   # If gateway is provided without IP, that's invalid
