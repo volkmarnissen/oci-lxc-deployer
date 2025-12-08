@@ -1,12 +1,12 @@
 //
 
-import { ApiUri, ISsh } from '../shared/types.mjs';
+import { ApiUri, ISsh } from '../shared/types';
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { IApplicationWeb, IParameter } from '../shared/types.mjs';
+import { IApplicationWeb, IParameter } from '../shared/types';
 
 
 

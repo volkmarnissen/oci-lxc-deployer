@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { IApplicationWeb, IParameter } from '../../shared/types.mjs';
+import { IApplicationWeb, IParameter } from '../../shared/types';
 import { ProxmoxConfigurationService } from '../ve-configuration.service';
 
 @Component({

@@ -1,7 +1,7 @@
 import { NgZone, OnDestroy, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatExpansionModule } from '@angular/material/expansion';
-import { IProxmoxExecuteMessage } from '../../shared/types.mjs';
+import { IProxmoxExecuteMessage } from '../../shared/types';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 
 @Component({

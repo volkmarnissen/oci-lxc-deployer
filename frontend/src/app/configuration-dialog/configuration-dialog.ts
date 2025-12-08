@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, inject } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProxmoxConfigurationService } from '../ve-configuration.service';
-import { ISsh } from '../../shared/types.mjs';
+import { ISsh } from '../../shared/types';
 
 @Component({
   selector: 'app-configuration-dialog',

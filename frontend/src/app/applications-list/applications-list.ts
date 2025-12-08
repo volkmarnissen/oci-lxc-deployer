@@ -4,7 +4,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { VeConfigurationDialog } from '../ve-configuration-dialog/ve-configuration-dialog';
 import { CommonModule } from '@angular/common';
 import { ProxmoxConfigurationService } from '../ve-configuration.service';
-import { IApplicationWeb } from '../../shared/types.mjs';
+import { IApplicationWeb } from '../../shared/types';
 
 interface IApplicationWebIntern extends IApplicationWeb{
   showErrors?: boolean;
