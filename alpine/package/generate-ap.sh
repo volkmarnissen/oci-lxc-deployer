@@ -179,7 +179,7 @@ sed \
 
   # Render pre-install with @PKGNAME@
   sed "s/@PKGNAME@/$PKGNAME/g" "$TPL_DIR/files/pre-install.in" > "$OUT_DIR/$PKGNAME.pre-install"
-
+  cp $TPL_DIR/files/post-upgrade.in "$OUT_DIR/files/service.initd" "$OUT_DIR/$PKGNAME.post-upgrade"
   # Render post-install with @PKGNAME@ and inject optional POST_INSTALL_EXTRA as multiline
   {
     while IFS= read -r line; do
