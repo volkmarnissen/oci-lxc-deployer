@@ -105,4 +105,7 @@ su - builder -s /bin/sh -c '
 mkdir -p /work/repo/lxc-manager || true
 cp /home/builder/.abuild/${PACKAGER_KEY}.pub "/work/repo/packager.rsa.pub" || true
 
+# Ensure repo artifacts are world-readable for CI artifact collection
+chmod -R a+rX /work/repo || true
+
 echo "Build finished for $PKG_NAME"
