@@ -32,4 +32,20 @@ if id @PKGNAME@ >/dev/null 2>&1; then
   chown -R @PKGNAME@:dialout /var/lib/@PKGNAME@ 2>/dev/null || true
 fi
 
+# Generate per-user SSH key for @PKGNAME@ if missing (requires ssh-keygen)
+if id @PKGNAME@ >/dev/null 2>&1; then
+  if command -v ssh-keygen >/dev/null 2>&1; then
+    user="@PKGNAME@"
+    home="$(getent passwd "$user" | cut -d: -f6 2>/dev/null)"
+    [ -n "$home" ] || home="/var/lib/$user"
+    install -d -m 700 -o "$user" -g "$user" "$home/.ssh"
+    if [ ! -s "$home/.ssh/id_ed25519" ]; then
+      # Create an ed25519 key without passphrase, comment indicates host
+      su -s /bin/sh -c "ssh-keygen -q -t ed25519 -N '' -C '${user}@$(hostname)' -f '$home/.ssh/id_ed25519'" "$user" 2>/dev/null || true
+      chmod 600 "$home/.ssh/id_ed25519" 2>/dev/null || true
+      chmod 644 "$home/.ssh/id_ed25519.pub" 2>/dev/null || true
+    fi
+  fi
+fi
+
 exit 0

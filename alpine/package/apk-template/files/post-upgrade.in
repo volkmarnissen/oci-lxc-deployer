@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Ensure runtime directory ownership and SSH dir/perms; do not create keys here
+if id @PKGNAME@ >/dev/null 2>&1; then
+  chown -R @PKGNAME@:dialout /var/lib/@PKGNAME@ 2>/dev/null || true
+  user="@PKGNAME@"
+  home="$(getent passwd "$user" | cut -d: -f6 2>/dev/null)"
+  [ -n "$home" ] || home="/var/lib/$user"
+  # ensure ~/.ssh exists and has correct ownership/perms
+  install -d -m 700 -o "$user" -g "$user" "$home/.ssh"
+  # Fix permissions if keys already exist; do not overwrite or generate
+  if [ -f "$home/.ssh/id_ed25519" ]; then chmod 600 "$home/.ssh/id_ed25519" 2>/dev/null || true; fi
+  if [ -f "$home/.ssh/id_ed25519.pub" ]; then chmod 644 "$home/.ssh/id_ed25519.pub" 2>/dev/null || true; fi
+fi
+
+exit 0
