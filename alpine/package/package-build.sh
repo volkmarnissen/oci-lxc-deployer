@@ -62,6 +62,16 @@ KEYDIR=/etc/apk/keys
 REPODEST=/work/repo
 repo=lxc-manager
 EOF
+# Ensure root (index/sign) uses the same config and keyring
+cat >/etc/abuild.conf <<EOF
+PACKAGER_PRIVKEY=/home/builder/.abuild/${PACKAGER_KEY}
+KEYDIR=/etc/apk/keys
+REPODEST=/work/repo
+repo=lxc-manager
+EOF
+# Make keyring visible to all apk/abuild invocations (builder and root phases)
+export ABUILD_KEYDIR=/etc/apk/keys
+export APK_KEYS=/etc/apk/keys
 chown -R builder:dialout /home/builder
 
 # Run abuild
@@ -71,8 +81,8 @@ su - builder -s /bin/sh -c '
   export ALLOW_UNTRUSTED=1
   export REPODEST=/work/repo
   export repo=lxc-manager
-  # Ensure abuild keys exist and pubkey installed (non-interactive)
-  PACKAGER="${PACKAGER:-builder}" abuild-keygen -a -i -n || true
+  # Ensure abuild uses the correct keyring for verification
+  export ABUILD_KEYDIR=/etc/apk/keys
    # Configure npm cache if provided
    if [ -n "${NPM_CONFIG_CACHE:-}" ]; then
      mkdir -p "${NPM_CONFIG_CACHE}"
@@ -81,18 +91,15 @@ su - builder -s /bin/sh -c '
    fi
   echo "Running checksum for '"$PKG_NAME"'..."
   abuild checksum || true
-  echo "Running abuild -r for '"$PKG_NAME"' (full build + package)..."
-  abuild -r -P "/work/repo"
+  echo "Running abuild -P for '"$PKG_NAME"' (build + package to REPODEST)..."
+  abuild -P "/work/repo" build
   echo "APK created successfully."
 '
-# Collect built artifacts into /work/repo and copy signing key
-  echo "Collecting APKs and indexes preserving channel/arch structure..." >&2
-  mkdir -p "/work/repo"
-  rm -rf "/work/repo/$PKG_NAME"/*
-  dirname=$(ls -d /work/repo/work/*)
-  mv $dirname "/work/repo/$PKG_NAME"/
-  echo "$dirname"
-  rmdir "/work/repo/work" || true
+# Collect built artifacts: with -P, abuild already placed them under REPODEST/repo
+  echo "Collecting APKs and indexes (no move needed with -P)..." >&2
+  mkdir -p "/work/repo/$PKG_NAME" || true
+  # Nothing to move; ensure directory exists and list result for logs
+  find "/work/repo/$PKG_NAME" -maxdepth 2 -type f -name "*.apk" -o -name "APKINDEX*.tar*" | sed 's/^/  -> /' || true
 
 # Copy public key to repo channel for convenience
 mkdir -p /work/repo/lxc-manager || true
