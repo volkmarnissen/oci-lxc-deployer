@@ -1,5 +1,5 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "name": "Update /etc/hosts entries",
   "description": "Optional template to update /etc/hosts with hostname and static IP addresses from previous steps.",
   "parameters": [

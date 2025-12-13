@@ -1,5 +1,5 @@
 {
-	"execute_on": "proxmox",
+	"execute_on": "ve",
 	"name": "Set IP Prefixes for LXC",
 	"description": "Set local static IPv4/IPv6 properties for all local applications and enable static IP mode.",
 	"parameters": [],

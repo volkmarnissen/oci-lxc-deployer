@@ -2,7 +2,20 @@
   "execute_on": "lxc", 
   "name": "Install APK Package(s)",
   "description": "Install APK packages inside the LXC container",
-  "context": "lxc",
-  "script": "install-apk-package.sh",
-  "inputs":[{ "id": "packages", "type": "string", "required": true }]
+  "parameters": [
+    {
+      "id": "packages",
+      "name": "APK packages",
+      "type": "string",
+      "required": true,
+      "description": "Space-separated list of APK packages to install"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Install Packages",
+      "script": "install-apk-package.sh",
+      "description": "Run apk add for provided packages in the container"
+    }
+  ]
 }

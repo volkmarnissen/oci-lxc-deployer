@@ -1,5 +1,5 @@
 {
-	"execute_on": "proxmox",
+	"execute_on": "ve",
 	"name": "Set Properties for backup",
 	"description": "Sets hostname and defaults.",
 	"parameters": [],

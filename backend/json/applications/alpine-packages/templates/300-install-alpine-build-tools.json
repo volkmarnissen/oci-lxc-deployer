@@ -1,0 +1,16 @@
+{
+  "execute_on": "lxc",
+  "name": "Install Alpine build tools",
+  "description": "Install alpine-sdk (build toolchain) and git for building APK packages",
+  "commands": [
+    {
+      "name": "Update indexes",
+      "command": "apk update 1>&2"
+    },
+    {
+      "name": "Install toolchain",
+      "command": "apk add --no-cache alpine-sdk git 1>&2",
+      "description": "alpine-sdk includes abuild, build-base, and related tools"
+    }
+  ]
+}

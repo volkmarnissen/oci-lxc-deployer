@@ -1,5 +1,5 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
 
   "name": "Map Serial Device",
   "description": "Map serial device to VM",

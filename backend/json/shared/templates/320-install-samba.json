@@ -1,6 +1,6 @@
 {
   "name": "320-install-samba",
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "description": "Install and configure Samba for a given mountpoint and user, with Time Machine support. Calls install-samba.sh with template variables.",
   "commands": [
     {

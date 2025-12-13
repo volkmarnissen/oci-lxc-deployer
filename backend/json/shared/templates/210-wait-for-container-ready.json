@@ -1,12 +1,16 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "name": "Wait for LXC Container Ready",
   "description": "Wait until LXC container is ready (network + apk available)",
-  "script": "wait-for-container-ready.sh",
-  "inputs": {
-    "vm_id": { "type": "string", "required": true }
-  },
-  "outputs": [
-    { "id": "ready", "type": "string" }
+  "parameters": [
+    { "id": "vm_id", "name": "VM ID", "type": "string", "required": true }
+  ],
+  "outputs": ["ready"],
+  "commands": [
+    {
+      "name": "Wait for Container",
+      "script": "wait-for-container-ready.sh",
+      "description": "Poll host until the LXC container reports readiness (network up, apk reachable)"
+    }
   ]
 }

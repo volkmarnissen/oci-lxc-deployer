@@ -5,7 +5,11 @@
   "type": "object",
   "properties": {
     "execute_on": {
-      "enum": ["proxmox", "lxc"]
+      "anyOf": [
+        { "const": "ve" },
+        { "const": "lxc" },
+        { "type": "string", "pattern": "^host:.*$" }
+      ]
     },
     "if": {
       "type": "boolean"

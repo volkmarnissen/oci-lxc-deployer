@@ -1,5 +1,5 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "name": "Latest OS Template",
   "description": "Download latest operating system template for Proxmox",
   "parameters": [

@@ -1,6 +1,6 @@
 {
     "$schema": "file:/Users/volkmar/proxmox2/schemas/template.schema.json",
-    "execute_on": "proxmox",
+    "execute_on": "ve",
     "name": "Write VM IDs JSON",
     "description": "Writes all LXC and QEMU VM IDs as a JSON array to stdout",
     "outputs": [

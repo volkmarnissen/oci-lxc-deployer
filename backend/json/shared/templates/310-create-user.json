@@ -1,5 +1,5 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "name": "310-create-user",
   "description": "Create a user inside the LXC container with specified username, uid, gid, and optional mountpoint write check. Calls create-user.sh with template variables.",
   "commands": [

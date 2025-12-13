@@ -1,5 +1,5 @@
 {
-  "execute_on": "proxmox",
+  "execute_on": "ve",
   "name": "Create LXC Container",
   "description": "Create LXC container on Proxmox host",
   "parameters": [
