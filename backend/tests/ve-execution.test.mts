@@ -417,8 +417,8 @@ describe("ProxmoxExecution", () => {
     expect(Array.isArray(rc!.outputs)).toBe(true);
     expect(rc!.outputs.length).toBeGreaterThan(0);
     const first = rc!.outputs[0];
-    expect(first.name).toBe("foo");
-    expect(first.value).toBe("bar");
+    expect(first!.name).toBe("foo");
+    expect(first!.value).toBe("bar");
   });
 
   // it("should emit error message if SSH connection fails", async () => {

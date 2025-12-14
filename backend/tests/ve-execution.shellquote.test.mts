@@ -58,8 +58,6 @@ describe("ProxmoxExecution shell quoting", () => {
         command.command!,
         command,
         10000,
-        undefined,
-        "/bin/sh",
       );
       return {
         lastSuccessfull: msg.exitCode === 0 ? 0 : -1,
