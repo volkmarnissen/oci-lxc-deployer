@@ -78,6 +78,7 @@ export class ApplicationLoader {
         appFile,
         "application",
       );
+      appData.id = appName;
       // Check for icon.png in the application directory
       let icon = appData?.icon ? appData.icon : "icon.png";
       if (appPath) {

@@ -32,8 +32,7 @@ export class WebAppVE {
       const { application, task } = req.params;
       const restartKeyParam =
         (req.query.restartKey as string | undefined) || undefined;
-      const veContextKey =
-        (req.query.veContext as string | undefined) || undefined;
+      const veContextKey = req.params.veContext as string;
       const params = req.body; // Array of { name, value }
       if (!Array.isArray(params)) {
         return res
@@ -49,11 +48,6 @@ export class WebAppVE {
 
         // 2. Load application (provides commands)
         const storageContext = StorageContext.getInstance();
-        if (!veContextKey) {
-          return res
-            .status(400)
-            .json({ success: false, error: "Missing veContext" });
-        }
         const ctx: IVEContext | null =
           storageContext.getVEContextByKey(veContextKey);
         if (!ctx) {

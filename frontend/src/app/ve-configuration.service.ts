@@ -19,6 +19,17 @@ export class VeConfigurationService {
   private http = inject(HttpClient);
   private router = inject(Router);
   private veContextKey?: string;
+  // Explicit initializer: call early (e.g., AppComponent.ngOnInit or APP_INITIALIZER)
+  initVeContext(): void {
+    this.getSshConfigs().subscribe({
+      next: () => {
+        // veContextKey is set via tap in getSshConfigs
+      },
+      error: (err) => {
+        console.warn('Failed to initialize VE context', err);
+      }
+    });
+  }
 
   private static _router: Router;
   static setRouter(router: Router) {

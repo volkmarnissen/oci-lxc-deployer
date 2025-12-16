@@ -262,14 +262,9 @@ export class VEWebApp {
     // GET /api/unresolved-parameters/:application/:task?veContext=<key>
     this.app.get(ApiUri.UnresolvedParameters, async (req, res) => {
       try {
-        const { application, task } = req.params;
-        const veContextKey =
-          (req.query.veContext as string | undefined) || undefined;
-        if (!veContextKey) {
-          return res
-            .status(400)
-            .json({ success: false, error: "Missing veContext" });
-        }
+        const application:string = req.params.application;
+        const task:string = req.params.task;
+        const veContextKey:string = req.params.veContext;
         const storageContext = StorageContext.getInstance();
         const ctx: IVEContext | null =
           storageContext.getVEContextByKey(veContextKey);

@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet, RouterLink } from '@angular/router';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { VeConfigurationService } from './ve-configuration.service';
 
 @Component({
   selector: 'app-root',
@@ -8,6 +9,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class App {
-  // Root app component renders header and router outlet
+export class App implements OnInit {
+  private cfg = inject(VeConfigurationService);
+  ngOnInit(): void {
+    this.cfg.initVeContext();
+  }
 }
