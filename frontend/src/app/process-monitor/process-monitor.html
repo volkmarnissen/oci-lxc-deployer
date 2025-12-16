@@ -1,37 +1,52 @@
-
 <h2>Process Monitor</h2>
 
-<button (click)="triggerRestart()" [disabled]="!restartKey">Restart ausführen</button>
-@if (!restartKey) { <small>(kein Restart-Key vorhanden)</small> }
+<button (click)="triggerRestart()" [disabled]="!restartKey">Run restart</button>
+@if (!restartKey) { <small>(no restart key available)</small> }
 
+<!-- Outer accordion: groups by application/task -->
 <mat-accordion>
-  @for (msg of messages; track msg.index) {
+  @for (group of messages; track group) {
     <mat-expansion-panel>
-    <mat-expansion-panel-header>
-      <mat-panel-title>
-        @if (msg.exitCode === 0) {
-          <span style="color:green; font-size:1.5em;">&#10003;</span>
-        } @else {
-          <span style="color:red; font-size:1.5em;">&#10007;</span>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          {{ group.application }} / {{ group.task }}
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <!-- Inner accordion: existing message-level panels remain unchanged -->
+      <mat-accordion>
+        @for (msg of group.messages; track msg.index) {
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                @if (msg.exitCode === 0) {
+                  <span style="color:green; font-size:1.5em;">&#10003;</span>
+                } @else {
+                  <span style="color:red; font-size:1.5em;">&#10007;</span>
+                }
+                &nbsp;{{ msg.command }}
+              </mat-panel-title>
+              <mat-panel-description>
+                @if (msg.stderr) {<span>stderr</span>}
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            @if (msg.stderr) {
+              <div>
+                <strong>stderr:</strong>
+                <pre>{{ msg.stderr }}</pre>
+              </div>
+            } @else {
+              <div>
+                <em>No stderr output.</em>
+              </div>
+            }
+          </mat-expansion-panel>
+        } @empty {
+          <div>No process messages available.</div>
         }
-        &nbsp;{{ msg.command }}
-      </mat-panel-title>
-      <mat-panel-description>
-        @if (msg.stderr) {<span>stderr</span>}
-      </mat-panel-description>
-    </mat-expansion-panel-header>
-    @if (msg.stderr) {
-      <div>
-        <strong>stderr:</strong>
-        <pre>{{ msg.stderr }}</pre>
-      </div>
-    } @else {
-      <div>
-        <em>No stderr output.</em>
-      </div>
-    }
-  </mat-expansion-panel>
-  }@empty {
+      </mat-accordion>
+    </mat-expansion-panel>
+  } @empty {
     <div>No process messages available.</div>
   }
 </mat-accordion>

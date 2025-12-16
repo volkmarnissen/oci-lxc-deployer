@@ -2,24 +2,25 @@ import { NgZone, OnDestroy, Component, OnInit, inject, Input, Output, EventEmitt
 import { ActivatedRoute } from '@angular/router';
 
 import { MatExpansionModule } from '@angular/material/expansion';
-import { IProxmoxExecuteMessage, ApiUri } from '../../shared/types';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { IVeExecuteMessagesResponse } from '../../shared/types';
+import { VeConfigurationService } from '../ve-configuration.service';
 
 @Component({
   selector: 'app-process-monitor',
   standalone: true,
-  imports: [MatExpansionModule, HttpClientModule],
+  imports: [MatExpansionModule],
   templateUrl: './process-monitor.html',
   styleUrl: './process-monitor.scss',
 })
 export class ProcessMonitor implements OnInit, OnDestroy {
-  messages: IProxmoxExecuteMessage[] = [];
+  messages: IVeExecuteMessagesResponse| undefined;
   private destroyed = false;
   private pollInterval?: number;
+  private veConfigurationService = inject(VeConfigurationService);
+   
   @Input() restartKey?: string;
   @Output() restartRequested = new EventEmitter<string>();
 
-  private http = inject(HttpClient);
   private zone = inject(NgZone);
   private route = inject(ActivatedRoute);
 
@@ -39,7 +40,7 @@ export class ProcessMonitor implements OnInit, OnDestroy {
 
   startPolling() {
     this.pollInterval = setInterval(() => {
-      this.http.get<IProxmoxExecuteMessage[]>(ApiUri.VeExecute).subscribe({
+      this.veConfigurationService.getExecuteMessages().subscribe({
         next: (msgs) => {
            if (msgs && msgs.length > 0) {
            console.log('Polled messages:', msgs);

@@ -40,24 +40,23 @@ export interface ICommand {
   script?: string;
   template?: string;
   description?: string;
-  execute_on?: string;
+  execute_on?: "ve" | "lxc";
 }
 
-export interface IVeExecuteMessage {
+export interface IProxmoxExecuteMessage {
   command: string;
   commandtext?: string;
   //commandtext: string;
   stderr: string;
   result: string | null;
   exitCode: number;
-  execute_on?: string;
-  error?: IJsonError|undefined;
+  execute_on?: "ve" | "lxc";
+  error?: IJsonError;
   index?: number;
 }
 
 export type ParameterType = "string" | "number" | "boolean" | "enum";
 export type IParameterValue = string | number | boolean
-
 export interface IParameter {
   id: string;
   name: string;
@@ -92,9 +91,9 @@ export enum ApiUri {
   SshConfigGET = "/api/ssh/config/:host",
   SshCheck = "/api/ssh/check",
   VeConfiguration = "/api/ve-configuration/:application/:task/:veContext",
-  VeExecute = "/api/ve/execute/:veContext",
+  VeExecute = "/api/ve/execute",
   Applications = "/api/applications",
-  UnresolvedParameters = "/api/unresolved-parameters/:application/:task/:veContext",
+  UnresolvedParameters = "/api/unresolved-parameters/:application/:task",
 }
 
 // Response interfaces for all backend endpoints (frontend mirror)
@@ -103,43 +102,35 @@ export interface IUnresolvedParametersResponse {
 }
 export interface ISshConfigsResponse {
   sshs: ISsh[];
-  key?: string| undefined;
+  key?: string;
 }
 export interface ISshConfigKeyResponse {
   key: string;
 }
 export interface ISshCheckResponse {
   permissionOk: boolean;
-  stderr?: string| undefined;
+  stderr?: string;
 }
 export interface ISetSshConfigResponse {
   success: boolean;
-  key?: string| undefined;
+  key?: string;
 }
 export interface IDeleteSshConfigResponse {
   success: boolean;
   deleted?: boolean;
-  key?: string| undefined;
+  key?: string;
 }
 export interface IPostVeConfigurationBody {
   params: { name: string; value: IParameterValue }[];
   restartKey?: string;
 }
-export interface IPostSshConfigResponse {
-  success: boolean;
-  key?: string;
-}
+
 export interface IPostVeConfigurationResponse {
   success: boolean;
   restartKey?: string;
 }
 export type IApplicationsResponse = IApplicationWeb[];
-export interface ISingleExecuteMessagesResponse {
-  application: string;
-  task: string;
-  messages: IVeExecuteMessage[];
-}
-export type IVeExecuteMessagesResponse = ISingleExecuteMessagesResponse[];
+export type IVeExecuteMessagesResponse = IProxmoxExecuteMessage[];
 export interface IVeConfigurationResponse {
   success: boolean;
   restartKey?: string;

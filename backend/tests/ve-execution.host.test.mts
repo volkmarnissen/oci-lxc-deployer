@@ -246,6 +246,7 @@ describe("VeExecution host: flow", () => {
       protected runOnVeHost(
         _input: string,
         tmplCommand: ICommand,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         _timeoutMs = 10000,
         remoteCommand?: string[],
       ) {

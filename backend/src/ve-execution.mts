@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { ICommand, IProxmoxExecuteMessage } from "@src/types.mjs";
+import { ICommand, IVeExecuteMessage } from "@src/types.mjs";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { JsonError, JsonValidator } from "./jsonvalidator.mjs";
@@ -58,7 +58,7 @@ export class VeExecution extends EventEmitter {
     tmplCommand: ICommand,
     timeoutMs = 10000,
     remoteCommand?: string[]
-  ): IProxmoxExecuteMessage {
+  ): IVeExecuteMessage {
     const sshCommand = this.sshCommand;
     let sshArgs: string[] = [];
     if (sshCommand === "ssh") {
@@ -88,7 +88,7 @@ export class VeExecution extends EventEmitter {
     // Only 'status' is available on SpawnSyncReturns<string> in Node.js typings
     const exitCode = typeof proc.status === "number" ? proc.status : -1;
     // Try to parse stdout as JSON and update outputs
-    const msg: IProxmoxExecuteMessage = {
+    const msg: IVeExecuteMessage = {
       stderr: structuredClone(stderr),
       commandtext: structuredClone(input),
       result: structuredClone(stdout),
@@ -184,7 +184,7 @@ export class VeExecution extends EventEmitter {
     command: string,
     tmplCommand: ICommand,
     timeoutMs = 10000,
-  ): IProxmoxExecuteMessage {
+  ): IVeExecuteMessage {
     // Pass command and arguments as array
     let lxcCmd: string[] | undefined = ["lxc-attach", "-n", String(vm_id)];
     // For testing: just pass through when using another sshCommand, like /bin/sh
@@ -273,7 +273,7 @@ export class VeExecution extends EventEmitter {
         } else {
           continue; // Skip unknown command type
         }
-        let lastMsg: IProxmoxExecuteMessage | undefined;
+        let lastMsg: IVeExecuteMessage | undefined;
         switch (cmd.execute_on) {
           case "lxc":
             // For lxc path, perform default variable replacement
@@ -300,7 +300,7 @@ export class VeExecution extends EventEmitter {
                 command: cmd.name,
                 execute_on: cmd.execute_on,
                 index: msgIndex++,
-              } as IProxmoxExecuteMessage);
+              } as IVeExecuteMessage);
               break outerloop;
             }
             this.runOnLxc(vm_id, execStrLxc, cmd);
@@ -326,7 +326,7 @@ export class VeExecution extends EventEmitter {
                       execute_on: cmd.execute_on,
                       host: hostname,
                       index: msgIndex++,
-                    } as unknown as IProxmoxExecuteMessage);
+                    } as unknown as IVeExecuteMessage);
                     break outerloop;
                   }
                   break;
@@ -339,7 +339,7 @@ export class VeExecution extends EventEmitter {
                     command: cmd.name,
                     execute_on: cmd.execute_on!,
                     index: msgIndex++,
-                  } as IProxmoxExecuteMessage);
+                  } as IVeExecuteMessage);
                   break outerloop;
                 }
         }
@@ -391,7 +391,7 @@ export class VeExecution extends EventEmitter {
           command: cmd.name,
           execute_on: cmd.execute_on,
           index: msgIndex++,
-        } as IProxmoxExecuteMessage);
+        } as IVeExecuteMessage);
         break outerloop;
       }
     }

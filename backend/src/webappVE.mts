@@ -4,12 +4,21 @@ import { StorageContext } from "./storagecontext.mjs";
 import express from "express";
 import fs from "fs";
 import path from "path";
-import { ApiUri, IProxmoxExecuteMessage, TaskType } from "./types.mjs";
+import {
+  ApiUri,
+  IVeExecuteMessage,
+  TaskType,
+  IVeConfigurationResponse,
+  IVeExecuteMessagesResponse,
+} from "./types.mjs";
 import { IRestartInfo, VeExecution } from "./ve-execution.mjs";
 
 export class WebAppVE {
-  messages: IProxmoxExecuteMessage[] = [];
+  messages: IVeExecuteMessagesResponse = [];
   private restartInfos: Map<string, IRestartInfo> = new Map();
+  returnResponse<T>(res: express.Response, payload: T, statusCode: number = 200) {
+    res.status(statusCode).json(payload);
+  }
 
   constructor(
     private app: express.Application,
@@ -59,8 +68,6 @@ export class WebAppVE {
             task as TaskType,
             veCtxToUse
           );
-          // const webuiTemplates = loaded.webuiTemplates;
-          //templateProcessor.loadTemplatesForApplication(application, webuiTemplates);
           const commands = loaded.commands;
           const defaults = new Map<string, string | number | boolean>();
           loaded.parameters.forEach((param) => {
@@ -77,8 +84,15 @@ export class WebAppVE {
             veCtxToUse,
             defaults,
           );
-          exec.on("message", (msg: IProxmoxExecuteMessage) => {
-            this.messages.push(msg);
+          exec.on("message", (msg: IVeExecuteMessage) => {
+            const existing = this.messages.find(
+              (g) => g.application === application && g.task === task,
+            );
+            if (existing) {
+              existing.messages.push(msg);
+            } else {
+              this.messages.push({ application, task, messages: [msg] });
+            }
           });
           exec.on("finished", (msg: IVMContext) => {
             veCtxToUse.getStorageContext().setVMContext(msg);
@@ -93,10 +107,11 @@ export class WebAppVE {
           if (result) {
             const key = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
             this.restartInfos.set(key, result);
-            res.status(200).json({ success: false, restartKey: key });
+            const payload: IVeConfigurationResponse = { success: false, restartKey: key };
+            res.status(200).json(payload);
             return;
           }
-          res.status(200).json({ success: true });
+          this.returnResponse<IVeConfigurationResponse>(res, { success: true });
         } catch (err: any) {
           res
             .status(500)
@@ -106,7 +121,9 @@ export class WebAppVE {
     );
     // GET /api/ProxmoxExecuteMessages: dequeues all messages in the queue and returns them
     this.app.get(ApiUri.VeExecute, (req, res) => {
-      res.json(this.messages);
+      this.returnResponse<IVeExecuteMessagesResponse>(res,  this.messages );
     });
+
+
   }
 }

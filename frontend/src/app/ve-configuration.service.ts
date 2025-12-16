@@ -1,21 +1,16 @@
 //
 
-import { ApiUri, ISsh } from '../shared/types';
+import { ApiUri, ISsh, IApplicationsResponse, ISshConfigsResponse, ISshConfigKeyResponse, ISshCheckResponse, IUnresolvedParametersResponse, IDeleteSshConfigResponse, IPostVeConfigurationResponse, IPostVeConfigurationBody, IPostSshConfigResponse, IVeExecuteMessagesResponse } from '../shared/types';
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
-import { IApplicationWeb, IParameter } from '../shared/types';
+import { IApplicationWeb, IParameterValue } from '../shared/types';
 
 
 
-export interface VeConfigurationParam { name: string; value: string | number | boolean }
-
-// HTTP response for SSH configs can be either a plain array
-// or an object containing the list and an optional key
-interface SshConfigsResponse { sshs: ISsh[]; key?: string };
-
+export interface VeConfigurationParam { name: string; value: IParameterValue }
 
 @Injectable({
   providedIn: 'root',
@@ -48,7 +43,6 @@ export class VeConfigurationService {
     }
     return throwError(() => err);
   }
-
   // Track VE context key returned by backend so we can append it to future calls when required
   private setVeContextKeyFrom(response: unknown) {
     if (response && typeof response === 'object') {
@@ -59,82 +53,76 @@ export class VeConfigurationService {
       }
     }
   }
+  post <T, U>(url:string, body:U):Observable<T> {
+    return this.http.post<T>(this.veContextKey? url.replace(":veContext", this.veContextKey) : url, body).pipe(
+      catchError(VeConfigurationService.handleError)
+    )
+  }
+  get<T>(url:string):Observable<T> {
+    return this.http.get<T>(this.veContextKey? url.replace(":veContext", this.veContextKey) : url).pipe(
+      catchError(VeConfigurationService.handleError)
+    )
+  }
 
   getVeContextKey(): string | undefined {
     return this.veContextKey;
   }
-
-  withVeContextKey(url: string): string {
-    if (!this.veContextKey) return url;
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}key=${encodeURIComponent(this.veContextKey)}`;
-  }
-
   getApplications(): Observable<IApplicationWeb[]> {
     VeConfigurationService.setRouter(this.router);
-      return this.http.get<IApplicationWeb[]>(ApiUri.Applications).pipe(
-      catchError(VeConfigurationService.handleError)
-    );
+    return this.get<IApplicationsResponse>(ApiUri.Applications);
   }
-  getUnresolvedParameters(application: string, task: string): Observable<{ unresolvedParameters: IParameter[] }> {
-    VeConfigurationService.setRouter(this.router);
-      const url = ApiUri.UnresolvedParameters
-        .replace(':application', encodeURIComponent(application))
-        .replace(':task', encodeURIComponent(task));
-      return this.http.get<{ unresolvedParameters: IParameter[] }>(url).pipe(
-      catchError(VeConfigurationService.handleError)
-    );
+
+  getUnresolvedParameters(application: string, task: string): Observable<IUnresolvedParametersResponse> {
+    const base = ApiUri.UnresolvedParameters
+      .replace(":application", encodeURIComponent(application))
+      .replace(":task", encodeURIComponent(task));
+    return this.get<IUnresolvedParametersResponse>(base);
   }
+
   getSshConfigs(): Observable<ISsh[]> {
-    return this.http.get<SshConfigsResponse>(ApiUri.SshConfigs).pipe(
+    return this.get<ISshConfigsResponse>(ApiUri.SshConfigs).pipe(
       tap((res) => this.setVeContextKeyFrom(res)),
-      map((res: SshConfigsResponse) => res.sshs),
-      catchError(VeConfigurationService.handleError)
+      map((res: ISshConfigsResponse) => res.sshs)
     );
   }
 
-  getSshConfigKey(host: string): Observable<{ key: string }> {
+  getSshConfigKey(host: string): Observable<ISshConfigKeyResponse> {
     const url = ApiUri.SshConfigGET.replace(':host', encodeURIComponent(host));
-    return this.http.get<{ key: string }>(url).pipe(
-      tap((res) => this.setVeContextKeyFrom(res)),
-      catchError(VeConfigurationService.handleError)
+    return this.get<ISshConfigKeyResponse>(url).pipe(
+      tap((res) => this.setVeContextKeyFrom(res))
     );
   }
 
-  checkSsh(host: string, port?: number) {
+  checkSsh(host: string, port?: number): Observable<ISshCheckResponse> {
     const params = new URLSearchParams({ host });
     if (typeof port === 'number') params.set('port', String(port));
-    return this.http.get<{ permissionOk: boolean; stderr?: string }>(`${ApiUri.SshCheck}?${params.toString()}`).pipe(
-      catchError(VeConfigurationService.handleError)
-    );
+    return this.get<ISshCheckResponse>(`${ApiUri.SshCheck}?${params.toString()}`);
   }
 
   postVeConfiguration(application: string, task: string, params: VeConfigurationParam[], restartKey?: string): Observable<{ success: boolean; restartKey?: string }> {
-    let url = ApiUri.VeConfiguration
+    const url = ApiUri.VeConfiguration
       .replace(':application', encodeURIComponent(application))
       .replace(':task', encodeURIComponent(task));
-    const qp = new URLSearchParams();
-    const veKey = this.getVeContextKey();
-    if (veKey) qp.set('veContext', veKey);
-    if (restartKey) qp.set('restartKey', restartKey);
-    if ([...qp.keys()].length > 0) url = `${url}?${qp.toString()}`;
-    return this.http.post<{ success: boolean; restartKey?: string }>(url, params).pipe(
-      catchError(VeConfigurationService.handleError)
+    return this.post<IPostVeConfigurationResponse,IPostVeConfigurationBody>(url, { params, restartKey }).pipe(
+      tap((res) => this.setVeContextKeyFrom(res))
     );
   }
 
-  setSshConfig(ssh: ISsh): Observable<{ success: boolean; key?: string }> {
-    return this.http.post<{ success: boolean; key?: string }>(ApiUri.SshConfig, ssh).pipe(
+  setSshConfig(ssh: ISsh): Observable<IPostSshConfigResponse> {
+    return this.post<IPostSshConfigResponse, ISsh>(ApiUri.SshConfig, ssh).pipe(
       tap((res) => this.setVeContextKeyFrom(res)),
       catchError(VeConfigurationService.handleError)
     );
   }
 
-  deleteSshConfig(host: string): Observable<{ success: boolean; deleted?: boolean; key?: string }> {
+  deleteSshConfig(host: string): Observable<IDeleteSshConfigResponse> {
     const params = new URLSearchParams({ host });
-      return this.http.delete<{ success: boolean; deleted?: boolean; key?: string }>(`${ApiUri.SshConfig}?${params.toString()}`).pipe(
+    return this.http.delete<IDeleteSshConfigResponse>(`${ApiUri.SshConfig}?${params.toString()}`).pipe(
       tap((res) => this.setVeContextKeyFrom(res)),
       catchError(VeConfigurationService.handleError)
     );
+  }
+  getExecuteMessages(): Observable<IVeExecuteMessagesResponse> {
+    return  this.get<IVeExecuteMessagesResponse>(ApiUri.VeExecute);
   }
 }

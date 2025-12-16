@@ -1,6 +1,17 @@
 #!/usr/bin/env node
 import express from "express";
-import { TaskType, ISsh, ApiUri } from "@src/types.mjs";
+import {
+  TaskType,
+  ISsh,
+  ApiUri,
+  IUnresolvedParametersResponse,
+  IApplicationsResponse,
+  ISshConfigsResponse,
+  ISshConfigKeyResponse,
+  ISshCheckResponse,
+  ISetSshConfigResponse,
+  IDeleteSshConfigResponse,
+} from "@src/types.mjs";
 import http from "http";
 import path from "path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +22,9 @@ import { IVEContext } from "./backend-types.mjs";
 export class VEWebApp {
   app: express.Application;
   public httpServer: http.Server;
-
+  returnResponse<T>(res: express.Response, payload: T, statusCode: number = 200) {
+    res.status(statusCode).json(payload);
+  }
   constructor(storageContext: StorageContext) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
@@ -65,8 +78,8 @@ export class VEWebApp {
     this.app.get(ApiUri.SshConfigs, (req, res) => {
       try {
         const sshs: ISsh[] = storageContext.listSshConfigs();
-        const key:string|undefined = storageContext.getCurrentVEContext()?.getKey();
-        res.json({sshs:sshs, key: key}).status(200);
+        const key = storageContext.getCurrentVEContext()?.getKey();
+        this.returnResponse<ISshConfigsResponse>(res, { sshs, key });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -84,12 +97,11 @@ export class VEWebApp {
           res.status(404).json({ error: "SSH config not found" });
           return;
         }
-        res.json({ key }).status(200);
+        this.returnResponse<ISshConfigKeyResponse>(res, { key });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
-    });
-
+    }); 
     // Check SSH permission for host/port
     this.app.get(ApiUri.SshCheck, (req, res) => {
       try {
@@ -101,7 +113,7 @@ export class VEWebApp {
           return;
         }
         const result = Ssh.checkSshPermission(host, port);
-        res.json(result);
+        this.returnResponse<ISshCheckResponse>(res, result);
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -126,7 +138,7 @@ export class VEWebApp {
       }
       try {
         // Add or update VE context
-        var currentKey:string| undefined = storageContext.setVEContext({ host, port, current } as IVEContext);
+        var currentKey:string|undefined = storageContext.setVEContext({ host, port, current } as IVEContext);
         // If set as current, unset others
         if (current === true) {
           for (const key of storageContext.keys().filter((k) => k.startsWith("ve_") && k !== `ve_${host}`)) {
@@ -137,7 +149,7 @@ export class VEWebApp {
          }
          else
           currentKey = undefined;
-        res.json({ success: true , key: currentKey }).status(200);
+        this.returnResponse<ISetSshConfigResponse>(res, { success: true , key: currentKey });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -154,7 +166,7 @@ export class VEWebApp {
         const key = `ve_${host}`;
         if (!storageContext.has(key)) {
           // Consider non-existent as success for idempotency
-          res.json({ success: true, deleted: false }).status(200);
+          this.returnResponse<IDeleteSshConfigResponse>(res, { success: true, deleted: false });
           return;
         }
         storageContext.remove(key);
@@ -168,7 +180,7 @@ export class VEWebApp {
           const updated = { ...ctx, current: true };
           storageContext.set(currentKey, updated);
         }
-        res.json({ success: true, deleted: true, key: currentKey  }).status(200);
+        this.returnResponse<IDeleteSshConfigResponse>(res, { success: true, deleted: true, key: currentKey });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -196,53 +208,47 @@ export class VEWebApp {
         // Set this one as current
         const curCtx: any = storageContext.get(key) || {};
         storageContext.set(key, { ...curCtx, current: true });
-        res.json({ success: true , key }).status(200);
+        this.returnResponse<ISetSshConfigResponse>(res, { success: true , key });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
     });
 
-    this.app.get(
-      ApiUri.UnresolvedParameters,
-      (req, res) => {
+    // GET /api/unresolved-parameters/:application/:task?veContext=<key>
+    this.app.get(ApiUri.UnresolvedParameters, async (req, res) => {
+      try {
         const { application, task } = req.params;
-        try {
-          const templateProcessor = storageContext.getTemplateProcessor();
-          const veContext = storageContext.getCurrentVEContext();
-          if (!veContext) {
-            res
-              .status(400)
-              .json({ error: "VE context not set. Please configure SSH host/port first." });
-            return;
-          }
-          const loaded = templateProcessor.loadApplication(
-            application,
-            task as TaskType,
-            veContext,
-          );
-          const unresolvedParameters =
-            templateProcessor.getUnresolvedParameters(
-              loaded.parameters,
-              loaded.resolvedParams,
-            );
-          res
-            .json({
-              unresolvedParameters: unresolvedParameters,
-            })
-            .status(200);
-        } catch (err: any) {
-          res
-            .status(400)
-            .json({ error: err.message, errors: err.errors || [] });
+        const veContextKey = (req.query.veContext as string | undefined) || undefined;
+        if (!veContextKey) {
+          return res.status(400).json({ success: false, error: "Missing veContext" });
         }
-      },
-    );
-
+        const storageContext = StorageContext.getInstance();
+        const ctx: IVEContext | null = storageContext.getVEContextByKey(veContextKey);
+        if (!ctx) {
+          return res.status(404).json({ success: false, error: "VE context not found" });
+        }
+        const templateProcessor = storageContext.getTemplateProcessor();
+        const loaded = templateProcessor.loadApplication(
+          application,
+          task as TaskType,
+          ctx
+        );
+        const unresolved = templateProcessor.getUnresolvedParameters(
+          loaded.parameters,
+          loaded.resolvedParams,
+        );
+        this.returnResponse<IUnresolvedParametersResponse>(res, { unresolvedParameters: unresolved });
+      } catch (err: any) {
+        return res
+          .status(500)
+          .json({ success: false, error: err?.message || "Unknown error" });
+      }
+    });
     this.app.get(ApiUri.Applications, (req, res) => {
       try {
         const applications = storageContext.listApplications();
-
-        res.json(applications).status(200);
+        const payload: IApplicationsResponse = applications;
+        res.json(payload).status(200);
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }

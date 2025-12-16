@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { IApplicationWeb, IParameter } from '../../shared/types';
+import { IApplicationWeb, IParameter, IParameterValue } from '../../shared/types';
 import { VeConfigurationService } from '../ve-configuration.service';
 import type { NavigationExtras } from '@angular/router';
 @Component({
@@ -81,9 +81,9 @@ export class VeConfigurationDialog implements OnInit {
   save() {
     if (this.form.invalid) return;
     this.loading.set(true);
-    const params = Object.entries(this.form.value)
+    const params = (Object.entries(this.form.value) as [string, IParameterValue][])
       .filter(([, value]) => value !== null && value !== undefined && value !== '')
-      .map(([name, value]) => ({ name, value: value as string | number | boolean }));
+      .map(([name, value]) => ({ name, value: value as IParameterValue }));
     const application = this.data.app.id;
     const task = 'installation';
     this.configService.postVeConfiguration(application, task, params).subscribe({
