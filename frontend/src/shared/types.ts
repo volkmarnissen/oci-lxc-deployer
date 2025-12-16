@@ -94,6 +94,7 @@ export enum ApiUri {
   VeConfiguration = "/api/ve-configuration/:application/:task/:veContext",
   VeExecute = "/api/ve/execute/:veContext",
   Applications = "/api/applications",
+  TemplateDetailsForApplication = "/api/template-details/:application/:task/:veContext",
   UnresolvedParameters = "/api/unresolved-parameters/:application/:task/:veContext",
 }
 
@@ -139,6 +140,11 @@ export interface ISingleExecuteMessagesResponse {
   task: string;
   messages: IVeExecuteMessage[];
 }
+export interface IApplicationResponse { 
+  application: IApplicationWeb;
+  parameters: IParameter[];
+}
+
 export type IVeExecuteMessagesResponse = ISingleExecuteMessagesResponse[];
 export interface IVeConfigurationResponse {
   success: boolean;

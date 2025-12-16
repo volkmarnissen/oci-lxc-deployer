@@ -72,7 +72,7 @@ export class TemplateProcessor extends EventEmitter {
       taskTemplates: [],
     };
     const appLoader = new ApplicationLoader(this.pathes);
-    appLoader.readApplicationJson(applicationName, readOpts);
+    let application = appLoader.readApplicationJson(applicationName, readOpts);
     if (readOpts.error.details && readOpts.error.details.length > 0) {
       throw new VELoadApplicationError(
         "Load Application error",
@@ -88,21 +88,6 @@ export class TemplateProcessor extends EventEmitter {
       throw new VELoadApplicationError(message, applicationName, task, [
         new JsonError(message),
       ]);
-    }
-    if (!readOpts.application) {
-      const message = `Application data not found for ${applicationName}`;
-      throw new VELoadApplicationError(message, applicationName, task, [
-        new JsonError(message),
-      ]);
-    }
-    let application = readOpts.application;
-    // Check for icon.png in the application directory
-    let icon = application?.icon ? application.icon : "icon.png";
-    if (readOpts.appPath) {
-      const iconPath = path.join(readOpts.appPath, icon);
-      if (fs.existsSync(iconPath)) {
-        application!.icon = icon;
-      }
     }
     application!.id = applicationName;
     // 3. Get template list for the task
@@ -121,7 +106,7 @@ export class TemplateProcessor extends EventEmitter {
       throw err;
     }
 
-    // 4. Track resolved parameters
+    // 4. Track en parameters
     const resolvedParams: IResolvedParam[] = [];
     const templatePathes = readOpts.applicationHierarchy.map((appDir) =>
       path.join(appDir, "templates"),
@@ -404,14 +389,16 @@ export class TemplateProcessor extends EventEmitter {
     return tmplPath;
   }
   getUnresolvedParameters(
-    parameters: IParameterWithTemplate[],
-    resolvedParams: IResolvedParam[],
+    application: string,
+    task: TaskType,
+    veContest?: IVEContext,
   ): IParameter[] {
+    const loaded = this.loadApplication(application, task, veContest!);
     // Only parameters whose id is not in resolvedParams.param
-    return parameters.filter(
+    return loaded.parameters.filter(
       (param) =>
         undefined ==
-        resolvedParams.find(
+        loaded.resolvedParams.find(
           (rp) => rp.id == param.id && rp.template != param.template,
         ),
     );

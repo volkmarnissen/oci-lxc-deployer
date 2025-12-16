@@ -74,14 +74,10 @@ async function main() {
         );
         process.exit(2);
       }
-      const result = templateProcessor.loadApplication(
+      const unresolved = templateProcessor.getUnresolvedParameters(
         application,
         task,
         veContext,
-      );
-      const unresolved = templateProcessor.getUnresolvedParameters(
-        result.parameters,
-        result.resolvedParams,
       );
       const requiredNames = unresolved
         .filter((param: any) => param.default === undefined)

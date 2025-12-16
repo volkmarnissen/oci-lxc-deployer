@@ -10,11 +10,9 @@ declare module "@tests/ve-test-helper.mjs" {
   }
 }
 ProxmoxTestHelper.prototype.createStorageContext = function () {
-  const schemaPath = path.join(__dirname, "../schemas");
-  const jsonPath = this.jsonDir;
   const localPath = path.join(__dirname, "../local/json");
   // Constructor expects (localPath, jsonPath, schemaPath)
-  const storage = new StorageContext(localPath, jsonPath, schemaPath);
+  const storage = new StorageContext(localPath);
   (StorageContext as any).instance = storage;
   return storage;
 };
@@ -46,10 +44,11 @@ describe("ProxmoxConfiguration.loadApplication", () => {
     const paramNames = result.parameters.map((p) => p.id);
     expect(paramNames).toContain("vm_id");
 
-    templateProcessor
-      .getUnresolvedParameters(result.parameters, result.resolvedParams)
-      .forEach((param) => {
-        expect(param.name).not.toBe("vm_id");
+    const unresolved= templateProcessor
+      .getUnresolvedParameters("modbus2mqtt",
+      "installation",{ host: "localhost", port: 22 } as any);
+    unresolved.forEach((param) => {
+        expect(param.id).not.toBe("ostype");
       });
   });
 

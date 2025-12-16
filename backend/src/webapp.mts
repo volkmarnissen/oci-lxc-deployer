@@ -19,6 +19,7 @@ import fs from "fs";
 import { StorageContext } from "./storagecontext.mjs";
 import { Ssh } from "./ssh.mjs";
 import { IVEContext } from "./backend-types.mjs";
+import { ITemplateProcessorLoadResult } from "./templateprocessor.mjs";
 export class VEWebApp {
   app: express.Application;
   public httpServer: http.Server;
@@ -171,7 +172,19 @@ export class VEWebApp {
         res.status(500).json({ error: err.message });
       }
     });
-
+    this.app.get<String>(ApiUri.SshConfig, (req, res) => {
+      try {
+        const veContext = storageContext.getCurrentVEContext();
+        if (!veContext) {
+          res.status(404).json({ error: "No default SSH config available. Please configure first" });
+          return;
+        }
+        const key = veContext.getKey(); 
+        this.returnResponse<ISshConfigKeyResponse>(res, { key });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
     // Delete SSH config by host (port currently ignored in keying)
     this.app.delete(ApiUri.SshConfig, (req, res) => {
       try {
@@ -266,14 +279,10 @@ export class VEWebApp {
             .json({ success: false, error: "VE context not found" });
         }
         const templateProcessor = storageContext.getTemplateProcessor();
-        const loaded = templateProcessor.loadApplication(
+        const unresolved = templateProcessor.getUnresolvedParameters(
           application,
           task as TaskType,
-          ctx,
-        );
-        const unresolved = templateProcessor.getUnresolvedParameters(
-          loaded.parameters,
-          loaded.resolvedParams,
+          ctx
         );
         this.returnResponse<IUnresolvedParametersResponse>(res, {
           unresolvedParameters: unresolved,
@@ -289,6 +298,20 @@ export class VEWebApp {
         const applications = storageContext.listApplications();
         const payload: IApplicationsResponse = applications;
         res.json(payload).status(200);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+    this.app.get(ApiUri.TemplateDetailsForApplication, (req, res) => {
+      try {
+        const veContext = storageContext.getVEContextByKey(req.params.veContext);
+        if (!veContext) {
+          return res
+            .status(404)
+            .json({ success: false, error: "VE context not found" });
+        } 
+        const application = storageContext.getTemplateProcessor().loadApplication(req.params.application,req.params.task as TaskType, veContext);
+        this.returnResponse<ITemplateProcessorLoadResult>(res, application);
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
