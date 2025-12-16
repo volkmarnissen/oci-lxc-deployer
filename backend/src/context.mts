@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "node:path";
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { mkdirSync } from "fs";
 
 export class Context {
   private context: Record<string, any> = {};
@@ -153,6 +154,9 @@ export class Context {
     try {
       const json = JSON.stringify(this.context, null, 2);
       const enc = this.encrypt(json);
+      if( ! existsSync( path.dirname(this.filePath))) {
+        mkdirSync( path.dirname(this.filePath), { recursive: true } );
+      }
       writeFileSync(this.filePath, enc, "utf-8");
     } catch {}
   }

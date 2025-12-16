@@ -1,4 +1,5 @@
-import path, { join } from "path";
+import path, { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { JsonError, JsonValidator } from "./jsonvalidator.mjs";
 import { readdirSync, statSync, existsSync, readFileSync } from "fs";
 import {
@@ -62,12 +63,14 @@ export class StorageContext extends Context implements IContext {
     return StorageContext.instance;
   }
   jsonValidator: JsonValidator;
+  private jsonPath: string;
+  private schemaPath: string;
   constructor(
-    private localPath: string,
-    private jsonPath: string = "json",
-    private schemaPath: string = "schemas",
-  ) {
+    private localPath: string ) {
     super(join(localPath, "storagecontext.json"));
+    const backendDirname = join( dirname(fileURLToPath(import.meta.url)), "..");
+    this.jsonPath = path.join(localPath, "json");
+    this.schemaPath = path.join(backendDirname, "schemas");
     this.jsonValidator = new JsonValidator(this.schemaPath, baseSchemas);
     this.loadContexts("vm", VMContext);
     this.loadContexts("ve", VEContext);

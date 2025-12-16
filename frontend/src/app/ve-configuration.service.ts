@@ -24,12 +24,15 @@ export class VeConfigurationService {
   static setRouter(router: Router) {
     VeConfigurationService._router = router;
   }
-  static handleError(err: Error & { errors?: Error; status?: number; message?: string }) {
+  static handleError(err: Error & { error: {error?: string};errors?: Error; status?: number; message?: string }) {
     let msg = '';
     if (err?.errors && Array.isArray(err.errors) && err.errors.length > 0) {
       msg = err.errors.join('\n');
     } else if (err?.errors instanceof Error) {
       msg = err.errors.message;
+    } else if (err?.error )
+    {
+      msg = err.error.error || JSON.stringify(err.error);
     } else if (err?.message) {
       msg = err.message;
     } else if (err?.status) {

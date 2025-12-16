@@ -281,16 +281,9 @@ if (
   if (!localDir) {
     localDir = path.join(process.cwd(), "local");
   }
-  const backendRoot = path.join(dirname, "..");
-  const sharedJsonPath = path.join(backendRoot, "json");
-  const schemaPath = path.join(backendRoot, "schemas");
-  const jsonTestPath = path.join(localDir, "json");
+
   // Initialize StorageContext with absolute paths to avoid CWD-dependency
-  (StorageContext as any).instance = new StorageContext(
-    jsonTestPath,
-    sharedJsonPath,
-    schemaPath,
-  );
+  StorageContext.setInstance( localDir);
   const webApp = new VEWebApp(StorageContext.getInstance());
   const port = process.env.PORT || 3000;
   webApp.httpServer.listen(port, () => {
