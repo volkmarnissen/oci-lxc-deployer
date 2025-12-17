@@ -13,7 +13,16 @@
 - Scripts referenced in templates must exist in the corresponding `scripts/` directory
 
 ## Applications
-- Templates für Anwendungen (`backend/json/applications/`) müssen dem Schema `backend/schemas/application.schema.json` entsprechen
+
+- Application templates must conform to `backend/schemas/application.schema.json`
+- Applications can use inheritance via `extends` to reuse other applications
+
+## Parameters
+
+- Parameters are passed between templates by matching parameter names (name equality)
+- Parameters are automatically discovered across templates; no need to initialize them in the first template
+- Best practice: Create a `set-parameters.json` template for each application to define application-specific defaults (e.g., `ostype`)
+- Child applications (via `extends`) can override `set-parameters.json` to customize inherited behavior
 
 
 ## Schemas
