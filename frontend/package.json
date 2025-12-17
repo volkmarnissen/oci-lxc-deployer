@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "prettier": "prettier --write ."
   },
   "prettier": {
     "printWidth": 100,
@@ -55,6 +56,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "prettier": "^3.7.4",
     "socket.io-client": "^4.8.1",
     "typescript": "~5.9.2",
     "typescript-eslint": "8.46.4",

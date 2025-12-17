@@ -1,0 +1,59 @@
+{
+  "execute_on": "lxc",
+  "name": "Create OpenRC Service",
+  "description": "Create, enable and start an OpenRC service for an npm package",
+  "parameters": [
+    {
+      "id": "command",
+      "name": "Command",
+      "type": "string",
+      "required": true,
+      "description": "The command to run (also used as service and user name)"
+    },
+    {
+      "id": "command_args",
+      "name": "Command Line Arguments",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Arguments for the command. Available variables: $HOME_DIR, $DATA_DIR, $SECURE_DIR"
+    },
+    {
+      "id": "uid",
+      "name": "User ID",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Optional user ID (defaults to auto-assigned)"
+    },
+    {
+      "id": "group",
+      "name": "Group Name",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Optional group name (will be created if not exists)"
+    },
+    {
+      "id": "owned_paths",
+      "name": "Owned Paths",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Space-separated list of files/directories the user should own with rw access"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Create OpenRC Service",
+      "script": "create-openrc-service.sh",
+      "description": "Create user, service file, enable and start the service"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "logfile_path"
+    }
+  ]
+}
+

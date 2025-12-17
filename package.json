@@ -15,7 +15,8 @@
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:debug": "PWDEBUG=1 playwright test --headed",
-    "lint:lang": "node scripts/check-language.js"
+    "lint:lang": "node scripts/check-language.js",
+    "prettier": "npm run prettier --prefix backend && npm run prettier --prefix frontend"
   },
   "bin": {
     "lxc-manager-web": "bin/webapp"

@@ -1,0 +1,30 @@
+# LXC Manager Project Rules
+
+## Templates
+
+- Templates in `backend/json/shared/templates/` and `backend/json/applications/` must be validated against `backend/schemas/template.schema.json`
+- Template outputs must conform to `backend/schemas/output.template.schema.json` (only `id` and optional `default` allowed)
+- Scripts referenced in templates must exist in the corresponding `scripts/` directory
+
+## Applications
+- Templates für Anwendungen (`backend/json/applications/`) müssen dem Schema `backend/schemas/application.schema.json` entsprechen
+
+
+## Schemas
+
+- All JSON schemas are in `backend/schemas/`
+- Use JSON Schema draft-07
+
+## Shell Scripts
+
+- Scripts run inside Alpine Linux LXC containers
+- Use POSIX-compliant `/bin/sh`, not bash
+- Template variables use `{{ variable }}` syntax
+- Output variables as `key=value` on stdout
+- Errors go to stderr
+
+## Language
+- All files must use English for file content, variable names, keys, strings, and outputs. Descriptions, comments, and documentation inside files must also be in English.
+- German may only be used in user-facing chat, or in translation resources specifically intended for UI localization.
+
+
