@@ -9,9 +9,6 @@ frontend/dist/
 # Test coverage
 coverage/
 
-# Editor configs (optional)
-.vscode/
-
 # Cypress/Playwright outputs
 cypress/
 playwright-report/
