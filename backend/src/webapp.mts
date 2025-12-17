@@ -275,7 +275,7 @@ export class VEWebApp {
             .json({ success: false, error: "VE context not found" });
         }
         const templateProcessor = storageContext.getTemplateProcessor();
-        const unresolved = templateProcessor.getUnresolvedParameters(
+        const unresolved = await templateProcessor.getUnresolvedParameters(
           application,
           task as TaskType,
           ctx
@@ -298,7 +298,7 @@ export class VEWebApp {
         res.status(500).json({ error: err.message });
       }
     });
-    this.app.get(ApiUri.TemplateDetailsForApplication, (req, res) => {
+    this.app.get(ApiUri.TemplateDetailsForApplication, async (req, res) => {
       try {
         const veContext = storageContext.getVEContextByKey(req.params.veContext);
         if (!veContext) {
@@ -306,7 +306,7 @@ export class VEWebApp {
             .status(404)
             .json({ success: false, error: "VE context not found" });
         } 
-        const application = storageContext.getTemplateProcessor().loadApplication(req.params.application,req.params.task as TaskType, veContext);
+        const application = await storageContext.getTemplateProcessor().loadApplication(req.params.application,req.params.task as TaskType, veContext);
         this.returnResponse<ITemplateProcessorLoadResult>(res, application);
       } catch (err: any) {
         res.status(500).json({ error: err.message });

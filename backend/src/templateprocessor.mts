@@ -60,12 +60,12 @@ export class TemplateProcessor extends EventEmitter {
   ) {
     super();
   }
-  loadApplication(
+  async loadApplication(
     applicationName: string,
     task: TaskType,
     veContext: IVEContext,
     sshCommand?: string,
-  ): ITemplateProcessorLoadResult {
+  ): Promise<ITemplateProcessorLoadResult> {
     const readOpts: IReadApplicationOptions = {
       applicationHierarchy: [],
       error: new VEConfigurationError("", applicationName),
@@ -142,7 +142,7 @@ export class TemplateProcessor extends EventEmitter {
         veContext,
         sshCommand,
       };
-      this.#processTemplate(ptOpts);
+      await this.#processTemplate(ptOpts);
     }
     // Save resolvedParams for getUnresolvedParameters
     this.resolvedParams = resolvedParams;
@@ -174,7 +174,7 @@ export class TemplateProcessor extends EventEmitter {
     }
   }
   // Private method to process a template (including nested templates)
-  #processTemplate(opts: IProcessTemplateOpts): void {
+  async #processTemplate(opts: IProcessTemplateOpts): Promise<void> {
     opts.visitedTemplates = opts.visitedTemplates ?? new Set<string>();
     opts.errors = opts.errors ?? [];
     // Prevent endless recursion
@@ -280,7 +280,7 @@ export class TemplateProcessor extends EventEmitter {
           const tmpErrors: IJsonError[] = [];
           const tmpResolved: IResolvedParam[] = [];
           const tmpWebui: string[] = [];
-          this.#processTemplate({
+          await this.#processTemplate({
             ...opts,
             template: enumTmplName,
             templatename: enumTmplName,
@@ -301,12 +301,12 @@ export class TemplateProcessor extends EventEmitter {
               undefined,
               opts.sshCommand ?? "ssh",
             );
-            const rc = ve.run(null);
+            const rc = await ve.run(null);
             if (rc && Array.isArray(rc.outputs) && rc.outputs.length > 0) {
               // If outputs is an array of {name, value}, map names as enum strings
               const first = rc.outputs[0];
               if (first && typeof first === "object" && "name" in first) {
-                pparm.enumValues = rc.outputs.map((o) => String(o.name));
+                pparm.enumValues = rc.outputs.map((o: { name: string; value: string | number | boolean }) => String(o.name));
               }
             }
           } catch (e: any) {
@@ -337,7 +337,7 @@ export class TemplateProcessor extends EventEmitter {
         cmd.name = `${tmplData.name || "unnamed-template"}`;
       }
       if (cmd.template !== undefined) {
-        this.#processTemplate({
+        await this.#processTemplate({
           ...opts,
           template: cmd.template,
           parentTemplate: this.extractTemplateName(opts.template),
@@ -388,12 +388,12 @@ export class TemplateProcessor extends EventEmitter {
     }
     return tmplPath;
   }
-  getUnresolvedParameters(
+  async getUnresolvedParameters(
     application: string,
     task: TaskType,
     veContest?: IVEContext,
-  ): IParameter[] {
-    const loaded = this.loadApplication(application, task, veContest!);
+  ): Promise<IParameter[]> {
+    const loaded = await this.loadApplication(application, task, veContest!);
     // Only parameters whose id is not in resolvedParams.param
     return loaded.parameters.filter(
       (param) =>

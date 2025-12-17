@@ -74,7 +74,7 @@ async function main() {
         );
         process.exit(2);
       }
-      const unresolved = templateProcessor.getUnresolvedParameters(
+      const unresolved = await templateProcessor.getUnresolvedParameters(
         application,
         task,
         veContext,
@@ -110,7 +110,7 @@ async function main() {
       );
       process.exit(2);
     }
-    const loaded = templateProcessor.loadApplication(
+    const loaded = await templateProcessor.loadApplication(
       application,
       task,
       veContext,
@@ -141,8 +141,8 @@ async function main() {
         console.error(`[${msg.commandtext}] ${msg.stderr}`);
       }
     });
-    const rcRestartInfo = exec.run(restartInfo);
-    saveRestartInfo(rcRestartInfo, restartInfoArg);
+    const rcRestartInfo = await exec.run(restartInfo);
+    if (rcRestartInfo) saveRestartInfo(rcRestartInfo, restartInfoArg);
     console.log("All tasks completed successfully.");
     process.exit(0);
   } catch (err) {

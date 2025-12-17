@@ -1,7 +1,44 @@
 import { EventEmitter } from "events";
 import { ICommand, IVeExecuteMessage } from "@src/types.mjs";
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, SpawnOptionsWithoutStdio } from "node:child_process";
+
+function spawnAsync(
+  cmd: string,
+  args: string[],
+  options: SpawnOptionsWithoutStdio & { input?: string; timeout?: number }
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn(cmd, args, { ...options, stdio: "pipe" });
+    let stdout = "";
+    let stderr = "";
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    if (options.input) {
+      proc.stdin?.write(options.input);
+      proc.stdin?.end();
+    }
+
+    proc.stdout?.on("data", (d) => (stdout += d.toString()));
+    proc.stderr?.on("data", (d) => (stderr += d.toString()));
+
+    if (options.timeout) {
+      timeoutId = setTimeout(() => {
+        proc.kill("SIGTERM");
+      }, options.timeout);
+    }
+
+    proc.on("close", (exitCode) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve({ stdout, stderr, exitCode: exitCode ?? -1 });
+    });
+
+    proc.on("error", () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve({ stdout, stderr, exitCode: -1 });
+    });
+  });
+}
 import { JsonError, JsonValidator } from "./jsonvalidator.mjs";
 import { StorageContext, VMContext } from "./storagecontext.mjs";
 import { IVEContext, IVMContext } from "./backend-types.mjs";
@@ -53,12 +90,12 @@ export class VeExecution extends EventEmitter {
    * @param command The command to execute
    * @param timeoutMs Timeout in milliseconds
    */
-  protected runOnVeHost(
+  protected async runOnVeHost(
     input: string,
     tmplCommand: ICommand,
     timeoutMs = 10000,
     remoteCommand?: string[],
-  ): IVeExecuteMessage {
+  ): Promise<IVeExecuteMessage> {
     const sshCommand = this.sshCommand;
     let sshArgs: string[] = [];
     if (sshCommand === "ssh") {
@@ -90,16 +127,13 @@ export class VeExecution extends EventEmitter {
     if (remoteCommand) {
       sshArgs = sshArgs.concat(remoteCommand);
     }
-    const proc = spawnSync(sshCommand, sshArgs, {
-      encoding: "utf-8",
+    const proc = await spawnAsync(sshCommand, sshArgs, {
       timeout: timeoutMs,
       input,
-      stdio: "pipe",
     });
     const stdout = proc.stdout || "";
     const stderr = proc.stderr || "";
-    // Only 'status' is available on SpawnSyncReturns<string> in Node.js typings
-    const exitCode = typeof proc.status === "number" ? proc.status : -1;
+    const exitCode = proc.exitCode;
     // Try to parse stdout as JSON and update outputs
     const msg: IVeExecuteMessage = {
       stderr: structuredClone(stderr),
@@ -212,28 +246,28 @@ export class VeExecution extends EventEmitter {
    * @param command Command to execute
    * @param timeoutMs Timeout in ms
    */
-  protected runOnLxc(
+  protected async runOnLxc(
     vm_id: string | number,
     command: string,
     tmplCommand: ICommand,
     timeoutMs = 10000,
-  ): IVeExecuteMessage {
+  ): Promise<IVeExecuteMessage> {
     // Pass command and arguments as array
     let lxcCmd: string[] | undefined = ["lxc-attach", "-n", String(vm_id)];
     // For testing: just pass through when using another sshCommand, like /bin/sh
     if (this.sshCommand !== "ssh") lxcCmd = undefined;
-    return this.runOnVeHost(command, tmplCommand, timeoutMs, lxcCmd);
+    return await this.runOnVeHost(command, tmplCommand, timeoutMs, lxcCmd);
   }
 
   /**
    * Executes host discovery flow: calls write-vmids-json.sh on VE host, parses used_vm_ids,
    * resolves VMContext by hostname, validates pve and vmid, then runs the provided command inside LXC.
    */
-  protected executeOnHost(
+  protected async executeOnHost(
     hostname: string,
     command: string,
     tmplCommand: ICommand,
-  ): void {
+  ): Promise<void> {
     const { join, dirname } = require("node:path");
     const { fileURLToPath } = require("node:url");
     const here = dirname(fileURLToPath(import.meta.url));
@@ -245,7 +279,7 @@ export class VeExecution extends EventEmitter {
       "scripts",
       "write-vmids-json.sh",
     );
-    const probeMsg = this.runOnVeHost(
+    const probeMsg = await this.runOnVeHost(
       "",
       { ...tmplCommand, name: "write-vmids" } as any,
       10000,
@@ -287,14 +321,14 @@ export class VeExecution extends EventEmitter {
       (vmctx as any).data || {},
     );
     execCmd = this.replaceVarsWithContext(execCmd, this.outputs || {});
-    this.runOnLxc(vmctx.vmid, execCmd, tmplCommand);
+    await this.runOnLxc(vmctx.vmid, execCmd, tmplCommand);
   }
 
   /**
    * Runs all commands, replacing variables from inputs/outputs, and executes them on the correct target.
    * Returns the index of the last successfully executed command.
    */
-  run(restartInfo: IRestartInfo | null = null): IRestartInfo | undefined {
+  async run(restartInfo: IRestartInfo | null = null): Promise<IRestartInfo | undefined> {
     let rcRestartInfo: IRestartInfo | undefined = undefined;
     let msgIndex = 0;
     let startIdx = 0;
@@ -359,12 +393,12 @@ export class VeExecution extends EventEmitter {
               } as IVeExecuteMessage);
               break outerloop;
             }
-            this.runOnLxc(vm_id, execStrLxc, cmd);
+            await this.runOnLxc(vm_id, execStrLxc, cmd);
             break;
           case "ve":
             // Default replacement for direct ve execution
             const execStrVe = this.replaceVars(rawStr);
-            lastMsg = this.runOnVeHost(execStrVe, cmd);
+            lastMsg = await this.runOnVeHost(execStrVe, cmd);
             break;
           default:
             if (
@@ -374,7 +408,7 @@ export class VeExecution extends EventEmitter {
               const hostname = (cmd.execute_on as string).split(":")[1] ?? "";
               try {
                 // Pass raw (unreplaced) string; executeOnHost will replace with vmctx.data
-                this.executeOnHost(hostname, rawStr, cmd);
+                await this.executeOnHost(hostname, rawStr, cmd);
               } catch (err: any) {
                 const msg = String(err?.message ?? err);
                 this.emit("message", {

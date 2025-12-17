@@ -76,7 +76,7 @@ export class WebAppVE {
         const templateProcessor = veCtxToUse
           .getStorageContext()
           .getTemplateProcessor();
-        const loaded = templateProcessor.loadApplication(
+        const loaded = await templateProcessor.loadApplication(
           application,
           task as TaskType,
           veCtxToUse,
@@ -116,18 +116,14 @@ export class WebAppVE {
         // Respond immediately, run execution in background
         this.returnResponse<IVeConfigurationResponse>(res, { success: true });
         
-        // Run asynchronously using setImmediate to not block the event loop
-        setImmediate(() => {
-          try {
-            const result = exec.run(restartInfoToUse);
-            if (result) {
-              const key = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-              this.restartInfos.set(key, result);
-            }
-          } catch (err: any) {
-            // Log error, execution already responded
-            console.error("Execution error:", err.message);
+        // Run asynchronously - now non-blocking thanks to async spawn
+        exec.run(restartInfoToUse).then((result) => {
+          if (result) {
+            const key = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            this.restartInfos.set(key, result);
           }
+        }).catch((err: Error) => {
+          console.error("Execution error:", err.message);
         });
       } catch (err: any) {
         res
