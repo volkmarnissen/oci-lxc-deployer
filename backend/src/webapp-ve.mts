@@ -14,9 +14,30 @@ import {
 } from "./types.mjs";
 import { IRestartInfo, VeExecution } from "./ve-execution.mjs";
 
+const MESSAGE_RETENTION_MS = 30 * 60 * 1000; // 30 minutes
+
 export class WebAppVE {
   messages: IVeExecuteMessagesResponse = [];
   private restartInfos: Map<string, IRestartInfo> = new Map();
+  private messageTimestamps: Map<string, number> = new Map(); // key: "app/task"
+  
+  private cleanupOldMessages() {
+    const now = Date.now();
+    const keysToRemove: string[] = [];
+    this.messageTimestamps.forEach((timestamp, key) => {
+      if (now - timestamp > MESSAGE_RETENTION_MS) {
+        keysToRemove.push(key);
+      }
+    });
+    for (const key of keysToRemove) {
+      const [app, task] = key.split('/');
+      this.messages = this.messages.filter(
+        g => !(g.application === app && g.task === task)
+      );
+      this.messageTimestamps.delete(key);
+    }
+  }
+  
   returnResponse<T>(
     res: express.Response,
     payload: T,
@@ -45,11 +66,9 @@ export class WebAppVE {
     // POST /api/proxmox-configuration/:application/:task
     this.post<
       { application: string; task: string; veContext: string },
-      IPostVeConfigurationBody,
-      { restartKey?: string }
+      IPostVeConfigurationBody
     >(ApiUri.VeConfiguration, async (req, res) => {
       const { application, task, veContext: veContextKey } = req.params;
-      const restartKeyParam = req.query.restartKey;
       const { params } = req.body;
       if (!Array.isArray(params)) {
         return res
@@ -93,6 +112,19 @@ export class WebAppVE {
         // 3. Start ProxmoxExecution
         const inputs = params.map(p => ({ id: p.name, value: p.value }));
         const exec = new VeExecution(commands, inputs, veCtxToUse, defaults);
+        // Generate restartKey upfront so we can return it immediately
+        const newRestartKey = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        
+        // Clear old messages for this application/task before starting
+        this.messages = this.messages.filter(
+          g => !(g.application === application && g.task === task)
+        );
+        const messageKey = `${application}/${task}`;
+        this.messageTimestamps.set(messageKey, Date.now());
+        
+        // Cleanup old messages periodically
+        this.cleanupOldMessages();
+        
         exec.on("message", (msg: IVeExecuteMessage) => {
           const existing = this.messages.find(
             (g) => g.application === application && g.task === task,
@@ -100,27 +132,20 @@ export class WebAppVE {
           if (existing) {
             existing.messages.push(msg);
           } else {
-            this.messages.push({ application, task, messages: [msg] });
+            this.messages.push({ application, task, messages: [msg], restartKey: newRestartKey });
           }
         });
         exec.on("finished", (msg: IVMContext) => {
           veCtxToUse.getStorageContext().setVMContext(msg);
         });
-        this.messages = [];
-        let restartInfoToUse: IRestartInfo | undefined = undefined;
-        if (restartKeyParam) {
-          const stored = this.restartInfos.get(restartKeyParam);
-          if (stored) restartInfoToUse = stored;
-        }
         
-        // Respond immediately, run execution in background
-        this.returnResponse<IVeConfigurationResponse>(res, { success: true });
+        // Respond immediately with restartKey, run execution in background
+        this.returnResponse<IVeConfigurationResponse>(res, { success: true, restartKey: newRestartKey });
         
         // Run asynchronously - now non-blocking thanks to async spawn
-        exec.run(restartInfoToUse).then((result) => {
+        exec.run(null).then((result) => {
           if (result) {
-            const key = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-            this.restartInfos.set(key, result);
+            this.restartInfos.set(newRestartKey, result);
           }
         }).catch((err: Error) => {
           console.error("Execution error:", err.message);
@@ -134,6 +159,64 @@ export class WebAppVE {
     // GET /api/ProxmoxExecuteMessages: dequeues all messages in the queue and returns them
     this.app.get(ApiUri.VeExecute, (req, res) => {
       this.returnResponse<IVeExecuteMessagesResponse>(res, this.messages);
+    });
+    
+    // POST /api/ve/restart/:restartKey/:veContext - Restart execution with stored restartInfo
+    this.app.post(ApiUri.VeRestart, async (req, res) => {
+      const { restartKey, veContext: veContextKey } = req.params;
+      
+      const restartInfo = this.restartInfos.get(restartKey);
+      if (!restartInfo) {
+        return res.status(404).json({ success: false, error: "Restart info not found" });
+      }
+      
+      const storageContext = StorageContext.getInstance();
+      const ctx = storageContext.getVEContextByKey(veContextKey);
+      if (!ctx) {
+        return res.status(404).json({ success: false, error: "VE context not found" });
+      }
+      
+      // Get application/task from the message group that has this restartKey
+      const messageGroup = this.messages.find(g => g.restartKey === restartKey);
+      if (!messageGroup) {
+        return res.status(404).json({ success: false, error: "No message group found for this restart key" });
+      }
+      
+      const { application, task } = messageGroup;
+      const veCtxToUse = ctx as IVEContext;
+      
+      // Simple restart: empty containers, restartInfo has everything needed
+      const exec = new VeExecution([], [], veCtxToUse, new Map());
+      
+      // Generate new restartKey
+      const newRestartKey = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      
+      // Clear old messages for this application/task
+      this.messages = this.messages.filter(g => !(g.application === application && g.task === task));
+      const messageKey = `${application}/${task}`;
+      this.messageTimestamps.set(messageKey, Date.now());
+      
+      exec.on("message", (msg: IVeExecuteMessage) => {
+        const existing = this.messages.find(g => g.application === application && g.task === task);
+        if (existing) {
+          existing.messages.push(msg);
+        } else {
+          this.messages.push({ application, task, messages: [msg], restartKey: newRestartKey });
+        }
+      });
+      exec.on("finished", (msg: IVMContext) => {
+        veCtxToUse.getStorageContext().setVMContext(msg);
+      });
+      
+      this.returnResponse<IVeConfigurationResponse>(res, { success: true, restartKey: newRestartKey });
+      
+      exec.run(restartInfo).then((result) => {
+        if (result) {
+          this.restartInfos.set(newRestartKey, result);
+        }
+      }).catch((err: Error) => {
+        console.error("Restart execution error:", err.message);
+      });
     });
   }
 }

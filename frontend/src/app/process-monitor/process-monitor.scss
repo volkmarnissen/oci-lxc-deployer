@@ -94,3 +94,19 @@
   white-space: pre-wrap;
 }
 
+.restart-btn {
+  background: #1976d2;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #1565c0;
+  }
+}
+

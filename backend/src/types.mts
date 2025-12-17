@@ -93,6 +93,7 @@ export enum ApiUri {
   SshConfigGET = "/api/ssh/config/:host",
   SshCheck = "/api/ssh/check",
   VeConfiguration = "/api/ve-configuration/:application/:task/:veContext",
+  VeRestart = "/api/ve/restart/:restartKey/:veContext",
   VeExecute = "/api/ve/execute/:veContext",
   Applications = "/api/applications",
   TemplateDetailsForApplication = "/api/template-details/:application/:task/:veContext",
@@ -125,7 +126,6 @@ export interface IDeleteSshConfigResponse {
 }
 export interface IPostVeConfigurationBody {
   params: { name: string; value: IParameterValue }[];
-  restartKey?: string;
 }
 export interface IPostSshConfigResponse {
   success: boolean;
@@ -140,6 +140,7 @@ export interface ISingleExecuteMessagesResponse {
   application: string;
   task: string;
   messages: IVeExecuteMessage[];
+  restartKey?: string;
 }
 export interface IApplicationResponse { 
   application: IApplicationWeb;

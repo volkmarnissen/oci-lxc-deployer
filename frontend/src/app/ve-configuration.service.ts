@@ -114,11 +114,11 @@ export class VeConfigurationService {
     return this.get<ISshCheckResponse>(`${ApiUri.SshCheck}?${params.toString()}`);
   }
 
-  postVeConfiguration(application: string, task: string, params: VeConfigurationParam[], restartKey?: string): Observable<{ success: boolean; restartKey?: string }> {
+  postVeConfiguration(application: string, task: string, params: VeConfigurationParam[]): Observable<{ success: boolean; restartKey?: string }> {
     const url = ApiUri.VeConfiguration
       .replace(':application', encodeURIComponent(application))
       .replace(':task', encodeURIComponent(task));
-    return this.post<IPostVeConfigurationResponse,IPostVeConfigurationBody>(url, { params, restartKey }).pipe(
+    return this.post<IPostVeConfigurationResponse,IPostVeConfigurationBody>(url, { params }).pipe(
       tap((res) => this.setVeContextKeyFrom(res))
     );
   }
@@ -139,5 +139,12 @@ export class VeConfigurationService {
   }
   getExecuteMessages(): Observable<IVeExecuteMessagesResponse> {
     return  this.get<IVeExecuteMessagesResponse>(ApiUri.VeExecute);
+  }
+  
+  restartExecution(restartKey: string): Observable<IVeConfigurationResponse> {
+    const url = ApiUri.VeRestart
+      .replace(':restartKey', encodeURIComponent(restartKey))
+      .replace(':veContext', encodeURIComponent(this.veContextKey || ''));
+    return this.http.post<IVeConfigurationResponse>(url, {});
   }
 }

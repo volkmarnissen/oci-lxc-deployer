@@ -158,10 +158,14 @@ export class VeExecution extends EventEmitter {
         } else {
           msg.result = "ERROR";
           msg.index = index;
-          this.emit("message", msg);
-          throw new JsonError(
+          msg.stderr = stderr;
+          msg.error = new JsonError(
             `Command "${tmplCommand.name}" failed with exit code ${exitCode}: ${stderr}`,
           );
+          msg.exitCode = exitCode;
+          msg.command = tmplCommand.name;
+          msg.commandtext = input;
+          this.emit("message", msg);
         }
       }
 

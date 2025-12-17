@@ -1,8 +1,5 @@
 <h2>Process Monitor</h2>
 
-<button (click)="triggerRestart()" [disabled]="!restartKey">Run restart</button>
-@if (!restartKey) { <small>(no restart key available)</small> }
-
 @if (messages && messages.length > 1) {
   <!-- Multiple groups: use accordion -->
   <mat-accordion>
@@ -29,6 +26,11 @@
 
 <!-- Shared template for group content -->
 <ng-template #groupContent let-group="group">
+  @if (group.restartKey) {
+    <button class="restart-btn" (click)="triggerRestart(group)">
+      ↻ Restart {{ group.application }}
+    </button>
+  }
   <!-- Successful commands as compact list -->
   <ul class="success-list">
     @for (msg of group.messages; track msg.index) {

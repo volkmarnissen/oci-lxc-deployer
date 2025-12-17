@@ -1,11 +1,9 @@
-import { NgZone, OnDestroy, Component, OnInit, inject, Input, Output, EventEmitter } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { NgZone, OnDestroy, Component, OnInit, inject } from '@angular/core';
 
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { CommonModule } from '@angular/common';
-import { IVeExecuteMessagesResponse } from '../../shared/types';
+import { IVeExecuteMessagesResponse, ISingleExecuteMessagesResponse } from '../../shared/types';
 import { VeConfigurationService } from '../ve-configuration.service';
 
 @Component({
@@ -17,32 +15,19 @@ import { VeConfigurationService } from '../ve-configuration.service';
 })
 export class ProcessMonitor implements OnInit, OnDestroy {
   messages: IVeExecuteMessagesResponse| undefined;
-  private destroyed = false;
   private pollInterval?: number;
   private veConfigurationService = inject(VeConfigurationService);
-  private queryParamSub?: Subscription;
-   
-  @Input() restartKey?: string;
-  @Output() restartRequested = new EventEmitter<string>();
 
   private zone = inject(NgZone);
-  private route = inject(ActivatedRoute);
 
   ngOnInit() {
-    // Subscribe to query param changes to get restartKey when it becomes available
-    this.queryParamSub = this.route.queryParamMap.subscribe(params => {
-      const key = params.get('restartKey');
-      if (key) this.restartKey = key;
-    });
     this.startPolling();
   }
 
   ngOnDestroy(): void {
-    this.destroyed = true;
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
-    this.queryParamSub?.unsubscribe();
   }
 
   startPolling() {
@@ -87,10 +72,25 @@ export class ProcessMonitor implements OnInit, OnDestroy {
     }
   }
 
-  triggerRestart() {
-    if (this.restartKey) {
-      this.restartRequested.emit(this.restartKey);
-    }
+  triggerRestart(group: ISingleExecuteMessagesResponse) {
+    if (!group.restartKey) return;
+    
+    this.veConfigurationService.restartExecution(group.restartKey).subscribe({
+      next: () => {
+        // Clear old messages for this group to show fresh run
+        if (this.messages) {
+          const idx = this.messages.findIndex(
+            g => g.application === group.application && g.task === group.task
+          );
+          if (idx >= 0) {
+            this.messages.splice(idx, 1);
+          }
+        }
+      },
+      error: (err) => {
+        console.error('Restart failed:', err);
+      }
+    });
   }
 
 }
