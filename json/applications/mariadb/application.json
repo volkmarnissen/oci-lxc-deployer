@@ -8,6 +8,11 @@
     "100-create-lxc.json",
     "200-start-lxc.json",
     "210-wait-for-container-ready.json",
-    "330-install-apk-package.json"
+    "330-install-apk-package.json",
+    "400-initialize-mariadb.json",
+    "430-configure-mariadb.json",
+    "410-start-mariadb.json",
+    "420-secure-mariadb.json",
+    "440-enable-mariadb.json"
   ]
 }

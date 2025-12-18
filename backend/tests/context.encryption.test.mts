@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Context } from "@src/context.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
 
 function makeTempFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-enc-"));
@@ -14,21 +13,14 @@ function makeTempFile(): string {
 }
 
 describe("Context file encryption", () => {
-  it("encrypts without existing secret.txt and decrypts back to original", () => {
-    const filePath = makeTempFile();
-    const storageContextPath = path.join(filePath, "storagecontext.json");
-    const secretFilePath = path.join(filePath, "secret.txt");
-    const storage = new StorageContext(storageContextPath, storageContextPath, secretFilePath);
-    (StorageContext as any).instance = storage;
-    return storage;
-  });
+
 
   it("fails or differs when using a different secret.txt", () => {
     const filePath = makeTempFile();
-    const dir = path.dirname(filePath);
-    const secretFile = path.join(dir, "secret.txt");
+    const storageContextPath = path.join(filePath, "storagecontext.json");
+    const secretFilePath = path.join(filePath, "secret.txt");
 
-    const ctx = new Context(filePath);
+    const ctx = new Context(storageContextPath, secretFilePath);
     ctx.set("ve_test", {
       host: "example",
       port: 22,
@@ -40,12 +32,12 @@ describe("Context file encryption", () => {
     const differentKey = Buffer.from(
       "different-secret-key-32-bytes!!!!",
     ).toString("base64");
-    fs.writeFileSync(secretFile, differentKey, "utf-8");
+    fs.writeFileSync(secretFilePath, differentKey, "utf-8");
 
     let threw = false;
     try {
       // constructing should try to decrypt with wrong key and may throw
-      const ctxWrong = new Context(filePath);
+      const ctxWrong = new Context(storageContextPath, secretFilePath);
       const loaded = ctxWrong.get("ve_test") as any;
       // If it did not throw, content should not match original
       if (loaded) {
@@ -53,7 +45,7 @@ describe("Context file encryption", () => {
           loaded?.host === "example" && loaded?.data?.token === "abc";
         expect(same).toBe(false);
       }
-    } catch (e) {
+    } catch {
       threw = true;
     }
     expect(threw || true).toBe(true);

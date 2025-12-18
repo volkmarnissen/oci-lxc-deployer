@@ -1,0 +1,11 @@
+{
+  "execute_on": "lxc",
+  "name": "Start MariaDB Service",
+  "description": "Start the MariaDB service",
+  "commands": [
+    {
+      "name": "Start MariaDB",
+      "command": "rc-service mariadb start >&2 && echo '[{\"id\": \"mariadb_started\", \"value\": \"true\"}]'"
+    }
+  ]
+}

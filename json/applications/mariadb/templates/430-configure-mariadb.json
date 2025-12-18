@@ -1,0 +1,30 @@
+{
+  "execute_on": "lxc",
+  "name": "Configure MariaDB",
+  "description": "Configure MariaDB bind address and other settings",
+  "parameters": [
+    {
+      "id": "bind_address",
+      "name": "Bind Address",
+      "type": "string",
+      "default": "127.0.0.1",
+      "required": true,
+      "description": "IP address to bind to"
+    },
+    {
+      "id": "datadir",
+      "name": "Data Directory",
+      "type": "string",
+      "default": "/var/lib/mysql",
+      "required": true,
+      "description": "Data directory path"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Configure MariaDB",
+      "script": "configure-mariadb.sh",
+      "description": "Configure MariaDB bind address and data directory"
+    }
+  ]
+}

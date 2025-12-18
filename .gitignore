@@ -28,4 +28,5 @@ alpine/package/*/
 alpine/repo/
 #
 test-results/
-backend/local/secret.txt
+**/secret.txt
+**/storagecontext.json

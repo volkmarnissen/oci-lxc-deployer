@@ -1,0 +1,46 @@
+{
+  "execute_on": "lxc",
+  "name": "Secure MariaDB Installation",
+  "description": "Run mariadb-secure-installation to secure the database",
+  "parameters": [
+    {
+      "id": "root_password",
+      "name": "Root Password",
+      "type": "string",
+      "required": false,
+      "secure": true,
+      "description": "Password for the MariaDB root user"
+    },
+    {
+      "id": "remove_anonymous_users",
+      "name": "Remove Anonymous Users",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "description": "Remove anonymous users"
+    },
+    {
+      "id": "allow_remote_root",
+      "name": "Allow Remote Root Login",
+      "type": "boolean",
+      "default": false,
+      "required": false,
+      "description": "Allow root login from remote hosts"
+    },
+    {
+      "id": "remove_test_database",
+      "name": "Remove Test Database",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "description": "Remove the test database"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Secure MariaDB",
+      "script": "secure-mariadb.sh",
+      "description": "Run mariadb-secure-installation with provided settings"
+    }
+  ]
+}

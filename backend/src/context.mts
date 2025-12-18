@@ -17,7 +17,7 @@ export class Context {
       const raw = readFileSync(this.storageContextFilePath, "utf-8");
       const jsonText = raw.startsWith("enc:") ? this.decrypt(raw) : raw;
       this.context = JSON.parse(jsonText);
-    } catch (err: any) {
+    } catch {
       console.log("No context file found, creating empty context");
       this.context = {};
       this.writeAll();  

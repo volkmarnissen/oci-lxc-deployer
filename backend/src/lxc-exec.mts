@@ -34,6 +34,7 @@ export async function exec(
   paramsFile: string,
   restartInfoFile?: string,
   localPath?: string,
+  storageContextFilePath?: string,
   secretsFilePath?: string,
 ): Promise<void> {
   let restartInfo: IRestartInfo | null = null;
@@ -45,8 +46,10 @@ export async function exec(
     const schemaPath = path.join(projectRoot, "schemas");
     const jsonPath = path.join(projectRoot, "json");
     const resolvedLocalPath = localPath || path.join(projectRoot, "local/json");
+    const resolvedStorageContextFilePath = storageContextFilePath || path.join(resolvedLocalPath, "storagecontext.json");
+    const resolvedSecretFilePath = secretsFilePath || path.join(resolvedLocalPath, "secret.txt");
     JsonError.baseDir = projectRoot;
-    StorageContext.setInstance(resolvedLocalPath, secretsFilePath);
+    StorageContext.setInstance(resolvedLocalPath, resolvedStorageContextFilePath, resolvedSecretFilePath);
     // Get all apps (name -> path)
     const allApps = StorageContext.getInstance().getAllAppNames();
     const appPath = allApps.get(application);

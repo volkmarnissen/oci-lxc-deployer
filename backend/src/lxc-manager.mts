@@ -8,6 +8,7 @@ import type { TaskType } from "./types.mjs";
 interface ParsedArgs {
   command?: string;
   localPath?: string;
+  storageContextFilePath?: string;
   secretsFilePath?: string;
   parametersFile?: string;
   restartInfoFile?: string;
@@ -39,6 +40,16 @@ function parseArgs(): ParsedArgs {
         args.localPath = path.join(process.cwd(), "local");
         i += 1;
       }
+    } else if (arg === "--storageContextFilePath") {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("--")) {
+        console.error("--storageContextFilePath requires a value");
+        process.exit(1);
+      }
+      args.storageContextFilePath = path.isAbsolute(value)
+        ? value
+        : path.join(process.cwd(), value);
+      i += 2;
     } else if (arg === "--secretsFilePath") {
       const value = argv[i + 1];
       if (!value || value.startsWith("--")) {
@@ -102,8 +113,8 @@ function isValidTaskType(task: string): task is TaskType {
   return VALID_TASK_TYPES.includes(task as TaskType);
 }
 
-async function startWebApp(localPath: string, secretsFilePath?: string) {
-  StorageContext.setInstance(localPath, secretsFilePath);
+async function startWebApp(localPath: string, storageContextPath: string, secretFilePath: string) {
+  StorageContext.setInstance(localPath, storageContextPath, secretFilePath);
   const webApp = new VEWebApp(StorageContext.getInstance());
   const port = process.env.PORT || 3000;
   webApp.httpServer.listen(port, () => {
@@ -116,16 +127,23 @@ async function runExecCommand(
   task: TaskType,
   parametersFile: string,
   localPath?: string,
+  storageContextFilePath?: string,
   secretsFilePath?: string,
   restartInfoFile?: string,
 ) {
+  // Set default values for optional parameters
+  const resolvedLocalPath = localPath || path.join(process.cwd(), "local");
+  const resolvedStorageContextFilePath = storageContextFilePath || path.join(resolvedLocalPath, "storagecontext.json");
+  const resolvedSecretFilePath = secretsFilePath || path.join(resolvedLocalPath, "secret.txt");
+  
   await execCommand(
     application,
     task,
     parametersFile,
     restartInfoFile,
-    localPath,
-    secretsFilePath,
+    resolvedLocalPath,
+    resolvedStorageContextFilePath,
+    resolvedSecretFilePath,
   );
 }
 
@@ -143,13 +161,16 @@ function printHelp() {
   console.log("    Start the web application server");
   console.log("");
   console.log("Options:");
-  console.log("  --local <path>              Path to the local data directory");
-  console.log("                             For exec: default is 'local' in current working directory");
-  console.log("                             For web app: default is 'examples' in current working directory");
-  console.log("                             If --local is specified without a value, uses 'local'");
-  console.log("  --secretsFilePath <path>   Path to the secrets file for encryption/decryption");
-  console.log("  --restartInfoFile <path>   Path to the restart info JSON file (exec command only)");
-  console.log("  --help, -h                 Show this help message");
+  console.log("  --local <path>                    Path to the local data directory");
+  console.log("                                   For exec: default is 'local' in current working directory");
+  console.log("                                   For web app: default is 'examples' in current working directory");
+  console.log("                                   If --local is specified without a value, uses 'local'");
+  console.log("  --storageContextFilePath <path>   Path to the storage context file (storagecontext.json)");
+  console.log("                                   Default: <localPath>/storagecontext.json");
+  console.log("  --secretsFilePath <path>          Path to the secrets file for encryption/decryption");
+  console.log("                                   Default: <localPath>/secret.txt");
+  console.log("  --restartInfoFile <path>          Path to the restart info JSON file (exec command only)");
+  console.log("  --help, -h                       Show this help message");
   console.log("");
   console.log("Task Types (for exec command):");
   VALID_TASK_TYPES.forEach(task => {
@@ -184,7 +205,9 @@ async function main() {
     // If no command, start webapp
     if (!args.command) {
       const localPath = args.localPath || path.join(process.cwd(), "examples");
-      await startWebApp(localPath, args.secretsFilePath);
+      const storageContextFilePath = args.storageContextFilePath || path.join(localPath, "storagecontext.json");
+      const secretFilePath = args.secretsFilePath || path.join(localPath, "secret.txt");
+      await startWebApp(localPath, storageContextFilePath, secretFilePath);
       return;
     }
     
@@ -205,11 +228,14 @@ async function main() {
         console.error("  <parameters file> Path to the JSON file containing task parameters");
         console.error("");
         console.error("Options:");
-        console.error("  --local <path>              Path to the local data directory");
-        console.error("                             (default: 'local' in current working directory)");
-        console.error("                             If --local is specified without a value, uses 'local'");
-        console.error("  --secretsFilePath <path>   Path to the secrets file for encryption/decryption");
-        console.error("  --restartInfoFile <path>   Path to the restart info JSON file");
+        console.error("  --local <path>                    Path to the local data directory");
+        console.error("                                   (default: 'local' in current working directory)");
+        console.error("                                   If --local is specified without a value, uses 'local'");
+        console.error("  --storageContextFilePath <path>   Path to the storage context file (storagecontext.json)");
+        console.error("                                   (default: <localPath>/storagecontext.json)");
+        console.error("  --secretsFilePath <path>          Path to the secrets file for encryption/decryption");
+        console.error("                                   (default: <localPath>/secret.txt)");
+        console.error("  --restartInfoFile <path>          Path to the restart info JSON file");
         console.error("");
         console.error("Examples:");
         console.error("  lxc-manager exec node-red installation ./params.json");
@@ -228,6 +254,7 @@ async function main() {
         args.task,
         args.parametersFile,
         args.localPath,
+        args.storageContextFilePath,
         args.secretsFilePath,
         args.restartInfoFile,
       );
@@ -241,9 +268,12 @@ async function main() {
       console.error("  lxc-manager [options]");
       console.error("");
       console.error("Options:");
-      console.error("  --local <path>            Path to the local data directory");
-      console.error("                           (default: 'examples' in current working directory)");
-      console.error("  --secretsFilePath <path> Path to the secrets file for encryption/decryption");
+      console.error("  --local <path>                    Path to the local data directory");
+      console.error("                                   (default: 'examples' in current working directory)");
+      console.error("  --storageContextFilePath <path>   Path to the storage context file (storagecontext.json)");
+      console.error("                                   (default: <localPath>/storagecontext.json)");
+      console.error("  --secretsFilePath <path>          Path to the secrets file for encryption/decryption");
+      console.error("                                   (default: <localPath>/secret.txt)");
       process.exit(1);
     }
   } catch (err: any) {

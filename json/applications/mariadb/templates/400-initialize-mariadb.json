@@ -1,0 +1,22 @@
+{
+  "execute_on": "lxc",
+  "name": "Initialize MariaDB",
+  "description": "Initialize MariaDB data directory and prepare the database",
+  "parameters": [
+    {
+      "id": "datadir",
+      "name": "Data Directory",
+      "type": "string",
+      "default": "/var/lib/mysql",
+      "required": true,
+      "description": "Directory where MariaDB stores its data files"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Initialize MariaDB",
+      "script": "initialize-mariadb.sh",
+      "description": "Initialize the MariaDB data directory"
+    }
+  ]
+}

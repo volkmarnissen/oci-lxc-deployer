@@ -1,0 +1,52 @@
+{
+  "execute_on": "lxc",
+  "name": "Create MariaDB User and Database",
+  "description": "Create a MariaDB user and database with full permissions",
+  "parameters": [
+    {
+      "id": "db_user",
+      "name": "Database User",
+      "type": "string",
+      "required": true,
+      "description": "Username for the MariaDB user"
+    },
+    {
+      "id": "db_password",
+      "name": "Database Password",
+      "type": "string",
+      "required": true,
+      "secure": true,
+      "description": "Password for the MariaDB user"
+    },
+    {
+      "id": "db_name",
+      "name": "Database Name",
+      "type": "string",
+      "required": true,
+      "description": "Name of the database to create"
+    },
+    {
+      "id": "db_host",
+      "name": "Allowed Host",
+      "type": "string",
+      "default": "%",
+      "required": false,
+      "description": "Host from which the user can connect (use % for any host, localhost for local only)"
+    },
+    {
+      "id": "root_password",
+      "name": "Root Password",
+      "type": "string",
+      "required": false,
+      "secure": true,
+      "description": "MariaDB root password (required if root password was set during installation)"
+    }
+  ],
+  "commands": [
+    {
+      "name": "Create User and Database",
+      "script": "create-mariadb-user.sh",
+      "description": "Create MariaDB user and database with full permissions"
+    }
+  ]
+}
