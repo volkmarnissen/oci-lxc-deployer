@@ -1,0 +1,50 @@
+{
+  "name": "Map ZFS Pool to LXC Container",
+  "description": "Maps a ZFS pool from the Proxmox host into an LXC container as a bind mount, with UID/GID mapping.\n\nThe ZFS pool must already be mounted (which is always the case in Proxmox). A subdirectory is created under the pool mountpoint and bound to the container.\n\nThis template can be called independently of the LXC container's state (running or stopped) and is safe to call multiple times (idempotent), e.g. before using the share.",
+  "execute_on": "ve",
+  "parameters": [
+    {
+      "id": "vm_id",
+      "name": "ID of the LXC Container",
+      "type": "string",
+      "required": true,
+      "description": "ID of the LXC container to which the ZFS pool will be mapped."
+    },
+    {
+      "id": "storage_selection",
+      "name": "Storage Selection",
+      "type": "enum",
+      "required": true,
+      "enumValuesTemplate": "list-available-storage.json",
+      "description": "Select ZFS pool to mount. Only pools prefixed with 'zfs:' are shown."
+    },
+    {
+      "id": "mountpoint",
+      "name": "Mount point host & container",
+      "type": "string",
+      "required": true,
+      "default": "/mnt/zfs",
+      "description": "Mount point on the Proxmox host and inside the container."
+    },
+    {
+      "id": "uid",
+      "name": "UID for mount directory",
+      "type": "string",
+      "required": true,
+      "description": "UID to set for the mount directory and bind mount."
+    },
+    {
+      "id": "gid",
+      "name": "GID for mount directory",
+      "type": "string",
+      "required": true,
+      "description": "GID to set for the mount directory and bind mount."
+    }
+  ],
+  "commands": [
+    {
+      "script": "map-zfs-pool.sh",
+      "description": "Executes the script to map the ZFS pool and set up the bind mount in the container."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "execute_on": "ve",
+  "name": "List Available Storage",
+  "description": "List all available storage options on the VE host: unmounted filesystem partitions (by UUID) and mounted ZFS pools. In Proxmox, ZFS pools are always mounted. Values are prefixed with 'uuid:' for filesystems and 'zfs:' for ZFS pools.",
+  "outputs": ["enumValues"],
+  "commands": [
+    {
+      "name": "List Available Storage",
+      "script": "list-available-storage.sh"
+    }
+  ]
+}

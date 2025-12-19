@@ -12,15 +12,32 @@
 # All output is sent to stderr. Script is idempotent and can be run multiple times safely.
 
 VMID="{{ vm_id}}"
-UUID="{{ host_device_uuid}}"
-DISK_SIZE="{{ disk_size}}"
+STORAGE_SELECTION="{{ storage_selection}}"
 MOUNTPOINT="{{ mountpoint}}"
 UID="{{ uid}}"
 GID="{{ gid}}"
 
 # Check that all parameters are not empty
-if [ -z "$VMID" ] || [ -z "$UUID" ] || [ -z "$DISK_SIZE" ] || [ -z "$MOUNTPOINT" ] || [ -z "$UID" ] || [ -z "$GID" ]; then
-  echo "Error: All parameters (vm_id, host_device_uuid, disk_size, mountpoint, uid, gid) must be set and not empty!" >&2
+if [ -z "$VMID" ] || [ -z "$STORAGE_SELECTION" ] || [ -z "$MOUNTPOINT" ] || [ -z "$UID" ] || [ -z "$GID" ]; then
+  echo "Error: All parameters (vm_id, storage_selection, mountpoint, uid, gid) must be set and not empty!" >&2
+  exit 1
+fi
+
+# Parse storage selection: uuid:... or zfs:...
+if echo "$STORAGE_SELECTION" | grep -q "^uuid:"; then
+  UUID=$(echo "$STORAGE_SELECTION" | sed 's/^uuid://')
+  STORAGE_TYPE="uuid"
+elif echo "$STORAGE_SELECTION" | grep -q "^zfs:"; then
+  POOL_NAME=$(echo "$STORAGE_SELECTION" | sed 's/^zfs://')
+  STORAGE_TYPE="zfs"
+else
+  echo "Error: Invalid storage selection format. Must start with 'uuid:' or 'zfs:'" >&2
+  exit 1
+fi
+
+# For ZFS pools, redirect to zfs pool mapping (this should not happen if UI filters correctly)
+if [ "$STORAGE_TYPE" = "zfs" ]; then
+  echo "Error: ZFS pools should be mapped using the map-zfs-pool template, not map-disk." >&2
   exit 1
 fi
 

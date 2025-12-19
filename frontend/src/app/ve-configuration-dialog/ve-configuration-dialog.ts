@@ -82,6 +82,14 @@ export class VeConfigurationDialog implements OnInit {
     return param.description;
   }
 
+  getEnumOptionLabel(option: string | { name: string; value: string | number | boolean }): string {
+    return typeof option === 'string' ? option : option.name;
+  }
+
+  getEnumOptionValue(option: string | { name: string; value: string | number | boolean }): string | number | boolean {
+    return typeof option === 'string' ? option : option.value;
+  }
+
   async onFileSelected(event: Event, paramId: string): Promise<void> {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
