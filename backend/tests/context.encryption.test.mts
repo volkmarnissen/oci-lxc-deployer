@@ -15,8 +15,9 @@ function makeTempFile(): string {
 describe("Context file encryption", () => {
   it("fails or differs when using a different secret.txt", () => {
     const filePath = makeTempFile();
-    const storageContextPath = path.join(filePath, "storagecontext.json");
-    const secretFilePath = path.join(filePath, "secret.txt");
+    const storageContextPath = filePath; // makeTempFile already returns the full path to storagecontext.json
+    const dir = path.dirname(filePath); // Get the directory containing the file
+    const secretFilePath = path.join(dir, "secret.txt");
 
     const ctx = new Context(storageContextPath, secretFilePath);
     ctx.set("ve_test", {

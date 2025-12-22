@@ -685,4 +685,256 @@ describe("VeExecution", () => {
       }
     } catch {}
   });
+
+  it("should collect list variables and format them as key=value lines", async () => {
+    const commands: ICommand[] = [
+      {
+        command: "echo '{{ volumes }}'",
+        name: "test-list-variables",
+        execute_on: "ve",
+      },
+    ];
+
+    const inputs: { id: string; value: string | number | boolean }[] = [
+      { id: "volume1", value: "/var/lib/myapp/data" },
+      { id: "volume2", value: "/var/lib/myapp/logs" },
+    ];
+
+    let capturedCommand = "";
+
+    class TestExec extends VeExecution {
+      protected async runOnVeHost(
+        input: string,
+        tmplCommand: ICommand
+      ): Promise<IVeExecuteMessage> {
+        // Capture the processed command to verify variable replacement
+        capturedCommand = input;
+        return {
+          command: tmplCommand.name,
+          execute_on: tmplCommand.execute_on ?? "",
+          exitCode: 0,
+          result: "OK",
+          stderr: "",
+          commandtext: input,
+        };
+      }
+    }
+
+    const exec = new TestExec(commands, inputs, dummyVE, new Map(), "/bin/sh");
+
+    // Set up outputs with list.volumes.* pattern
+    exec.outputs.set("list.volumes.volume1", "/var/lib/myapp/data");
+    exec.outputs.set("list.volumes.volume2", "/var/lib/myapp/logs");
+
+    // Execute the command
+    await exec.run();
+    
+    // The command should have volumes replaced with key=value lines
+    const expectedOutput = `volume1=/var/lib/myapp/data
+volume2=/var/lib/myapp/logs`;
+    
+    expect(capturedCommand).toContain(expectedOutput);
+  });
+
+  it("should handle list variables from outputs, inputs, and defaults with priority", async () => {
+    const commands: ICommand[] = [
+      {
+        command: "echo '{{ envvars }}'",
+        name: "test-list-variables-priority",
+        execute_on: "ve",
+      },
+    ];
+
+    const inputs: { id: string; value: string | number | boolean }[] = [
+      { id: "var1", value: "input-value" },
+    ];
+
+    const defaults = new Map<string, string | number | boolean>();
+    defaults.set("list.envvars.var2", "default-value");
+
+    let capturedCommand = "";
+
+    class TestExec extends VeExecution {
+      protected async runOnVeHost(
+        input: string,
+        tmplCommand: ICommand
+      ): Promise<IVeExecuteMessage> {
+        capturedCommand = input;
+        return {
+          command: tmplCommand.name,
+          execute_on: tmplCommand.execute_on ?? "",
+          exitCode: 0,
+          result: "OK",
+          stderr: "",
+          commandtext: input,
+        };
+      }
+    }
+    const exec = new TestExec(commands, inputs, dummyVE, defaults, "/bin/sh");
+
+    // Set up outputs with list.envvars.* pattern (highest priority)
+    exec.outputs.set("list.envvars.var1", "output-value");
+    exec.outputs.set("list.envvars.var2", "output-override");
+    exec.outputs.set("list.envvars.var3", "output-only");
+
+    // Execute the command
+    await exec.run();
+    
+    // Outputs should take precedence over inputs and defaults
+    // var1 should be from outputs, not inputs
+    expect(capturedCommand).toContain("var1=output-value");
+    // var2 should be from outputs, not defaults
+    expect(capturedCommand).toContain("var2=output-override");
+    // var3 should be from outputs only
+    expect(capturedCommand).toContain("var3=output-only");
+    
+    // Should not contain input value
+    expect(capturedCommand).not.toContain("input-value");
+    // Should not contain default value
+    expect(capturedCommand).not.toContain("default-value");
+  });
+
+  it("should handle list variables from context with highest priority", () => {
+    const commands: ICommand[] = [
+      {
+        command: "echo '{{ volumes }}'",
+        name: "test-list-variables-context",
+        execute_on: "ve",
+      },
+    ];
+
+    const inputs: { id: string; value: string | number | boolean }[] = [];
+
+    class TestExec extends VeExecution {
+      protected async runOnVeHost(
+        input: string,
+        tmplCommand: ICommand
+      ): Promise<IVeExecuteMessage> {
+        return {
+          command: tmplCommand.name,
+          execute_on: tmplCommand.execute_on!,
+          exitCode: 0,
+          result: "OK",
+          stderr: "",
+          commandtext: input,
+        };
+      }
+      public callReplaceVarsWithContext(
+        str: string,
+        ctx: Record<string, any>,
+      ): string {
+        return this.replaceVarsWithContext(str, ctx);
+      }
+    }
+
+    const exec = new TestExec(commands, inputs, dummyVE, new Map(), "/bin/sh");
+
+    // Set up outputs
+    exec.outputs.set("list.volumes.volume1", "/var/lib/myapp/data");
+    exec.outputs.set("list.volumes.volume2", "/var/lib/myapp/logs");
+
+    // Create context with list.volumes.* entries (should take precedence)
+    const context = {
+      "list.volumes.volume1": "/var/lib/myapp/data-from-context",
+      "list.volumes.volume3": "/var/lib/myapp/cache",
+    };
+
+    // Replace variables with context
+    const processedCommand = exec.callReplaceVarsWithContext(
+      "echo '{{ volumes }}'",
+      context,
+    );
+
+    // The processed command should have the volumes replaced
+    // Extract the volumes part (between the quotes)
+    const volumesMatch = processedCommand.match(/echo '([^']+)'/);
+    expect(volumesMatch).not.toBeNull();
+    const volumesContent = volumesMatch![1]!;
+    
+    // Split by newlines to get individual volume entries
+    const volumeLines = volumesContent.split('\n');
+    
+    // Context values should take precedence
+    expect(volumeLines).toContain("volume1=/var/lib/myapp/data-from-context");
+    // volume2 should come from outputs (not in context)
+    expect(volumeLines).toContain("volume2=/var/lib/myapp/logs");
+    // volume3 should come from context
+    expect(volumeLines).toContain("volume3=/var/lib/myapp/cache");
+    
+    // Should not contain the original output value for volume1
+    expect(volumeLines).not.toContain("volume1=/var/lib/myapp/data");
+  });
+
+  it("should work with example from set-parameters.json template", async () => {
+    // This test matches the example template provided:
+    // {
+    //   "commands": [
+    //     {
+    //       "command": "[{ \"id\":\"list.volumes.volume1\",\"value\":\"{{ volume1 }}\"},{\"id\":\"list.volumes.volume2\",\"value\":\"{{ volume2 }}\"}]"
+    //     }
+    //   ],
+    //   "outputs": [
+    //     { "id": "list.volumes" }
+    //   ]
+    // }
+    
+    const commands: ICommand[] = [
+      {
+        command: "echo '{{ volumes }}'",
+        name: "test-example-template",
+        execute_on: "ve",
+      },
+    ];
+
+    const inputs: { id: string; value: string | number | boolean }[] = [
+      { id: "volume1", value: "/var/lib/myapp/data" },
+      { id: "volume2", value: "/var/lib/myapp/logs" },
+    ];
+
+    let capturedCommand = "";
+
+    class TestExec extends VeExecution {
+      protected async runOnVeHost(
+        input: string,
+        tmplCommand: ICommand
+      ): Promise<IVeExecuteMessage> {
+        capturedCommand = input;
+        return {
+          command: tmplCommand.name,
+          execute_on: tmplCommand.execute_on as string,
+          exitCode: 0,
+          result: "OK",
+          stderr: "",
+          commandtext: input,
+        };
+      }
+    }
+
+    const exec = new TestExec(commands, inputs, dummyVE, new Map(), "/bin/sh");
+
+    // Simulate outputs from set-parameters.json template command
+    // The command would output: [{ "id":"list.volumes.volume1","value":"/var/lib/myapp/data"},{"id":"list.volumes.volume2","value":"/var/lib/myapp/logs"}]
+    exec.outputs.set("list.volumes.volume1", "/var/lib/myapp/data");
+    exec.outputs.set("list.volumes.volume2", "/var/lib/myapp/logs");
+
+    // Execute the command
+    await exec.run();
+    
+    // Extract the volumes content from the command
+    const volumesMatch = capturedCommand.match(/echo '([^']+)'/);
+    expect(volumesMatch).not.toBeNull();
+    const volumesContent = volumesMatch![1]!;
+    
+    // Split by newlines to get individual volume entries
+    const volumeLines = volumesContent.split('\n');
+    
+    // Verify the expected format: key=value lines
+    expect(volumeLines).toContain("volume1=/var/lib/myapp/data");
+    expect(volumeLines).toContain("volume2=/var/lib/myapp/logs");
+    
+    // Verify the format is correct (key=value, one per line)
+    expect(volumeLines.length).toBe(2);
+    expect(volumeLines[0]).toMatch(/^volume\d+=/);
+    expect(volumeLines[1]).toMatch(/^volume\d+=/);
+  });
 });

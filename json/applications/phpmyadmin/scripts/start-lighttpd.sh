@@ -15,3 +15,4 @@ if ! rc-service lighttpd status >/dev/null 2>&1; then
 fi
 
 exit 0
+

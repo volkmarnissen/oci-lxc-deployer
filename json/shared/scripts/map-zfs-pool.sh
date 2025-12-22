@@ -135,3 +135,4 @@ fi
 
 echo "ZFS pool $POOL_NAME successfully mapped to container $VMID: $CONTAINER_DIR -> $MOUNTPOINT" >&2
 exit 0
+

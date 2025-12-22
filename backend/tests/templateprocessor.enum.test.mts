@@ -69,7 +69,14 @@ describe("TemplateProcessor enum handling", () => {
     expect(dynParam).toBeDefined();
     // TemplateProcessor should surface the enumValuesTemplate to webuiTemplates
     expect(loaded.webuiTemplates).toContain("list-enum-values.json");
-    // And should inject enumValues from the template output (value fields)
-    expect((dynParam as any).enumValues).toEqual(["eth0", "eth1"]);
+    // And should inject enumValues from the template output
+    // The template returns [{name: "eth0", value: "eth0"}, {name: "eth1", value: "eth1"}]
+    // TemplateProcessor assigns rc.outputs directly to enumValues
+    const enumValues = (dynParam as any).enumValues;
+    expect(Array.isArray(enumValues)).toBe(true);
+    expect(enumValues.length).toBe(2);
+    // Check that it contains the expected objects
+    expect(enumValues).toContainEqual({ name: "eth0", value: "eth0" });
+    expect(enumValues).toContainEqual({ name: "eth1", value: "eth1" });
   });
 });
