@@ -168,7 +168,17 @@ export class WebAppVE {
                     existingMsg.result = (existingMsg.result || "") + (msg.result || "");
                   }
                   // Update other fields if provided
-                  if (msg.exitCode !== undefined) existingMsg.exitCode = msg.exitCode;
+                  if (msg.exitCode !== undefined) {
+                    existingMsg.exitCode = msg.exitCode;
+                    // Reset error flag if exitCode is 0 (success)
+                    if (msg.exitCode === 0) {
+                      existingMsg.error = false;
+                    }
+                  }
+                  // Update error flag if explicitly provided
+                  if (msg.error !== undefined) {
+                    existingMsg.error = msg.error;
+                  }
                   return; // Don't add as new message, just update existing
                 } else {
                   // Non-partial message with same index: skip duplicate
@@ -190,6 +200,18 @@ export class WebAppVE {
                   // Update partial flag if not already set
                   if (lastMsg.partial === undefined) {
                     lastMsg.partial = true;
+                  }
+                  // Update exitCode and error flag if provided
+                  if (msg.exitCode !== undefined) {
+                    lastMsg.exitCode = msg.exitCode;
+                    // Reset error flag if exitCode is 0 (success)
+                    if (msg.exitCode === 0) {
+                      lastMsg.error = false;
+                    }
+                  }
+                  // Update error flag if explicitly provided
+                  if (msg.error !== undefined) {
+                    lastMsg.error = msg.error;
                   }
                   return; // Don't add as new message, just update existing
                 }
@@ -334,7 +356,17 @@ export class WebAppVE {
                   existingMsg.result = (existingMsg.result || "") + (msg.result || "");
                 }
                 // Update other fields if provided
-                if (msg.exitCode !== undefined) existingMsg.exitCode = msg.exitCode;
+                if (msg.exitCode !== undefined) {
+                  existingMsg.exitCode = msg.exitCode;
+                  // Reset error flag if exitCode is 0 (success)
+                  if (msg.exitCode === 0) {
+                    existingMsg.error = false;
+                  }
+                }
+                // Update error flag if explicitly provided
+                if (msg.error !== undefined) {
+                  existingMsg.error = msg.error;
+                }
                 return; // Don't add as new message, just update existing
               } else {
                 // Non-partial message with same index: skip duplicate
@@ -356,6 +388,18 @@ export class WebAppVE {
                 // Update partial flag if not already set
                 if (lastMsg.partial === undefined) {
                   lastMsg.partial = true;
+                }
+                // Update exitCode and error flag if provided
+                if (msg.exitCode !== undefined) {
+                  lastMsg.exitCode = msg.exitCode;
+                  // Reset error flag if exitCode is 0 (success)
+                  if (msg.exitCode === 0) {
+                    lastMsg.error = false;
+                  }
+                }
+                // Update error flag if explicitly provided
+                if (msg.error !== undefined) {
+                  lastMsg.error = msg.error;
                 }
                 return; // Don't add as new message, just update existing
               }
