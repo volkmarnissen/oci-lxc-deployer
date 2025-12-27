@@ -48,6 +48,11 @@ export interface IVMContext {
   data: any;
   getKey(): string;
 }
+export interface IVMInstallContext {
+  hostname: string;
+  application: string;
+  changedParams: Array<{ name: string; value: string | number | boolean }>;
+}
 export interface IApplicationBase {
   name: string;
   extends?: string;

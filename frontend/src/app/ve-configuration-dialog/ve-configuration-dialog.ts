@@ -132,9 +132,9 @@ export class VeConfigurationDialog implements OnInit {
     if (this.form.invalid) return;
     this.loading.set(true);
     
-    // Separate params and outputs based on changed values
+    // Separate params and changed parameters
     const params: VeConfigurationParam[] = [];
-    const outputs: { id: string; value: IParameterValue }[] = [];
+    const changedParams: VeConfigurationParam[] = [];
     
     for (const [paramId, currentValue] of Object.entries(this.form.value) as [string, IParameterValue][]) {
       const initialValue = this.initialValues.get(paramId);
@@ -143,9 +143,9 @@ export class VeConfigurationDialog implements OnInit {
                         (currentValue !== null && currentValue !== undefined && currentValue !== '');
       
       if (hasChanged) {
-        // For now, we treat all changed parameters as params
-        // The backend will determine which are outputs based on template definitions
+        // Collect changed parameters for vmInstallContext
         if (currentValue !== null && currentValue !== undefined && currentValue !== '') {
+          changedParams.push({ name: paramId, value: currentValue as IParameterValue });
           params.push({ name: paramId, value: currentValue as IParameterValue });
         }
       } else if (currentValue !== null && currentValue !== undefined && currentValue !== '') {
@@ -157,8 +157,8 @@ export class VeConfigurationDialog implements OnInit {
     const application = this.data.app.id;
     const task = 'installation';
     
-    // For now, send outputs as empty array - will be populated by backend logic later
-    this.configService.postVeConfiguration(application, task, params, outputs.length > 0 ? outputs : undefined).subscribe({
+    // Pass changedParams to backend for vmInstallContext
+    this.configService.postVeConfiguration(application, task, params, changedParams.length > 0 ? changedParams : undefined).subscribe({
       next: (res) => {
         this.loading.set(false);
         // Navigate to process monitor; pass restartKey and original parameters

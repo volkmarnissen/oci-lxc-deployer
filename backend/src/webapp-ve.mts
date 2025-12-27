@@ -240,7 +240,7 @@ export class WebAppVE {
       IPostVeConfigurationBody
     >(ApiUri.VeConfiguration, async (req, res) => {
       const { application, task, veContext: veContextKey } = req.params;
-      const { params, outputs } = req.body;
+      const { params, outputs, changedParams } = req.body;
       if (!Array.isArray(params)) {
         return res
           .status(400)
@@ -251,6 +251,12 @@ export class WebAppVE {
         return res
           .status(400)
           .json({ success: false, error: "Invalid outputs" });
+      }
+      // Accept changedParams array if provided (for vmInstallContext)
+      if (changedParams !== undefined && !Array.isArray(changedParams)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid changedParams" });
       }
       try {
         // Load application (provides commands)
@@ -266,6 +272,19 @@ export class WebAppVE {
         const templateProcessor = veCtxToUse
           .getStorageContext()
           .getTemplateProcessor();
+        
+        // Save vmInstallContext if changedParams are provided
+        if (changedParams && changedParams.length > 0) {
+          const hostname = typeof veCtxToUse.host === "string" 
+            ? veCtxToUse.host 
+            : (veCtxToUse.host as any)?.host || "unknown";
+          storageContext.setVMInstallContext({
+            hostname,
+            application,
+            changedParams: changedParams.map(p => ({ name: p.name, value: p.value })),
+          });
+        }
+        
         const loaded = await templateProcessor.loadApplication(
           application,
           task as TaskType,
