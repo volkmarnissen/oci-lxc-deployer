@@ -1,8 +1,6 @@
 import { EventEmitter } from "events";
 import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import fs from "node:fs";
 import { IVEContext, IVMContext } from "./backend-types.mjs";
-import { VMContext } from "./storagecontext.mjs";
 import { VariableResolver } from "./variable-resolver.mjs";
 import { OutputProcessor } from "./output-processor.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
@@ -16,6 +14,8 @@ import {
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 import { VeExecutionSshExecutor } from "./ve-execution-ssh-executor.mjs";
 import { VeExecutionHostDiscovery } from "./ve-execution-host-discovery.mjs";
+import { VeExecutionCommandProcessor } from "./ve-execution-command-processor.mjs";
+import { VeExecutionStateManager } from "./ve-execution-state-manager.mjs";
 
 // Re-export for backward compatibility
 export type { IOutput, IProxmoxRunResult, IRestartInfo };
@@ -35,6 +35,8 @@ export class VeExecution extends EventEmitter {
   private messageEmitter: VeExecutionMessageEmitter;
   private sshExecutor: VeExecutionSshExecutor;
   private hostDiscovery: VeExecutionHostDiscovery;
+  private commandProcessor!: VeExecutionCommandProcessor;
+  private stateManager: VeExecutionStateManager;
   
   constructor(
     commands: ICommand[],
@@ -89,6 +91,14 @@ export class VeExecution extends EventEmitter {
       variableResolver: this.variableResolver,
       runOnLxc: (vm_id, command, tmplCommand) => this.runOnLxc(vm_id, command, tmplCommand),
     });
+    this.stateManager = new VeExecutionStateManager({
+      outputs: this.outputs,
+      outputsRaw: this.outputsRaw,
+      inputs: this.inputs,
+      defaults: this.defaults,
+      veContext: this.veContext,
+      initializeVariableResolver: () => this.initializeVariableResolver(),
+    });
   }
 
   /**
@@ -100,6 +110,50 @@ export class VeExecution extends EventEmitter {
       () => this.inputs,
       () => this.defaults,
     );
+  }
+
+  /**
+   * Updates helper modules with current state (called when state might have changed).
+   */
+  private updateHelperModules(): void {
+    this.sshExecutor = new VeExecutionSshExecutor({
+      veContext: this.veContext,
+      sshCommand: this.sshCommand,
+      scriptTimeoutMs: this.scriptTimeoutMs,
+      messageEmitter: this.messageEmitter,
+      outputProcessor: this.outputProcessor,
+      outputsRaw: this.outputsRaw,
+      setOutputsRaw: (raw) => {
+        this.outputsRaw = raw;
+      },
+    });
+    this.hostDiscovery = new VeExecutionHostDiscovery({
+      sshExecutor: this.sshExecutor,
+      outputs: this.outputs,
+      variableResolver: this.variableResolver,
+      runOnLxc: (vm_id, cmd, tmplCmd) => this.runOnLxc(vm_id, cmd, tmplCmd),
+    });
+    this.commandProcessor = new VeExecutionCommandProcessor({
+      outputs: this.outputs,
+      inputs: this.inputs,
+      variableResolver: this.variableResolver,
+      messageEmitter: this.messageEmitter,
+      runOnLxc: (vm_id, cmd, tmplCmd) => this.runOnLxc(vm_id, cmd, tmplCmd),
+      runOnVeHost: (input, cmd, timeout, remote) => this.runOnVeHost(input, cmd, timeout, remote),
+      executeOnHost: (hostname, cmd, tmplCmd) => this.executeOnHost(hostname, cmd, tmplCmd),
+      outputsRaw: this.outputsRaw,
+      setOutputsRaw: (raw) => {
+        this.outputsRaw = raw;
+      },
+    });
+    this.stateManager = new VeExecutionStateManager({
+      outputs: this.outputs,
+      outputsRaw: this.outputsRaw,
+      inputs: this.inputs,
+      defaults: this.defaults,
+      veContext: this.veContext,
+      initializeVariableResolver: () => this.initializeVariableResolver(),
+    });
   }
 
   /**
@@ -142,17 +196,7 @@ export class VeExecution extends EventEmitter {
     const actualTimeout = timeoutMs !== undefined ? timeoutMs : this.scriptTimeoutMs;
     
     // Update sshExecutor for helper methods
-    this.sshExecutor = new VeExecutionSshExecutor({
-      veContext: this.veContext,
-      sshCommand: this.sshCommand,
-      scriptTimeoutMs: this.scriptTimeoutMs,
-      messageEmitter: this.messageEmitter,
-      outputProcessor: this.outputProcessor,
-      outputsRaw: this.outputsRaw,
-      setOutputsRaw: (raw) => {
-        this.outputsRaw = raw;
-      },
-    });
+    this.updateHelperModules();
     const uniqueMarker = this.sshExecutor.createUniqueMarker();
     
     const { stdout, stderr, exitCode } = await this.executeSshCommand(
@@ -225,244 +269,13 @@ export class VeExecution extends EventEmitter {
     command: string,
     tmplCommand: ICommand,
   ): Promise<void> {
-    // Update sshExecutor and hostDiscovery dependencies in case they changed
-    this.sshExecutor = new VeExecutionSshExecutor({
-      veContext: this.veContext,
-      sshCommand: this.sshCommand,
-      scriptTimeoutMs: this.scriptTimeoutMs,
-      messageEmitter: this.messageEmitter,
-      outputProcessor: this.outputProcessor,
-      outputsRaw: this.outputsRaw,
-      setOutputsRaw: (raw) => {
-        this.outputsRaw = raw;
-      },
-    });
-    this.hostDiscovery = new VeExecutionHostDiscovery({
-      sshExecutor: this.sshExecutor,
-      outputs: this.outputs,
-      variableResolver: this.variableResolver,
-      runOnLxc: (vm_id, cmd, tmplCmd) => this.runOnLxc(vm_id, cmd, tmplCmd),
-    });
+    // Update helper modules in case state changed
+    this.updateHelperModules();
     return await this.hostDiscovery.executeOnHost(hostname, command, tmplCommand, this);
   }
 
-  /**
-   * Restores state from restart info and returns the starting index.
-   */
-  private restoreStateFromRestartInfo(restartInfo: IRestartInfo | null): number {
-    if (!restartInfo) return 0;
 
-    // Load previous state
-    this.outputs.clear();
-    this.inputs = {};
-    this.defaults.clear();
-    const startIdx = restartInfo.lastSuccessfull !== undefined ? restartInfo.lastSuccessfull + 1 : 0;
-    
-    for (const inp of restartInfo.inputs) {
-      this.inputs[inp.name] = inp.value;
-    }
-    for (const outp of restartInfo.outputs) {
-      this.outputs.set(outp.name, outp.value);
-    }
-    for (const def of restartInfo.defaults) {
-      this.defaults.set(def.name, def.value);
-    }
-    
-    // Re-initialize variable resolver with updated state
-    this.initializeVariableResolver();
-    
-    return startIdx;
-  }
 
-  /**
-   * Handles a skipped command by emitting a message.
-   */
-  private handleSkippedCommand(cmd: ICommand, msgIndex: number): number {
-    this.messageEmitter.emitStandardMessage(
-      cmd,
-      cmd.description || "Skipped: all required parameters missing",
-      null,
-      0,
-      msgIndex,
-    );
-    return msgIndex + 1;
-  }
-
-  /**
-   * Processes a single property entry and sets it in outputs if valid.
-   */
-  private processPropertyEntry(entry: { id: string; value?: any }): void {
-    if (!entry || typeof entry !== "object" || !entry.id || entry.value === undefined) {
-      return;
-    }
-    
-    let value = entry.value;
-    // Replace variables in value if it's a string
-    if (typeof value === "string") {
-      value = this.variableResolver.replaceVars(value);
-      // Skip property if value is "NOT_DEFINED" (optional parameter not set)
-      if (value === "NOT_DEFINED") {
-        return; // Skip this property
-      }
-    }
-    // Only set if value is a primitive type (not array)
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      this.outputs.set(entry.id, value);
-    }
-  }
-
-  /**
-   * Handles a properties command by processing all properties and emitting a message.
-   */
-  private handlePropertiesCommand(cmd: ICommand, msgIndex: number): number {
-    try {
-      if (Array.isArray(cmd.properties)) {
-        // Array of {id, value} objects
-        for (const entry of cmd.properties) {
-          this.processPropertyEntry(entry);
-        }
-      } else if (cmd.properties && typeof cmd.properties === "object" && "id" in cmd.properties) {
-        // Single object with id and value
-        this.processPropertyEntry(cmd.properties as { id: string; value?: any });
-      }
-      
-      // Emit success message
-      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
-      this.messageEmitter.emitStandardMessage(
-        propertiesCmd,
-        "",
-        JSON.stringify(cmd.properties),
-        0,
-        msgIndex,
-      );
-      return msgIndex + 1;
-    } catch (err: any) {
-      const msg = `Failed to process properties: ${err?.message || err}`;
-      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
-      this.messageEmitter.emitStandardMessage(propertiesCmd, msg, null, -1, msgIndex);
-      return msgIndex + 1;
-    }
-  }
-
-  /**
-   * Loads command content from script file or command string.
-   */
-  private loadCommandContent(cmd: ICommand): string | null {
-    if (cmd.script !== undefined) {
-      // Read script file, replace variables, then execute
-      return fs.readFileSync(cmd.script, "utf-8");
-    } else if (cmd.command !== undefined) {
-      return cmd.command;
-    }
-    return null;
-  }
-
-  /**
-   * Gets vm_id from inputs or outputs.
-   */
-  private getVmId(): string | number | undefined {
-    if (typeof this.inputs["vm_id"] === "string" || typeof this.inputs["vm_id"] === "number") {
-      return this.inputs["vm_id"];
-    }
-    if (this.outputs.has("vm_id")) {
-      const v = this.outputs.get("vm_id");
-      if (typeof v === "string" || typeof v === "number") {
-        return v;
-      }
-    }
-    return undefined;
-  }
-
-  /**
-   * Executes a command based on its execute_on target.
-   */
-  private async executeCommandByTarget(
-    cmd: ICommand,
-    rawStr: string,
-  ): Promise<IVeExecuteMessage | undefined> {
-    switch (cmd.execute_on) {
-      case "lxc": {
-        const execStrLxc = this.variableResolver.replaceVars(rawStr);
-        const vm_id = this.getVmId();
-        if (!vm_id) {
-          const msg = "vm_id is required for LXC execution but was not found in inputs or outputs.";
-          this.messageEmitter.emitStandardMessage(cmd, msg, null, -1, -1);
-          throw new Error(msg);
-        }
-        await this.runOnLxc(vm_id, execStrLxc, cmd);
-        return undefined;
-      }
-      case "ve": {
-        const execStrVe = this.variableResolver.replaceVars(rawStr);
-        return await this.runOnVeHost(execStrVe, cmd);
-      }
-      default: {
-        if (typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
-          const hostname = (cmd.execute_on as string).split(":")[1] ?? "";
-          // Pass raw (unreplaced) string; executeOnHost will replace with vmctx.data
-          await this.executeOnHost(hostname, rawStr, cmd);
-          return undefined;
-        } else {
-          throw new Error(cmd.name + " is missing the execute_on property");
-        }
-      }
-    }
-  }
-
-  /**
-   * Parses fallback outputs from echo JSON format.
-   */
-  private parseFallbackOutputs(lastMsg: IVeExecuteMessage | undefined): void {
-    if (
-      this.outputs.size === 0 &&
-      lastMsg &&
-      typeof lastMsg.result === "string"
-    ) {
-      const m = String(lastMsg.result)
-        .replace(/^echo\s+/, "")
-        .replace(/^"/, "")
-        .replace(/"$/, "");
-      try {
-        const obj = JSON.parse(m);
-        this.outputsRaw = [];
-        for (const [name, value] of Object.entries(obj)) {
-          const v = value as string | number | boolean;
-          this.outputs.set(name, v);
-          this.outputsRaw.push({ name, value: v });
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    }
-  }
-
-  /**
-   * Builds restart info object from current state.
-   */
-  private buildRestartInfo(lastSuccessIndex: number): IRestartInfo {
-    const vm_id = this.outputs.get("vm_id");
-    return {
-      vm_id:
-        vm_id !== undefined
-          ? Number.parseInt(vm_id as string, 10)
-          : undefined,
-      lastSuccessfull: lastSuccessIndex,
-      inputs: Object.entries(this.inputs).map(([name, value]) => ({
-        name,
-        value,
-      })),
-      outputs:
-        this.outputsRaw && Array.isArray(this.outputsRaw)
-          ? this.outputsRaw.map(({ name, value }) => ({ name, value }))
-          : Array.from(this.outputs.entries()).map(([name, value]) => ({
-              name,
-              value,
-            })),
-      defaults: Array.from(this.defaults.entries()).map(
-        ([name, value]) => ({ name, value }),
-      ),
-    };
-  }
 
 
   /**
@@ -472,28 +285,34 @@ export class VeExecution extends EventEmitter {
   async run(
     restartInfo: IRestartInfo | null = null,
   ): Promise<IRestartInfo | undefined> {
+    // Update all helper modules with current state
+    this.updateHelperModules();
+    
     let rcRestartInfo: IRestartInfo | undefined = undefined;
     let msgIndex = 0;
-    const startIdx = this.restoreStateFromRestartInfo(restartInfo);
+    const startIdx = this.stateManager.restoreStateFromRestartInfo(restartInfo);
     outerloop: for (let i = startIdx; i < this.commands.length; ++i) {
       const cmd = this.commands[i];
       if (!cmd || typeof cmd !== "object") continue;
       
+      // Update helper modules in case state changed during execution
+      this.updateHelperModules();
+
       // Check if this is a skipped command (has "(skipped)" in name)
       if (cmd.name && cmd.name.includes("(skipped)")) {
-        msgIndex = this.handleSkippedCommand(cmd, msgIndex);
+        msgIndex = this.commandProcessor.handleSkippedCommand(cmd, msgIndex);
         continue;
       }
       
       try {
         if (cmd.properties !== undefined) {
           // Handle properties: replace variables in values, set as outputs
-          msgIndex = this.handlePropertiesCommand(cmd, msgIndex);
+          msgIndex = this.commandProcessor.handlePropertiesCommand(cmd, msgIndex);
           continue; // Skip execution, only set properties
         }
         
         // Load command content
-        const rawStr = this.loadCommandContent(cmd);
+        const rawStr = this.commandProcessor.loadCommandContent(cmd);
         if (!rawStr) {
           continue; // Skip unknown command type
         }
@@ -501,7 +320,7 @@ export class VeExecution extends EventEmitter {
         // Execute command based on target
         let lastMsg: IVeExecuteMessage | undefined;
         try {
-          lastMsg = await this.executeCommandByTarget(cmd, rawStr);
+          lastMsg = await this.commandProcessor.executeCommandByTarget(cmd, rawStr);
         } catch (err: any) {
           // Handle execution errors
           if (typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
@@ -512,22 +331,22 @@ export class VeExecution extends EventEmitter {
           }
           // Only set restartInfo if we've executed at least one command successfully
           if (i > startIdx) {
-            rcRestartInfo = this.buildRestartInfo(i - 1);
+            rcRestartInfo = this.stateManager.buildRestartInfo(i - 1);
           }
           break outerloop;
         }
 
         // Fallback: if no outputs were produced, try to parse echo JSON
-        this.parseFallbackOutputs(lastMsg);
+        this.commandProcessor.parseFallbackOutputs(lastMsg);
 
         // Build restart info for successful execution
-        rcRestartInfo = this.buildRestartInfo(i);
+        rcRestartInfo = this.stateManager.buildRestartInfo(i);
       } catch (e) {
         // Handle any other errors
         this.messageEmitter.emitErrorMessage(cmd, e, msgIndex++);
         // Set restartInfo even on error so restart is possible, but only if we've executed at least one command
         if (i > startIdx) {
-          rcRestartInfo = this.buildRestartInfo(i - 1);
+          rcRestartInfo = this.stateManager.buildRestartInfo(i - 1);
         }
         break outerloop;
       }
@@ -557,25 +376,9 @@ export class VeExecution extends EventEmitter {
   }
 
   buildVmContext(): IVMContext {
-    if (!this.veContext) {
-      throw new Error("VE context not set");
-    }
-    var data: any = {};
-    data.vmid = this.outputs.get("vm_id");
-    const hostVal = (this.veContext as any)?.host;
-    const veKey =
-      typeof (this.veContext as any)?.getKey === "function"
-        ? (this.veContext as any).getKey()
-        : typeof hostVal === "string"
-          ? `ve_${hostVal}`
-          : undefined;
-    data.vekey = veKey;
-    data.data = {};
-
-    this.outputs.forEach((value, key) => {
-      data.data[key] = value;
-    });
-    return new VMContext(data);
+    // Update helper modules in case state changed
+    this.updateHelperModules();
+    return this.stateManager.buildVmContext();
   }
 
   /**

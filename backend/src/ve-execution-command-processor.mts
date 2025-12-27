@@ -1,0 +1,187 @@
+import fs from "node:fs";
+import { ICommand, IVeExecuteMessage } from "./types.mjs";
+import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
+import { VariableResolver } from "./variable-resolver.mjs";
+
+export interface CommandProcessorDependencies {
+  outputs: Map<string, string | number | boolean>;
+  inputs: Record<string, string | number | boolean>;
+  variableResolver: VariableResolver;
+  messageEmitter: VeExecutionMessageEmitter;
+  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand) => Promise<IVeExecuteMessage>;
+  runOnVeHost: (input: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<IVeExecuteMessage>;
+  executeOnHost: (hostname: string, command: string, tmplCommand: ICommand) => Promise<void>;
+  outputsRaw: { name: string; value: string | number | boolean }[] | undefined;
+  setOutputsRaw: (raw: { name: string; value: string | number | boolean }[]) => void;
+}
+
+/**
+ * Handles command processing for VeExecution.
+ */
+export class VeExecutionCommandProcessor {
+  constructor(private deps: CommandProcessorDependencies) {}
+
+  /**
+   * Handles a skipped command by emitting a message.
+   */
+  handleSkippedCommand(cmd: ICommand, msgIndex: number): number {
+    this.deps.messageEmitter.emitStandardMessage(
+      cmd,
+      cmd.description || "Skipped: all required parameters missing",
+      null,
+      0,
+      msgIndex,
+    );
+    return msgIndex + 1;
+  }
+
+  /**
+   * Processes a single property entry and sets it in outputs if valid.
+   */
+  private processPropertyEntry(entry: { id: string; value?: any }): void {
+    if (!entry || typeof entry !== "object" || !entry.id || entry.value === undefined) {
+      return;
+    }
+    
+    let value = entry.value;
+    // Replace variables in value if it's a string
+    if (typeof value === "string") {
+      value = this.deps.variableResolver.replaceVars(value);
+      // Skip property if value is "NOT_DEFINED" (optional parameter not set)
+      if (value === "NOT_DEFINED") {
+        return; // Skip this property
+      }
+    }
+    // Only set if value is a primitive type (not array)
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      this.deps.outputs.set(entry.id, value);
+    }
+  }
+
+  /**
+   * Handles a properties command by processing all properties and emitting a message.
+   */
+  handlePropertiesCommand(cmd: ICommand, msgIndex: number): number {
+    try {
+      if (Array.isArray(cmd.properties)) {
+        // Array of {id, value} objects
+        for (const entry of cmd.properties) {
+          this.processPropertyEntry(entry);
+        }
+      } else if (cmd.properties && typeof cmd.properties === "object" && "id" in cmd.properties) {
+        // Single object with id and value
+        this.processPropertyEntry(cmd.properties as { id: string; value?: any });
+      }
+      
+      // Emit success message
+      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
+      this.deps.messageEmitter.emitStandardMessage(
+        propertiesCmd,
+        "",
+        JSON.stringify(cmd.properties),
+        0,
+        msgIndex,
+      );
+      return msgIndex + 1;
+    } catch (err: any) {
+      const msg = `Failed to process properties: ${err?.message || err}`;
+      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
+      this.deps.messageEmitter.emitStandardMessage(propertiesCmd, msg, null, -1, msgIndex);
+      return msgIndex + 1;
+    }
+  }
+
+  /**
+   * Loads command content from script file or command string.
+   */
+  loadCommandContent(cmd: ICommand): string | null {
+    if (cmd.script !== undefined) {
+      // Read script file, replace variables, then execute
+      return fs.readFileSync(cmd.script, "utf-8");
+    } else if (cmd.command !== undefined) {
+      return cmd.command;
+    }
+    return null;
+  }
+
+  /**
+   * Gets vm_id from inputs or outputs.
+   */
+  getVmId(): string | number | undefined {
+    if (typeof this.deps.inputs["vm_id"] === "string" || typeof this.deps.inputs["vm_id"] === "number") {
+      return this.deps.inputs["vm_id"];
+    }
+    if (this.deps.outputs.has("vm_id")) {
+      const v = this.deps.outputs.get("vm_id");
+      if (typeof v === "string" || typeof v === "number") {
+        return v;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Executes a command based on its execute_on target.
+   */
+  async executeCommandByTarget(
+    cmd: ICommand,
+    rawStr: string,
+  ): Promise<IVeExecuteMessage | undefined> {
+    switch (cmd.execute_on) {
+      case "lxc": {
+        const execStrLxc = this.deps.variableResolver.replaceVars(rawStr);
+        const vm_id = this.getVmId();
+        if (!vm_id) {
+          const msg = "vm_id is required for LXC execution but was not found in inputs or outputs.";
+          this.deps.messageEmitter.emitStandardMessage(cmd, msg, null, -1, -1);
+          throw new Error(msg);
+        }
+        await this.deps.runOnLxc(vm_id, execStrLxc, cmd);
+        return undefined;
+      }
+      case "ve": {
+        const execStrVe = this.deps.variableResolver.replaceVars(rawStr);
+        return await this.deps.runOnVeHost(execStrVe, cmd);
+      }
+      default: {
+        if (typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
+          const hostname = (cmd.execute_on as string).split(":")[1] ?? "";
+          // Pass raw (unreplaced) string; executeOnHost will replace with vmctx.data
+          await this.deps.executeOnHost(hostname, rawStr, cmd);
+          return undefined;
+        } else {
+          throw new Error(cmd.name + " is missing the execute_on property");
+        }
+      }
+    }
+  }
+
+  /**
+   * Parses fallback outputs from echo JSON format.
+   */
+  parseFallbackOutputs(lastMsg: IVeExecuteMessage | undefined): void {
+    if (
+      this.deps.outputs.size === 0 &&
+      lastMsg &&
+      typeof lastMsg.result === "string"
+    ) {
+      const m = String(lastMsg.result)
+        .replace(/^echo\s+/, "")
+        .replace(/^"/, "")
+        .replace(/"$/, "");
+      try {
+        const obj = JSON.parse(m);
+        const raw: { name: string; value: string | number | boolean }[] = [];
+        for (const [name, value] of Object.entries(obj)) {
+          const v = value as string | number | boolean;
+          this.deps.outputs.set(name, v);
+          raw.push({ name, value: v });
+        }
+        this.deps.setOutputsRaw(raw);
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }
+}
+
