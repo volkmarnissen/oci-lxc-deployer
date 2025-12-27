@@ -41,6 +41,47 @@ export class WebAppVeRouteHandlers {
   }
 
   /**
+   * Recursively serializes an array of details, handling both JsonError instances and plain objects.
+   */
+  private serializeDetailsArray(details: IJsonError[] | undefined): IJsonError[] | undefined {
+    if (!details || !Array.isArray(details)) {
+      return undefined;
+    }
+    
+    return details.map((d) => {
+      // If it's a JsonError instance with toJSON, use it
+      if (d && typeof d === 'object' && typeof (d as any).toJSON === "function") {
+        return (d as any).toJSON();
+      }
+      
+      // If it's already a plain object with the expected structure, ensure details are serialized
+      if (d && typeof d === 'object') {
+        const result: any = {
+          name: (d as any).name,
+          message: (d as any).message,
+          line: (d as any).line,
+        };
+        
+        // Recursively serialize nested details if they exist
+        if ((d as any).details && Array.isArray((d as any).details)) {
+          result.details = this.serializeDetailsArray((d as any).details);
+        }
+        
+        if ((d as any).filename !== undefined) result.filename = (d as any).filename;
+        
+        return result as IJsonError;
+      }
+      
+      // Fallback: convert to string or return as-is
+      return {
+        name: 'Error',
+        message: String(d),
+        details: undefined
+      } as IJsonError;
+    });
+  }
+
+  /**
    * Serializes an error to a JSON-serializable object.
    * Uses toJSON() if available, otherwise extracts error properties.
    */
@@ -63,8 +104,14 @@ export class WebAppVeRouteHandlers {
       
       // If it's a JsonError or VEConfigurationError, try to get details
       if (err instanceof JsonError || err instanceof VEConfigurationError) {
+        // Use toJSON() if available to ensure proper recursive serialization
+        if (typeof (err as any).toJSON === 'function') {
+          return (err as any).toJSON();
+        }
+        
+        // Fallback: manually extract details and serialize them
         if ((err as any).details) {
-          errorObj.details = (err as any).details;
+          errorObj.details = this.serializeDetailsArray((err as any).details);
         }
         if ((err as any).filename) {
           errorObj.filename = (err as any).filename;
@@ -138,21 +185,31 @@ export class WebAppVeRouteHandlers {
         ? "sh" 
         : "ssh";
       
-      const loaded = await templateProcessor.loadApplication(
-        application,
-        task as TaskType,
-        veCtxToUse,
-        sshCommand,
-      );
-      const commands = loaded.commands;
-      const defaults = this.parameterProcessor.buildDefaults(loaded.parameters);
-
       // Use changedParams if provided (even if empty), otherwise fall back to params
       // This allows restarting installation with only changed parameters
       // For normal installation, changedParams should contain all changed parameters
       const paramsToUse = body.changedParams !== undefined
         ? body.changedParams
         : body.params;
+
+      // Prepare initialInputs for loadApplication (for skip_if_all_missing checks)
+      // Convert params to initialInputs format (only non-empty values)
+      const initialInputs = paramsToUse
+        .filter((p) => p.value !== null && p.value !== undefined && p.value !== '')
+        .map((p) => ({
+          id: p.name,
+          value: p.value,
+        }));
+
+      const loaded = await templateProcessor.loadApplication(
+        application,
+        task as TaskType,
+        veCtxToUse,
+        sshCommand,
+        initialInputs, // Pass initialInputs so skip_if_all_missing can check user inputs
+      );
+      const commands = loaded.commands;
+      const defaults = this.parameterProcessor.buildDefaults(loaded.parameters);
 
       // Process parameters: for upload parameters with "local:" prefix, read file and base64 encode
       const processedParams = await this.parameterProcessor.processParameters(
@@ -250,11 +307,20 @@ export class WebAppVeRouteHandlers {
     const templateProcessor = veCtxToUse.getStorageContext().getTemplateProcessor();
     let loaded;
     try {
+      // Use parameters from restartInfo.inputs for skip_if_all_missing checks
+      const initialInputs = restartInfo.inputs
+        .filter((p) => p.value !== null && p.value !== undefined && p.value !== '')
+        .map((p) => ({
+          id: p.name,
+          value: p.value,
+        }));
+
       loaded = await templateProcessor.loadApplication(
         application,
         task as TaskType,
         veCtxToUse,
         sshCommand,
+        initialInputs,
       );
     } catch (err: any) {
       const serializedError = this.serializeError(err);
@@ -272,10 +338,27 @@ export class WebAppVeRouteHandlers {
     const commands = loaded.commands;
     const defaults = this.parameterProcessor.buildDefaults(loaded.parameters);
 
+    // Process parameters from restartInfo.inputs
+    const paramsFromRestartInfo = restartInfo.inputs.map((p) => ({
+      name: p.name,
+      value: p.value,
+    }));
+    
+    const processedParams = await this.parameterProcessor.processParameters(
+      paramsFromRestartInfo,
+      loaded.parameters,
+      storageContext,
+    );
+
+    const inputs = processedParams.map((p) => ({
+      id: p.id,
+      value: p.value,
+    }));
+
     // Create execution with reloaded commands but use restartInfo for state
     const { exec, restartKey: newRestartKey } = this.executionSetup.setupExecution(
       commands,
-      [],
+      inputs,
       defaults,
       veCtxToUse,
       this.messageManager,
@@ -338,7 +421,15 @@ export class WebAppVeRouteHandlers {
       ? "sh" 
       : "ssh";
     
-    // Load application to get commands
+    // Prepare initialInputs for loadApplication (for skip_if_all_missing checks)
+    const initialInputs = installCtx.changedParams
+      .filter((p) => p.value !== null && p.value !== undefined && p.value !== '')
+      .map((p) => ({
+        id: p.name,
+        value: p.value,
+      }));
+
+    // Load application to get commands (with initialInputs for skip_if_all_missing checks)
     let loaded;
     try {
       loaded = await templateProcessor.loadApplication(
@@ -346,6 +437,7 @@ export class WebAppVeRouteHandlers {
         installCtx.task,
         veCtxToUse,
         sshCommand,
+        initialInputs, // Pass initialInputs so skip_if_all_missing can check user inputs
       );
     } catch (err: any) {
       const serializedError = this.serializeError(err);

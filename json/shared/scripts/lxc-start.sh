@@ -30,7 +30,7 @@ fi
 
 # Try to start the container
 echo "Attempting to start container $VMID..." >&2
-if ! pct start "$VMID" 2>&1; then
+if ! pct start "$VMID" >/dev/null 2>&1; then
   # Capture the original error message
   START_ERROR=$(pct start "$VMID" 2>&1)
   echo "Failed to start container $VMID" >&2
@@ -43,9 +43,8 @@ if ! pct start "$VMID" 2>&1; then
   pct status "$VMID" >&2
   echo "" >&2
   echo "Container configuration:" >&2
-  pct config "$VMID" >&2 2>&1 || echo "Could not read container configuration" >&2
+  pct config "$VMID" >&2 || echo "Could not read container configuration" >&2
   exit 1
 fi
 
-# Emit a simple JSON output for consistency
-echo '[{"id":"started","value":"true"}]'
+exit 0

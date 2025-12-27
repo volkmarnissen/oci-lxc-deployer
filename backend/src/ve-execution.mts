@@ -224,7 +224,12 @@ export class VeExecution extends EventEmitter {
       }
     } catch (e: any) {
       msg.index = getNextMessageIndex();
-      msg.error = new JsonError(e.message);
+      // If e is already a JsonError, preserve its details; otherwise create a new one
+      if (e instanceof JsonError) {
+        msg.error = e;
+      } else {
+        msg.error = new JsonError(e.message);
+      }
       msg.exitCode = -1;
       msg.partial = false;
       this.emit("message", msg);

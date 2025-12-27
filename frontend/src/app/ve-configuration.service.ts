@@ -148,6 +148,7 @@ export class VeConfigurationService {
       return throwError(() => new Error("VE context not set"));
     }
     // Note: post() already replaces :veContext, so only replace :restartKey here
+    // Parameters are contained in the restart context, no need to send them
     const url = ApiUri.VeRestart.replace(':restartKey', encodeURIComponent(restartKey));
     return this.post<IPostVeConfigurationResponse, object>(url, {});
   }

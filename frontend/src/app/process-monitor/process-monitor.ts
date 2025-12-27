@@ -122,6 +122,7 @@ export class ProcessMonitor implements OnInit, OnDestroy {
   triggerRestart(group: ISingleExecuteMessagesResponse) {
     if (!group.restartKey) return;
     
+    // Parameters are contained in the restart context, no need to send them
     this.veConfigurationService.restartExecution(group.restartKey).subscribe({
       next: () => {
         // Clear old messages for this group to show fresh run

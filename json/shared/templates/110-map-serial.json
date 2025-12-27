@@ -1,18 +1,15 @@
 {
   "execute_on": "ve",
-
   "name": "Map Serial Device",
   "description": "Map serial device to VM",
-  "skip_if_all_missing": ["serial_host"],
+  "skip_if_all_missing": ["usb_bus_device"],
   "parameters": [
-
     {
-      "id": "serial_host",
-      "name": "Path to USB Serial Device",
+      "id": "usb_bus_device",
+      "name": "USB Bus:Device",
       "type": "string",
-      "required": false,
-      "default": "/dev/ttyUSB0",
-      "description": "Path to the USB device on the Proxmox host"
+      "required": true,
+      "description": "USB bus and device number in format bus:device (e.g., 1:3 for /dev/bus/usb/001/003)"
     },
     {
       "id": "vm_id",
@@ -41,7 +38,6 @@
   "commands": [
     {
       "name": "Map Serial Device",
-      "if": "{{ usb }}",
       "script": "map-serial-device.sh"
     }
   ]

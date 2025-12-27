@@ -57,3 +57,5 @@ rm -f ./packagefile.apk
 # Output JSON for compatibility (though outputs are already set by template)
 echo '[{ "id": "packageurl", "value": "'"$PACKAGEURL"'" }, { "id": "packagerpubkeyurl", "value": "'"$PACKAGERPUBKEYURL"'" }]'
 
+
+

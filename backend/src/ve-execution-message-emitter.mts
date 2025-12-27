@@ -1,7 +1,8 @@
 import { EventEmitter } from "events";
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
+import { ICommand, IVeExecuteMessage, IJsonError } from "./types.mjs";
 import { VeExecutionConstants } from "./ve-execution-constants.mjs";
 import { getNextMessageIndex } from "./ve-execution-constants.mjs";
+import { JsonError } from "./jsonvalidator.mjs";
 
 /**
  * Handles message emission for VeExecution.
@@ -62,7 +63,19 @@ export class VeExecutionMessageEmitter {
     hostname?: string,
   ): void {
     const msg = String(error?.message ?? error);
-    this.emitStandardMessage(cmd, msg, null, -1, msgIndex, hostname);
+    // If error is a JsonError, preserve its details in the error field
+    const errorObj: IJsonError | undefined = error instanceof JsonError ? error : undefined;
+    this.eventEmitter.emit("message", {
+      stderr: msg,
+      result: null,
+      exitCode: -1,
+      command: cmd.name,
+      execute_on: cmd.execute_on,
+      host: hostname,
+      index: msgIndex,
+      partial: false,
+      error: errorObj,
+    } as IVeExecuteMessage);
   }
 }
 

@@ -10,6 +10,7 @@ import {
   ISshCheckResponse,
   ISetSshConfigResponse,
   IDeleteSshConfigResponse,
+  IJsonError,
 } from "@src/types.mjs";
 import http from "http";
 import path from "path";
@@ -54,6 +55,47 @@ export class VEWebApp {
   }
 
   /**
+   * Recursively serializes an array of details, handling both JsonError instances and plain objects.
+   */
+  private serializeDetailsArray(details: IJsonError[] | undefined): IJsonError[] | undefined {
+    if (!details || !Array.isArray(details)) {
+      return undefined;
+    }
+    
+    return details.map((d) => {
+      // If it's a JsonError instance with toJSON, use it
+      if (d && typeof d === 'object' && typeof (d as any).toJSON === "function") {
+        return (d as any).toJSON();
+      }
+      
+      // If it's already a plain object with the expected structure, ensure details are serialized
+      if (d && typeof d === 'object') {
+        const result: any = {
+          name: (d as any).name,
+          message: (d as any).message,
+          line: (d as any).line,
+        };
+        
+        // Recursively serialize nested details if they exist
+        if ((d as any).details && Array.isArray((d as any).details)) {
+          result.details = this.serializeDetailsArray((d as any).details);
+        }
+        
+        if ((d as any).filename !== undefined) result.filename = (d as any).filename;
+        
+        return result as IJsonError;
+      }
+      
+      // Fallback: convert to string or return as-is
+      return {
+        name: 'Error',
+        message: String(d),
+        details: undefined
+      } as IJsonError;
+    });
+  }
+
+  /**
    * Converts an error to a serializable JSON object.
    * Uses toJSON() if available, otherwise extracts error properties.
    */
@@ -81,8 +123,14 @@ export class VEWebApp {
 
       // If it's a JsonError or VEConfigurationError, try to get details
       if (err instanceof JsonError || err instanceof VEConfigurationError) {
+        // Use toJSON() if available to ensure proper recursive serialization
+        if (typeof (err as any).toJSON === 'function') {
+          return (err as any).toJSON();
+        }
+        
+        // Fallback: manually extract details and serialize them
         if ((err as any).details) {
-          errorObj.details = (err as any).details;
+          errorObj.details = this.serializeDetailsArray((err as any).details);
         }
         if ((err as any).filename) {
           errorObj.filename = (err as any).filename;

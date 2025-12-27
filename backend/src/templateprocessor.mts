@@ -65,6 +65,7 @@ export class TemplateProcessor extends EventEmitter {
     task: TaskType,
     veContext: IVEContext,
     sshCommand?: string,
+    initialInputs?: Array<{ id: string; value: string | number | boolean }>,
   ): Promise<ITemplateProcessorLoadResult> {
     const readOpts: IReadApplicationOptions = {
       applicationHierarchy: [],
@@ -107,7 +108,23 @@ export class TemplateProcessor extends EventEmitter {
     }
 
     // 4. Track en parameters
+    // Initialize resolvedParams with initialInputs (user-provided parameters)
+    // This allows skip_if_all_missing to check user inputs
     const resolvedParams: IResolvedParam[] = [];
+    if (initialInputs) {
+      for (const input of initialInputs) {
+        // Only add non-empty values to resolvedParams
+        if (input.value !== null && input.value !== undefined && input.value !== '') {
+          // IResolvedParam requires 'id' and 'template'
+          // We use "user_input" as template name for user-provided parameters
+          // This allows skip_if_all_missing to find user inputs
+          resolvedParams.push({
+            id: input.id,
+            template: "user_input",
+          });
+        }
+      }
+    }
     const templatePathes = readOpts.applicationHierarchy.map((appDir) =>
       path.join(appDir, "templates"),
     );

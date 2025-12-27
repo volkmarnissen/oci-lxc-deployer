@@ -5,7 +5,6 @@
     "set-parameters.json",
     "010-get-latest-os-template.json",
     "100-create-configure-lxc.json",
-    "110-map-serial.json",
     "200-start-lxc.json",
     "210-wait-for-container-ready.json",
     "set-download-url.json",

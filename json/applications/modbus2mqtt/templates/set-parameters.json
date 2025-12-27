@@ -59,6 +59,14 @@
       "default": "1000",
       "description": "GID for the user and mount permissions. Will be used consistently on VE host and LXC container.",
       "advanced": true
+    },
+    {
+      "id": "usb_bus_device",
+      "name": "USB Serial Port",
+      "type": "enum",
+      "required": false,
+      "enumValuesTemplate": "list-host-usb-serial-ports.json",
+      "description": "Select USB serial port to map to the container. Format: bus:device (e.g., 1:3). The port will be mapped as /dev/ttyUSB0 in the container."
     }
   ],
   "commands": [

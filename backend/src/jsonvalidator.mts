@@ -41,13 +41,46 @@ export class JsonError extends Error implements IJsonError {
       message: this.message,
       line: (this as any).line,
       details: this.details
-        ? this.details.map((d) =>
-            typeof (d as any).toJSON === "function" ? (d as any).toJSON() : d,
-          )
+        ? this.details.map((d) => this.serializeDetail(d))
         : undefined,
     };
     if (this.filename !== undefined) obj.filename = this.filename;
     return obj as IJsonError;
+  }
+
+  /**
+   * Recursively serializes a detail, handling both JsonError instances and plain objects.
+   */
+  private serializeDetail(d: IJsonError | any): IJsonError {
+    // If it's a JsonError instance with toJSON, use it
+    if (d && typeof d === 'object' && typeof (d as any).toJSON === "function") {
+      return (d as any).toJSON();
+    }
+    
+    // If it's already a plain object with the expected structure, ensure details are serialized
+    if (d && typeof d === 'object') {
+      const result: any = {
+        name: d.name,
+        message: d.message,
+        line: d.line,
+      };
+      
+      // Recursively serialize nested details if they exist
+      if (d.details && Array.isArray(d.details)) {
+        result.details = d.details.map((nested: any) => this.serializeDetail(nested));
+      }
+      
+      if (d.filename !== undefined) result.filename = d.filename;
+      
+      return result as IJsonError;
+    }
+    
+    // Fallback: convert to string or return as-is
+    return {
+      name: 'Error',
+      message: String(d),
+      details: undefined
+    } as IJsonError;
   }
 }
 export class ValidateJsonError extends JsonError implements IJsonError {
