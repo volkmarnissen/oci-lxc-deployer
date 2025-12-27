@@ -18,16 +18,12 @@
       "description": "URL of the public key for verifying the package"
     }
   ],
+  "outputs": ["packageurl", "packagerpubkeyurl"],
   "commands": [
     {
-      "name": "Download Package",
-      "command": "if [ -z '{{ packageurl }}' ] || [ '{{ packageurl }}' = '' ]; then echo 'Error: packageurl is empty' >&2; exit 1; fi; wget -O packagefile.apk '{{ packageurl }}' >&2 || { echo 'Error: Failed to download package from {{ packageurl }}' >&2; exit 1; }",
-      "description": "Download package to the LXC container"
-    },
-    {
-      "name": "Install Package",
-      "command": "if [ -z '{{ packagerpubkeyurl }}' ] || [ '{{ packagerpubkeyurl }}' = '' ]; then echo 'Error: packagerpubkeyurl is empty' >&2; exit 1; fi; KEY=$(wget -q -O - '{{ packagerpubkeyurl }}' 2>&1) || { echo 'Error: Failed to download public key from {{ packagerpubkeyurl }}' >&2; exit 1; }; apk add --allow-untrusted --key \"$KEY\" ./packagefile.apk >&2 || { echo 'Error: Failed to install package' >&2; exit 1; }",
-      "description": "Verify and install package on the LXC container"
+      "name": "Download and Install Package",
+      "script": "300-download-and-install-apk-package.sh",
+      "description": "Download and install APK package on the LXC container"
     }
   ]
 }

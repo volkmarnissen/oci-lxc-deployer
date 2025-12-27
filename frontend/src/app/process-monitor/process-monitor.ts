@@ -25,14 +25,22 @@ export class ProcessMonitor implements OnInit, OnDestroy {
   private zone = inject(NgZone);
   private dialog = inject(MatDialog);
   private storedParams: Record<string, { name: string; value: IParameterValue }[]> = {};
+  private storedVmInstallKeys: Record<string, string> = {}; // Map from restartKey to vmInstallKey
 
   ngOnInit() {
-    // Get original parameters from navigation state
+    // Get original parameters and vmInstallKey from navigation state
     // Try getCurrentNavigation first (during navigation), then history.state (after navigation)
     const navigation = this.router.getCurrentNavigation();
-    const state = (navigation?.extras?.state || history.state) as { originalParams?: { name: string; value: IParameterValue }[], restartKey?: string } | null;
+    const state = (navigation?.extras?.state || history.state) as { 
+      originalParams?: { name: string; value: IParameterValue }[], 
+      restartKey?: string,
+      vmInstallKey?: string
+    } | null;
     if (state?.originalParams && state.restartKey) {
       this.storedParams[state.restartKey] = state.originalParams;
+    }
+    if (state?.vmInstallKey && state.restartKey) {
+      this.storedVmInstallKeys[state.restartKey] = state.vmInstallKey;
     }
     this.startPolling();
   }
@@ -68,6 +76,12 @@ export class ProcessMonitor implements OnInit, OnDestroy {
   private mergeMessages(newMsgs: IVeExecuteMessagesResponse) {
     if (!this.messages) {
       this.messages = [...newMsgs];
+      // Store vmInstallKey from backend response if available
+      for (const group of newMsgs) {
+        if (group.vmInstallKey && group.restartKey) {
+          this.storedVmInstallKeys[group.restartKey] = group.vmInstallKey;
+        }
+      }
       return;
     }
     
@@ -76,6 +90,11 @@ export class ProcessMonitor implements OnInit, OnDestroy {
         g => g.application === newGroup.application && g.task === newGroup.task
       );
       if (existing) {
+        // Update vmInstallKey if provided in new group
+        if (newGroup.vmInstallKey && newGroup.restartKey) {
+          existing.vmInstallKey = newGroup.vmInstallKey;
+          this.storedVmInstallKeys[newGroup.restartKey] = newGroup.vmInstallKey;
+        }
         // Append only new messages (by index)
         const existingIndices = new Set(existing.messages.map(m => m.index));
         for (const msg of newGroup.messages) {
@@ -86,6 +105,10 @@ export class ProcessMonitor implements OnInit, OnDestroy {
       } else {
         // Add new application/task group
         this.messages.push({ ...newGroup });
+        // Store vmInstallKey if available
+        if (newGroup.vmInstallKey && newGroup.restartKey) {
+          this.storedVmInstallKeys[newGroup.restartKey] = newGroup.vmInstallKey;
+        }
       }
     }
   }
@@ -120,16 +143,22 @@ export class ProcessMonitor implements OnInit, OnDestroy {
   triggerRestartFull(group: ISingleExecuteMessagesResponse) {
     if (!group.restartKey) return;
     
-    // Get original parameters from stored state or navigation
-    const originalParams = this.storedParams[group.restartKey];
-    if (!originalParams) {
-      console.error('Original parameters not found for restart key:', group.restartKey);
-      alert('Original parameters not found. Please start installation again.');
+    // Try to get vmInstallKey from group (from backend response) or stored state
+    const vmInstallKey = group.vmInstallKey || this.storedVmInstallKeys[group.restartKey];
+    
+    if (!vmInstallKey) {
+      console.error('vmInstallKey not found for restart key:', group.restartKey);
+      alert('Installation context not found. Please start installation again.');
       return;
     }
     
-    this.veConfigurationService.restartExecutionFull(group, originalParams).subscribe({
-      next: () => {
+    // Use the new restartInstallation endpoint with vmInstallKey
+    this.veConfigurationService.restartInstallation(vmInstallKey).subscribe({
+      next: (response) => {
+        // Update stored vmInstallKey if returned in response
+        if (response.vmInstallKey && group.restartKey) {
+          this.storedVmInstallKeys[group.restartKey] = response.vmInstallKey;
+        }
         // Clear old messages for this group to show fresh run
         if (this.messages) {
           const idx = this.messages.findIndex(
@@ -141,7 +170,7 @@ export class ProcessMonitor implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.error('Full restart failed:', err);
+        console.error('Restart from beginning failed:', err);
       }
     });
   }

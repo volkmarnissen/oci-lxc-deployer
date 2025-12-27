@@ -10,12 +10,30 @@ if ! command -v wget >/dev/null 2>&1; then
   exit 1
 fi
 
-# Fetch GitHub API response
-API_URL="https://api.github.com/repos/$owner/$repo/releases/latest"
-API_RESPONSE=$(wget -q -O - "$API_URL" 2>&1) || {
-  echo "Error: Failed to fetch GitHub API: $API_RESPONSE" >&2
+# Check DNS resolution for api.github.com
+if ! getent hosts api.github.com >/dev/null 2>&1; then
+  echo "Error: DNS resolution failed for api.github.com. Check network connectivity and DNS configuration." >&2
   exit 1
-}
+fi
+
+# Fetch GitHub API response with timeout and retry
+API_URL="https://api.github.com/repos/$owner/$repo/releases/latest"
+API_RESPONSE=""
+RETRY_COUNT=0
+MAX_RETRIES=3
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  API_RESPONSE=$(wget --timeout=10 --tries=1 -q -O - "$API_URL" 2>&1) && break
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    sleep 2
+  fi
+done
+
+if [ -z "$API_RESPONSE" ] || echo "$API_RESPONSE" | grep -q "bad address\|Connection refused\|Network is unreachable\|Name or service not known"; then
+  echo "Error: Failed to fetch GitHub API after $MAX_RETRIES attempts: $API_RESPONSE" >&2
+  exit 1
+fi
 
 # Extract package URL from API response
 packagerurl=$(echo "$API_RESPONSE" | \

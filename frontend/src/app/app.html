@@ -1,21 +1,31 @@
 <header class="app-header">
   <img class="app-logo" src="/favicon-32.png" alt="Logo" width="24" height="24" />
   <span class="app-title">Proxmox WebApp</span>
-  <span>
-  <button class="apps-btn header-btn" type="button" aria-label="Applications" routerLink="/applications" matTooltip="Applications">
-    <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect x="3" y="3" width="8" height="8" rx="2" fill="#3949AB"/>
-      <rect x="13" y="3" width="8" height="8" rx="2" fill="#1E88E5"/>
-      <rect x="3" y="13" width="8" height="8" rx="2" fill="#43A047"/>
-      <rect x="13" y="13" width="8" height="8" rx="2" fill="#FB8C00"/>
-    </svg>
-  </button>
-  <button class="monitor-btn header-btn" type="button" aria-label="Process Monitor" routerLink="/monitor" matTooltip="Process Monitor">
-    <span aria-hidden="true">📊</span>
-  </button>
-  <button class="settings-btn header-btn" type="button" aria-label="Settings" routerLink="/ssh-config" matTooltip="Settings">
-    <span class="gear" aria-hidden="true">⚙️</span>
-  </button>
+  <span class="header-actions">
+    @if (sshConfigs.length > 0) {
+      <label class="host-label">Host:</label>
+      <mat-form-field appearance="outline" class="host-selector">
+        <mat-select [(ngModel)]="currentHost" (selectionChange)="onHostChange($event.value)" [value]="currentHost">
+          @for (ssh of sshConfigs; track ssh.host) {
+            <mat-option [value]="ssh.host">{{ getHostDisplay(ssh) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+    <button class="apps-btn header-btn" type="button" aria-label="Applications" routerLink="/applications" matTooltip="Applications">
+      <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="3" y="3" width="8" height="8" rx="2" fill="#3949AB"/>
+        <rect x="13" y="3" width="8" height="8" rx="2" fill="#1E88E5"/>
+        <rect x="3" y="13" width="8" height="8" rx="2" fill="#43A047"/>
+        <rect x="13" y="13" width="8" height="8" rx="2" fill="#FB8C00"/>
+      </svg>
+    </button>
+    <button class="monitor-btn header-btn" type="button" aria-label="Process Monitor" routerLink="/monitor" matTooltip="Process Monitor">
+      <span aria-hidden="true">📊</span>
+    </button>
+    <button class="settings-btn header-btn" type="button" aria-label="Settings" routerLink="/ssh-config" matTooltip="Settings">
+      <span class="gear" aria-hidden="true">⚙️</span>
+    </button>
   </span>
 </header>
 

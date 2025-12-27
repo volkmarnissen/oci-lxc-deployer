@@ -112,7 +112,7 @@ export class VeConfigurationService {
     return this.get<ISshCheckResponse>(`${ApiUri.SshCheck}?${params.toString()}`);
   }
 
-  postVeConfiguration(application: string, task: string, params: VeConfigurationParam[], changedParams?: VeConfigurationParam[]): Observable<{ success: boolean; restartKey?: string }> {
+  postVeConfiguration(application: string, task: string, params: VeConfigurationParam[], changedParams?: VeConfigurationParam[]): Observable<{ success: boolean; restartKey?: string; vmInstallKey?: string }> {
     const url = ApiUri.VeConfiguration
       .replace(':application', encodeURIComponent(application))
       .replace(':task', encodeURIComponent(task));
@@ -152,17 +152,14 @@ export class VeConfigurationService {
     return this.post<IPostVeConfigurationResponse, object>(url, {});
   }
 
-  restartExecutionFull(group: ISingleExecuteMessagesResponse, params: VeConfigurationParam[]): Observable<IPostVeConfigurationResponse> {
+  restartInstallation(vmInstallKey: string): Observable<IPostVeConfigurationResponse> {
     if (!this.veContextKey) {
       return throwError(() => new Error("VE context not set"));
     }
-    
-    const application = group.application;
-    const task = group.task;
-    const url = ApiUri.VeConfiguration
-      .replace(':application', encodeURIComponent(application))
-      .replace(':task', encodeURIComponent(task));
-    
-    return this.post<IPostVeConfigurationResponse, IPostVeConfigurationBody>(url, { params });
+    // Note: post() already replaces :veContext, so only replace :vmInstallKey here
+    const url = ApiUri.VeRestartInstallation.replace(':vmInstallKey', encodeURIComponent(vmInstallKey));
+    return this.post<IPostVeConfigurationResponse, object>(url, {}).pipe(
+      tap((res) => this.setVeContextKeyFrom(res))
+    );
   }
 }

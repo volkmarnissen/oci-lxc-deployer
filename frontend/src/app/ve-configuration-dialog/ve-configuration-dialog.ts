@@ -158,21 +158,23 @@ export class VeConfigurationDialog implements OnInit {
     const task = 'installation';
     
     // Pass changedParams to backend for vmInstallContext
-    this.configService.postVeConfiguration(application, task, params, changedParams.length > 0 ? changedParams : undefined).subscribe({
-      next: (res) => {
-        this.loading.set(false);
-        // Navigate to process monitor; pass restartKey and original parameters
-        const extras: NavigationExtras = {
-          queryParams: res.restartKey ? { restartKey: res.restartKey } : {},
-          state: { 
-            originalParams: params,
-            application: application,
-            task: task
-          }
-        };
-        this.dialogRef.close(this.form.value);
-        this.configService['router'].navigate(['/monitor'], extras);
-      },
+        this.configService.postVeConfiguration(application, task, params, changedParams.length > 0 ? changedParams : undefined).subscribe({
+          next: (res) => {
+            this.loading.set(false);
+            // Navigate to process monitor; pass restartKey, vmInstallKey and original parameters
+            const extras: NavigationExtras = {
+              queryParams: res.restartKey ? { restartKey: res.restartKey } : {},
+              state: { 
+                originalParams: params,
+                application: application,
+                task: task,
+                restartKey: res.restartKey,
+                vmInstallKey: res.vmInstallKey
+              }
+            };
+            this.dialogRef.close(this.form.value);
+            this.configService['router'].navigate(['/monitor'], extras);
+          },
       error: (err: unknown) => {
         const errors = this.convertErrorToJsonErrors('Failed to install configuration', err);
         this.showErrorDialog(errors);
