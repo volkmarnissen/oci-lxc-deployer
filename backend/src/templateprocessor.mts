@@ -365,13 +365,28 @@ export class TemplateProcessor extends EventEmitter {
     
     // Mark outputs as resolved AFTER confirming template is not skipped
     // This ensures that outputs are only set for templates that actually execute
+    // Allow overwriting outputs if template only has properties commands (explicit value setting)
+    // Prevent overwriting outputs from different templates with scripts/commands (prevents conflicts)
+    const currentTemplateName = this.extractTemplateName(opts.template);
+    // Check if template only has properties commands (no scripts or command strings)
+    const hasOnlyProperties = tmplData.commands?.every(
+      (cmd) => cmd.properties !== undefined && cmd.script === undefined && cmd.command === undefined && cmd.template === undefined
+    ) ?? false;
+    
     for (const out of tmplData.outputs ?? []) {
-      if (undefined == opts.resolvedParams.find((p) => p.id === out.id)) {
+      const existing = opts.resolvedParams.find((p) => p.id === out.id);
+      if (undefined == existing) {
+        // Parameter not yet resolved, add it
         opts.resolvedParams.push({
           id: out.id,
-          template: this.extractTemplateName(opts.template),
+          template: currentTemplateName,
         });
+      } else if (hasOnlyProperties) {
+        // Template only has properties commands, allow overwriting (explicit value setting)
+        // This enables templates like create-db-homeassistant.json to overwrite outputs from create-db-dynamic-prices.json
+        existing.template = currentTemplateName;
       }
+      // If parameter is resolved by a different template with scripts/commands, do nothing (prevent conflicts)
     }
 
     // Custom validation: 'if' must refer to another parameter name, not its own
@@ -470,7 +485,10 @@ export class TemplateProcessor extends EventEmitter {
     // Add commands or process nested templates
 
     for (const cmd of tmplData.commands ?? []) {
-      if (!cmd.name || cmd.name.trim() === "") {
+      // Set command name from template name if command name is missing or empty
+      // This applies to all command types: script, command, template, and properties
+      // This is especially important for properties-only commands which often don't have a name field
+      if (!cmd.name || (typeof cmd.name === "string" && cmd.name.trim() === "")) {
         cmd.name = `${tmplData.name || "unnamed-template"}`;
       }
       if (cmd.template !== undefined) {
@@ -533,7 +551,14 @@ export class TemplateProcessor extends EventEmitter {
         );
         opts.commands.push({ ...cmd, execute_on: tmplData.execute_on });
       } else {
-        opts.commands.push({ ...cmd, execute_on: tmplData.execute_on });
+        // Handle properties-only commands or other command types
+        // Ensure name is set (should already be set above, but ensure it's preserved)
+        const commandToAdd: ICommand = {
+          ...cmd,
+          execute_on: tmplData.execute_on,
+          name: cmd.name || tmplData.name || "unnamed-template",
+        };
+        opts.commands.push(commandToAdd);
       }
     }
   }

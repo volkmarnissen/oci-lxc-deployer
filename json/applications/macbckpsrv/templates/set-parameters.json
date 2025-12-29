@@ -18,15 +18,7 @@
       "default": "macbckpsrv",
       "required": true,
       "description": "Username for the Mac OS Time Machine Backup Server container"
-    }, 
-    {
-      "id": "storage_selection",
-      "name": "Storage Selection",
-      "type": "enum",
-      "required": true,
-      "enumValuesTemplate": "list-available-storage.json",
-      "description": "Select storage to mount. Volumes will be created at <host_mountpoint>/volumes/<hostname>/<volume-key>. If not provided, volumes will be created under /mnt/volumes/<hostname>/<volume-key>."
-     },
+    },
     {
       "id": "password",
       "name": "Password",

@@ -97,15 +97,6 @@
       "advanced": true,
       "upload": true,
       "description": "CA private key file (optional). Required if CA certificate is provided."
-    },
-    {
-      "id": "storage_selection",
-      "name": "Storage Selection",
-      "type": "enum",
-      "required": false,
-      "enumValuesTemplate": "list-available-storage.json",
-      "description": "Select storage to mount. Volumes will be created at <host_mountpoint>/volumes/<hostname>/<volume-key>. If not provided, volumes will be created under /mnt/volumes/<hostname>/<volume-key>.",
-      "advanced": true
     }
   ],
   "commands": [

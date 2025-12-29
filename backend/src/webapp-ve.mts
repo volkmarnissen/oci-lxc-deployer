@@ -11,7 +11,7 @@ import { WebAppVeRestartManager } from "./webapp-ve-restart-manager.mjs";
 import { WebAppVeParameterProcessor } from "./webapp-ve-parameter-processor.mjs";
 import { WebAppVeExecutionSetup } from "./webapp-ve-execution-setup.mjs";
 import { WebAppVeRouteHandlers } from "./webapp-ve-route-handlers.mjs";
-import { StorageContext } from "./storagecontext.mjs";
+import { StorageContext, VMInstallContext } from "./storagecontext.mjs";
 
 export class WebAppVE {
   private messageManager: WebAppVeMessageManager;
@@ -74,6 +74,7 @@ export class WebAppVE {
       const { application, task, veContext: veContextKey } = req.params;
       
       // Set vmInstallContext in StorageContext if changedParams are provided
+      // Only create new context if it doesn't exist yet (preserve existing context for restarts)
       let vmInstallKey: string | undefined;
       if (req.body.changedParams && req.body.changedParams.length > 0) {
         const storageContext = StorageContext.getInstance();
@@ -82,12 +83,28 @@ export class WebAppVE {
           const hostname = typeof veContext.host === "string" 
             ? veContext.host 
             : (veContext.host as any)?.host || "unknown";
-          vmInstallKey = storageContext.setVMInstallContext({
+          // Check if context already exists
+          const tempContext = new VMInstallContext({
             hostname,
             application,
             task: task as TaskType,
-            changedParams: req.body.changedParams.map(p => ({ name: p.name, value: p.value })),
+            changedParams: [],
           });
+          const existingKey = tempContext.getKey();
+          const existingContext = storageContext.get(existingKey);
+          
+          if (existingContext instanceof VMInstallContext) {
+            // Context exists - use existing key (preserve persistent context)
+            vmInstallKey = existingKey;
+          } else {
+            // Context doesn't exist - create new one
+            vmInstallKey = storageContext.setVMInstallContext({
+              hostname,
+              application,
+              task: task as TaskType,
+              changedParams: req.body.changedParams.map(p => ({ name: p.name, value: p.value })),
+            });
+          }
         }
       }
       

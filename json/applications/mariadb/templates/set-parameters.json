@@ -62,15 +62,6 @@
       "default": true,
       "required": false,
       "description": "Remove the default test database"
-    },
-    {
-      "id": "storage_selection",
-      "name": "Storage Selection",
-      "type": "enum",
-      "required": false,
-      "enumValuesTemplate": "list-available-storage.json",
-      "description": "Select storage to mount. Volumes will be created at <host_mountpoint>/volumes/<hostname>/<volume-key>. If not provided, volumes will be created under /mnt/volumes/<hostname>/<volume-key>.",
-      "advanced": true
     }
   ],
   "commands": [
@@ -83,26 +74,6 @@
         {
           "id": "packages",
           "value": "mariadb mariadb-client"
-        },
-        {
-          "id": "datadir",
-          "value": "{{datadir}}"
-        },
-        {
-          "id": "root_password",
-          "value": "{{root_password}}"
-        },
-        {
-          "id": "bind_address",
-          "value": "{{bind_address}}"
-        },
-        {
-          "id": "allow_remote_root",
-          "value": "{{allow_remote_root}}"
-        },
-        {
-          "id": "remove_anonymous_users",
-          "value": "{{remove_anonymous_users}}"
         },
         {
           "id": "remove_test_database",

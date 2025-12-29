@@ -87,11 +87,7 @@ export class ApplicationLoader {
           id: application,
           name: application
         }
-        if (opts.error && Array.isArray(opts.error.details)) {
-          opts.error.details.push(e);
-        }else{
-          opts.error.details = [e];
-        }
+        this.addErrorToOptions(opts, e);
       }
 
       appData.id = appName;
@@ -109,9 +105,7 @@ export class ApplicationLoader {
         try {
           this.readApplicationJson(appData.extends, opts);
         } catch (e: Error | any) {
-          if (opts.error && Array.isArray(opts.error.details)) {
-            opts.error.details.push(e);
-          }
+          this.addErrorToOptions(opts, e);
         }
       }
 
@@ -145,12 +139,41 @@ export class ApplicationLoader {
       this.processTemplates(appData, opts);
       return appData;
     } catch (e: Error | any) {
-      if (opts.error.details === undefined) {
-        opts.error.details = [];
-      }
-      opts.error.details.push(e);
+      this.addErrorToOptions(opts, e);
     }
     throw opts.error;
+  }
+
+  /**
+   * Adds an error to the options error details array.
+   * @param opts Read application options
+   * @param error Error to add
+   */
+  private addErrorToOptions(opts: IReadApplicationOptions, error: Error | any): void {
+    if (opts.error && Array.isArray(opts.error.details)) {
+      opts.error.details.push(error);
+    } else if (opts.error) {
+      opts.error.details = [error];
+    }
+  }
+
+  /**
+   * Adds a template to the task entry, allowing duplicates.
+   * Duplicates are logged for debugging but not stored as warnings.
+   * @param templateName Name of the template to add
+   * @param taskEntry Task entry to add the template to
+   * @param taskName Name of the task (e.g., "installation")
+   */
+  private addTemplateToTask(
+    templateName: string,
+    taskEntry: { task: string; templates: (ITemplateReference | string)[] },
+    taskName: string,
+  ): void {
+    // Allow duplicates - log info when duplicate is detected for debugging
+    if (taskEntry.templates.includes(templateName)) {
+      console.log(`[INFO] Template '${templateName}' appears multiple times in ${taskName} task. It will be executed multiple times.`);
+    }
+    taskEntry.templates.push(templateName);
   }
 
   private processTemplates(
@@ -176,9 +199,8 @@ export class ApplicationLoader {
       if (Array.isArray(list)) {
         for (const entry of list) {
           if (typeof entry === "string") {
-            if (!taskEntry.templates.includes(entry)) {
-              taskEntry.templates.push(entry);
-            }
+            // Allow duplicates - templates can be executed multiple times with different parameters
+            this.addTemplateToTask(entry, taskEntry, key);
           } else if (typeof entry === "object" && entry !== null) {
             const name = entry.name;
             if (!name) continue;
@@ -186,18 +208,21 @@ export class ApplicationLoader {
               const idx = taskEntry.templates.indexOf(entry.before);
               if (idx !== -1) {
                 taskEntry.templates.splice(idx, 0, name);
-              } else if (!taskEntry.templates.includes(name)) {
-                taskEntry.templates.push(name);
+              } else {
+                // Allow duplicates - log info when duplicate is detected
+                this.addTemplateToTask(name, taskEntry, key);
               }
             } else if (entry.after) {
               const idx = taskEntry.templates.indexOf(entry.after);
               if (idx !== -1) {
                 taskEntry.templates.splice(idx + 1, 0, name);
-              } else if (!taskEntry.templates.includes(name)) {
-                taskEntry.templates.push(name);
+              } else {
+                // Allow duplicates - log info when duplicate is detected
+                this.addTemplateToTask(name, taskEntry, key);
               }
-            } else if (!taskEntry.templates.includes(name)) {
-              taskEntry.templates.push(name);
+            } else {
+              // Allow duplicates - log info when duplicate is detected
+              this.addTemplateToTask(name, taskEntry, key);
             }
           }
         }

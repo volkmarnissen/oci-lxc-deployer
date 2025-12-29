@@ -10,6 +10,7 @@ import {
   IOutput,
   VeExecutionConstants,
   getNextMessageIndex,
+  resetMessageIndex,
 } from "./ve-execution-constants.mjs";
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 import { VeExecutionSshExecutor } from "./ve-execution-ssh-executor.mjs";
@@ -294,8 +295,19 @@ export class VeExecution extends EventEmitter {
     this.updateHelperModules();
     
     let rcRestartInfo: IRestartInfo | undefined = undefined;
-    let msgIndex = 0;
     const startIdx = this.stateManager.restoreStateFromRestartInfo(restartInfo);
+    // Initialize msgIndex based on startIdx: each command (including skipped and properties) produces one message
+    // This ensures properties commands get the correct index even after a restart
+    // Note: We use msgIndex (not getNextMessageIndex) for properties commands to ensure consistency
+    // Reset global message index to startIdx to keep it in sync with msgIndex
+    if (restartInfo) {
+      resetMessageIndex();
+      // Set global message index to startIdx so getNextMessageIndex() returns correct values
+      for (let j = 0; j < startIdx; j++) {
+        getNextMessageIndex();
+      }
+    }
+    let msgIndex = startIdx;
     outerloop: for (let i = startIdx; i < this.commands.length; ++i) {
       const cmd = this.commands[i];
       if (!cmd || typeof cmd !== "object") continue;
@@ -313,6 +325,9 @@ export class VeExecution extends EventEmitter {
         if (cmd.properties !== undefined) {
           // Handle properties: replace variables in values, set as outputs
           msgIndex = this.commandProcessor.handlePropertiesCommand(cmd, msgIndex);
+          // Build restart info for successful properties command
+          // This ensures that if properties is the last command, allSuccessful check passes
+          rcRestartInfo = this.stateManager.buildRestartInfo(i);
           continue; // Skip execution, only set properties
         }
         

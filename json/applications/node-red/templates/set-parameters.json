@@ -18,15 +18,6 @@
       "required": false,
       "advanced": true,
       "description": "Port number for Node-RED HTTP server (default: 1880)"
-    },
-    {
-      "id": "storage_selection",
-      "name": "Storage Selection",
-      "type": "enum",
-      "required": false,
-      "enumValuesTemplate": "list-available-storage.json",
-      "description": "Select storage to mount. Volumes will be created at <host_mountpoint>/volumes/<hostname>/<volume-key>. If not provided, volumes will be created under /mnt/volumes/<hostname>/<volume-key>.",
-      "advanced": true
     }
   ],
   "commands": [

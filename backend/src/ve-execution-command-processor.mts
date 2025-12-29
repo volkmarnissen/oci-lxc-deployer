@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { ICommand, IVeExecuteMessage } from "./types.mjs";
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 import { VariableResolver } from "./variable-resolver.mjs";
+import { getNextMessageIndex } from "./ve-execution-constants.mjs";
 
 export interface CommandProcessorDependencies {
   outputs: Map<string, string | number | boolean>;
@@ -25,12 +26,14 @@ export class VeExecutionCommandProcessor {
    * Handles a skipped command by emitting a message.
    */
   handleSkippedCommand(cmd: ICommand, msgIndex: number): number {
+    // Use getNextMessageIndex() to ensure consistency with other commands
+    const index = getNextMessageIndex();
     this.deps.messageEmitter.emitStandardMessage(
       cmd,
       cmd.description || "Skipped: all required parameters missing",
       null,
       0,
-      msgIndex,
+      index,
     );
     return msgIndex + 1;
   }
@@ -74,19 +77,27 @@ export class VeExecutionCommandProcessor {
       }
       
       // Emit success message
-      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
+      // Use command name (which should be set from template name) or fallback to "properties"
+      const commandName = cmd.name && cmd.name.trim() !== "" ? cmd.name : "properties";
+      const propertiesCmd = { ...cmd, name: commandName };
+      // Use getNextMessageIndex() to ensure consistency with other commands
+      const index = getNextMessageIndex();
       this.deps.messageEmitter.emitStandardMessage(
         propertiesCmd,
         "",
         JSON.stringify(cmd.properties),
         0,
-        msgIndex,
+        index,
       );
       return msgIndex + 1;
     } catch (err: any) {
       const msg = `Failed to process properties: ${err?.message || err}`;
-      const propertiesCmd = { ...cmd, name: cmd.name || "properties" };
-      this.deps.messageEmitter.emitStandardMessage(propertiesCmd, msg, null, -1, msgIndex);
+      // Use command name (which should be set from template name) or fallback to "properties"
+      const commandName = cmd.name && cmd.name.trim() !== "" ? cmd.name : "properties";
+      const propertiesCmd = { ...cmd, name: commandName };
+      // Use getNextMessageIndex() to ensure consistency with other commands
+      const index = getNextMessageIndex();
+      this.deps.messageEmitter.emitStandardMessage(propertiesCmd, msg, null, -1, index);
       return msgIndex + 1;
     }
   }

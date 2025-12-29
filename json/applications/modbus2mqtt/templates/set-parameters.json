@@ -36,15 +36,6 @@
       "description": "URL of the public key for verifying the package"
     },
     {
-      "id": "storage_selection",
-      "name": "Storage Selection",
-      "type": "enum",
-      "required": false,
-      "enumValuesTemplate": "list-available-storage.json",
-      "description": "Select storage to mount. Volumes will be created at <host_mountpoint>/volumes/<hostname>/<volume-key>. If not provided, volumes will be created under /mnt/volumes/<hostname>/<volume-key>.",
-      "advanced": true
-    },
-    {
       "id": "uid",
       "name": "UID",
       "type": "string",

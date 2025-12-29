@@ -2,7 +2,7 @@
   "execute_on": "ve",
   "name": "Update /etc/hosts entries",
   "description": "Optional template to update /etc/hosts with hostname and static IP addresses from previous steps.",
-  "skip_if_all_missing": ["hostname"],
+  "skip_if_all_missing": ["static_ip", "static_ip6"],
   "parameters": [
     {
       "name": "hostname",
