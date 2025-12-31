@@ -180,6 +180,12 @@ async function runUpdatedocCommand(applicationName?: string) {
   const jsonPath = path.join(projectRoot, "json");
   const localPath = path.join(projectRoot, "local", "json");
 
+  // Validate all JSON files before generating documentation
+  // If validation fails, process.exit(1) will be called and documentation won't be generated
+  console.log("Validating all JSON files before generating documentation...\n");
+  await validateAllJson();
+  console.log("\n✓ Validation successful. Proceeding with documentation generation...\n");
+
   // Initialize StorageContext
   StorageContext.setInstance(
     localPath,
