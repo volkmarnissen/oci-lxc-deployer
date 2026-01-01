@@ -52,6 +52,14 @@
       "type": "string",
       "description": "GID for setting permissions on Samba share directories. Should match the GID from 'Bind Multiple Volumes to LXC' (160) if volumes are used.",
       "required": true
+    },
+    {
+      "id": "allow-guest",
+      "name": "Allow Guest Access",
+      "type": "boolean",
+      "default": false,
+      "description": "Enable guest access to Samba shares. If enabled, shares will be accessible without authentication.",
+      "advanced": true
     }
   ]
 }

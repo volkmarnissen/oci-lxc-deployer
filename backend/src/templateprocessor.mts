@@ -443,6 +443,8 @@ export class TemplateProcessor extends EventEmitter {
       }
       // IMPORTANT: Do NOT set outputs when template is skipped
       // This ensures that subsequent templates correctly detect missing parameters
+      // IMPORTANT: Do NOT add parameters when template is skipped
+      // This ensures that parameters from skipped templates don't appear in unresolved parameters
       return; // Exit early, don't process this template further
     }
     
@@ -473,6 +475,7 @@ export class TemplateProcessor extends EventEmitter {
     }
 
     // Custom validation: 'if' must refer to another parameter name, not its own
+    // Only validate and add parameters if template is NOT skipped
     if (tmplData.parameters) {
       const paramNames = tmplData.parameters.map((p) => p.id);
       for (const param of tmplData.parameters) {
@@ -489,6 +492,7 @@ export class TemplateProcessor extends EventEmitter {
       }
     }
     // Add all parameters (no duplicates)
+    // Only add parameters if template is NOT skipped
     for (const param of tmplData.parameters ?? []) {
       if (!opts.parameters.some((p) => p.id === param.id)) {
         const pparm: IParameterWithTemplate = {

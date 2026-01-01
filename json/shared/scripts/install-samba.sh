@@ -28,6 +28,7 @@ VOLUMES="{{ volumes }}"
 ADDITIONAL_SHARES="{{ additional_shares }}"
 UID_VALUE="{{ uid }}"
 GID_VALUE="{{ gid }}"
+ALLOW_GUEST="{{ allow-guest }}"
 
 # Global variables for service management
 SERVICE_CMD=""
@@ -122,14 +123,23 @@ configure_global_samba() {
   # Create a clean, new smb.conf with only our configuration
   # This avoids issues with default shares like [homes], [printers], etc.
   # Shares will be appended to this file by create_all_shares()
+  
+  # Determine guest access settings
+  local map_to_guest="Never"
+  local guest_ok_global="no"
+  if [ "$ALLOW_GUEST" = "true" ] || [ "$ALLOW_GUEST" = "1" ]; then
+    map_to_guest="Bad User"
+    guest_ok_global="yes"
+  fi
+  
   cat > /etc/samba/smb.conf <<EOF
 [global]
   workgroup = WORKGROUP
   server role = standalone server
   server string = Samba Time Machine Server
   security = user
-  map to guest = Never
-  guest ok = no
+  map to guest = $map_to_guest
+  guest ok = $guest_ok_global
   wide links = yes
   unix extensions = no
   vfs objects = acl_xattr catia fruit streams_xattr
@@ -223,13 +233,26 @@ create_share_config() {
   # Append share configuration directly to smb.conf
   # Note: force user/group makes Samba run file operations as the specified user
   # This requires the directory to be writable by that user or owned by that user
+  
+  # Determine guest access for this share
+  local guest_ok_share="no"
+  local valid_users_line=""
+  if [ "$ALLOW_GUEST" = "true" ] || [ "$ALLOW_GUEST" = "1" ]; then
+    guest_ok_share="yes"
+    # If guest access is allowed, valid users is optional (guest can access)
+    valid_users_line=""
+  else
+    # If guest access is not allowed, require valid user
+    valid_users_line="  valid users = $USERNAME"
+  fi
+  
   cat >> /etc/samba/smb.conf <<EOF
 [$share_name]
   path = $share_path
   available = yes
   writable = yes
-  guest ok = no
-  valid users = $USERNAME
+  guest ok = $guest_ok_share
+${valid_users_line}
   vfs objects = catia fruit streams_xattr
   fruit:time machine = yes
   force user = $USERNAME

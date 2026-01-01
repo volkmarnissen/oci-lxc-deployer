@@ -3,6 +3,7 @@
   "description": "Binds multiple host directories to an LXC container.\n\nFor each volume entry (key=value format, one per line), creates a bind mount from <host_mountpoint>/<base_path>/<hostname>/<key> to /<value> in the container.\n\nIf host_mountpoint is provided (from 'Mount Disk on Host' (120) or 'Mount ZFS Pool on Host' (121)), volumes are created at <host_mountpoint>/<base_path>/<hostname>/<key>.\nIf host_mountpoint is not provided, volumes are created at /mnt/<base_path>/<hostname>/<key>.\n\nThis template can be called independently of the LXC container's state (running or stopped) and is safe to call multiple times (idempotent).",
   "execute_on": "ve",
   "skip_if_all_missing": ["volumes"],
+  "skip_if_property_set": "skip_bind_multiple_volumes_to_lxc",
   "parameters": [
     {
       "id": "vm_id",

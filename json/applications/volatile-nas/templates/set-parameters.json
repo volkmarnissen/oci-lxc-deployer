@@ -48,7 +48,11 @@
     {
       "properties": [
         { "id": "ostype", "value": "debian" },
-        { "id": "packages", "value": "samba avahi-daemon" }
+        { "id": "allow-guest", "value": true },
+        { "id": "skip_mount_disk_on_host", "value": true },
+        { "id": "skip_bind_multiple_volumes_to_lxc", "value": true },
+        { "id": "packages", "value": "samba avahi-daemon" },
+        { "id": "volumes", "value": "nas=/var/nas" }
       ]
     }
   ]
