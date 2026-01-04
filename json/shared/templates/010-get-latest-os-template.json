@@ -16,7 +16,7 @@
     {
       "name": "Latest OS Template",
       "script": "get-latest-os-template.sh",
-      "outputs": ["template_path", "ostype"]
+      "outputs": ["template_path"]
     }
   ]
 }

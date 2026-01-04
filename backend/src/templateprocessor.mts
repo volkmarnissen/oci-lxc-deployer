@@ -490,6 +490,8 @@ export class TemplateProcessor extends EventEmitter {
     
     // Add all collected outputs to resolvedParams
     // Check for conflicts: if another template in the same task already set this output ID, it's an error
+    // UNLESS at least one of the templates is conditional (skip_if_all_missing or skip_if_property_set)
+    // In that case, only one template will execute in practice, so it's not a real conflict
     for (const outputId of allOutputIds) {
       const existing = opts.resolvedParams.find((p) => p.id === outputId);
       if (undefined == existing) {
@@ -499,14 +501,95 @@ export class TemplateProcessor extends EventEmitter {
           template: currentTemplateName,
         });
       } else {
-        // Output ID already set by another template - this is a conflict
-        // Even if both templates only have properties, setting the same output ID multiple times is an error
+        // Output ID already set by another template - check if this is a real conflict
         const conflictingTemplate = existing.template;
-        opts.errors.push(
-          new JsonError(
-            `Output/property ID "${outputId}" is set by multiple templates in the same task: "${conflictingTemplate}" and "${currentTemplateName}". Each output ID can only be set once per task.`,
-          ),
-        );
+        
+        // Check if the conflicting template is conditional
+        let conflictingTemplateIsConditional = false;
+        let conflictingTemplateSetsOutput = true; // Default: assume it sets output (since it's in resolvedParams)
+        if (opts.processedTemplates) {
+          const normalizedConflictingName = TemplatePathResolver.normalizeTemplateName(conflictingTemplate);
+          const conflictingTemplateInfo = opts.processedTemplates.get(normalizedConflictingName);
+          if (conflictingTemplateInfo) {
+            conflictingTemplateIsConditional = conflictingTemplateInfo.conditional || false;
+            
+            // Check if the conflicting template actually sets this ID as an output
+            // If it only defines it as a parameter (not as output), it's not a conflict
+            try {
+              const conflictingTmplPath = conflictingTemplateInfo.path;
+              const validator = this.storageContext.getJsonValidator();
+              const conflictingTmplData = validator.serializeJsonFileWithSchema<ITemplate>(
+                conflictingTmplPath,
+                "template.schema.json",
+              );
+              
+              // Check if the conflicting template sets this ID as output (in outputs or properties)
+              conflictingTemplateSetsOutput = false;
+              for (const cmd of conflictingTmplData.commands ?? []) {
+                // Check outputs
+                if (cmd.outputs) {
+                  for (const output of cmd.outputs) {
+                    const id = typeof output === "string" ? output : output.id;
+                    if (id === outputId) {
+                      conflictingTemplateSetsOutput = true;
+                      break;
+                    }
+                  }
+                }
+                // Check properties (properties are automatically outputs)
+                if (cmd.properties !== undefined) {
+                  if (Array.isArray(cmd.properties)) {
+                    for (const prop of cmd.properties) {
+                      if (prop && typeof prop === "object" && prop.id === outputId) {
+                        conflictingTemplateSetsOutput = true;
+                        break;
+                      }
+                    }
+                  } else if (cmd.properties && typeof cmd.properties === "object" && cmd.properties.id === outputId) {
+                    conflictingTemplateSetsOutput = true;
+                  }
+                }
+                if (conflictingTemplateSetsOutput) break;
+              }
+            } catch (e) {
+              // If we can't load the template, assume it sets output (conservative approach)
+              conflictingTemplateSetsOutput = true;
+            }
+          }
+        }
+        
+        // If the conflicting template only defines it as a parameter (not as output), it's not a conflict
+        // The parameter will be resolved by the current template's output, and it will be ignored in the UI
+        if (!conflictingTemplateSetsOutput) {
+          // Allow the conflict - conflicting template only defines parameter, current template sets output
+          // Update the resolvedParams to use the current template (last one wins)
+          const existingIndex = opts.resolvedParams.findIndex((p) => p.id === outputId);
+          if (existingIndex !== -1) {
+            opts.resolvedParams[existingIndex] = {
+              id: outputId,
+              template: currentTemplateName,
+            };
+          }
+        } else if (isConditional || conflictingTemplateIsConditional) {
+          // If at least one template is conditional, it's not a real conflict
+          // because in practice only one will execute (the other will be skipped)
+          // Allow the conflict - at least one template is conditional, so only one will execute
+          // Update the resolvedParams to use the current template (last one wins)
+          const existingIndex = opts.resolvedParams.findIndex((p) => p.id === outputId);
+          if (existingIndex !== -1) {
+            opts.resolvedParams[existingIndex] = {
+              id: outputId,
+              template: currentTemplateName,
+            };
+          }
+        } else {
+          // Both templates are non-conditional and both set the output - this is a real conflict
+          opts.errors.push(
+            new JsonError(
+              `Output/property ID "${outputId}" is set by multiple templates in the same task: "${conflictingTemplate}" and "${currentTemplateName}". Each output ID can only be set once per task.`,
+            ),
+          );
+        }
       }
     }
 
@@ -524,6 +607,35 @@ export class TemplateProcessor extends EventEmitter {
               `Parameter '${param.name}': 'if' must refer to another parameter name in the same template (not itself).`,
             ),
           );
+        }
+      }
+    }
+    
+    // Check if template defines a parameter and also sets it as output
+    // This is only OK if:
+    // 1. Another template has already set it as output (resolved), OR
+    // 2. The parameter is optional (required: false or not set)
+    //    In this case, the parameter can be provided by the user, or the script can generate it as output
+    if (tmplData.parameters) {
+      for (const param of tmplData.parameters) {
+        // Check if this parameter ID is also set as output in this template
+        if (allOutputIds.has(param.id)) {
+          // Parameter is defined and also set as output in the same template
+          // Check if it was already resolved by another template
+          const wasAlreadyResolved = opts.resolvedParams.some(
+            (p) => p.id === param.id && p.template !== currentTemplateName
+          );
+          // Check if parameter is optional (required: false or not set)
+          const isOptional = param.required !== true;
+          
+          if (!wasAlreadyResolved && !isOptional) {
+            // This is an error: template defines required parameter and sets it as output, but no other template set it first
+            opts.errors.push(
+              new JsonError(
+                `Template "${currentTemplateName}" defines required parameter "${param.id}" and also sets it as output. This is only allowed if another template sets "${param.id}" as output first, or if the parameter is optional.`,
+              ),
+            );
+          }
         }
       }
     }

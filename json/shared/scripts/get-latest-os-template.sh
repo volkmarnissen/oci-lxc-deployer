@@ -44,4 +44,4 @@ if [ -z "$template_path" ]; then
 fi
 
 # Output the template path in JSON format to stdout
-echo '[{"id":"template_path","value":"'$template_path'"},{"id":"ostype","value":"'$OSTYPE'"}]'
+echo '[{"id":"template_path","value":"'$template_path'"}]'

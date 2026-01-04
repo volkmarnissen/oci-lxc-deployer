@@ -22,8 +22,7 @@
     {
       "name": "Download and Install Package",
       "script": "300-download-and-install-apk-package.sh",
-      "description": "Download and install APK package on the LXC container",
-      "outputs": ["packageurl", "packagerpubkeyurl"]
+      "description": "Download and install APK package on the LXC container"
     }
   ]
 }

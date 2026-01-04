@@ -215,6 +215,14 @@ export class ApplicationLoader {
               // before is an array, use the first element
               const beforeName = entry.before[0];
               const existingTemplates = taskEntry.templates.map(t => typeof t === "string" ? t : t.name);
+              // Check for duplicates before inserting
+              if (existingTemplates.includes(name)) {
+                const error = new JsonError(
+                  `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
+                );
+                this.addErrorToOptions(opts, error);
+                return; // Don't add duplicate
+              }
               const idx = existingTemplates.indexOf(beforeName);
               if (idx !== -1) {
                 taskEntry.templates.splice(idx, 0, name);
@@ -225,6 +233,14 @@ export class ApplicationLoader {
               // after is an array, use the first element
               const afterName = entry.after[0];
               const existingTemplates = taskEntry.templates.map(t => typeof t === "string" ? t : t.name);
+              // Check for duplicates before inserting
+              if (existingTemplates.includes(name)) {
+                const error = new JsonError(
+                  `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
+                );
+                this.addErrorToOptions(opts, error);
+                return; // Don't add duplicate
+              }
               const idx = existingTemplates.indexOf(afterName);
               if (idx !== -1) {
                 taskEntry.templates.splice(idx + 1, 0, name);
