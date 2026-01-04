@@ -24,6 +24,7 @@ export class VeExecutionSshExecutor {
 
   /**
    * Builds SSH arguments for connecting to the VE host.
+   * When sshCommand is "sh" (for testing), remoteCommand is used directly as command arguments.
    */
   buildSshArgs(remoteCommand?: string[]): string[] {
     let sshArgs: string[] = [];
@@ -56,9 +57,15 @@ export class VeExecutionSshExecutor {
         String(port),
         `${host}`,
       ];
-    }
-    if (remoteCommand) {
-      sshArgs = sshArgs.concat(remoteCommand);
+      // For SSH, remoteCommand is appended after the host
+      if (remoteCommand) {
+        sshArgs = sshArgs.concat(remoteCommand);
+      }
+    } else {
+      // For non-SSH commands (e.g., "sh" for testing), remoteCommand is used directly
+      if (remoteCommand) {
+        sshArgs = remoteCommand;
+      }
     }
     return sshArgs;
   }
@@ -138,14 +145,17 @@ export class VeExecutionSshExecutor {
     stderr: string,
     exitCode: number,
   ): IVeExecuteMessage {
-    return {
+    const message: IVeExecuteMessage = {
       stderr: structuredClone(stderr),
       commandtext: structuredClone(input),
       result: structuredClone(stdout),
       exitCode,
       command: structuredClone(tmplCommand.name),
-      execute_on: structuredClone(tmplCommand.execute_on!),
     };
+    if (tmplCommand.execute_on) {
+      message.execute_on = structuredClone(tmplCommand.execute_on);
+    }
+    return message;
   }
 
   /**

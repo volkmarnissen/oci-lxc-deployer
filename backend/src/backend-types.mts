@@ -26,7 +26,7 @@ export interface IConfiguredPathes {
   localPath: string;
 }
 export interface ITemplate {
-  execute_on: "ve" | "lxc";
+  execute_on: "ve" | "lxc" | string; // string allows "host:hostname" pattern
   skip_if_all_missing?: string[];
   skip_if_property_set?: string;
   name: string;
@@ -41,7 +41,7 @@ export interface IContext {
 export interface IVMContext {
   vmid: number;
   vekey: string;
-  data: any;
+  outputs: Record<string, string| number| boolean>;
   getKey(): string;
 }
 export interface IVMInstallContext {

@@ -21,17 +21,17 @@ import { ApplicationLoader } from "./apploader.mjs";
 const baseSchemas: string[] = ["templatelist.schema.json"];
 
 export class VMContext implements IVMContext {
+  vmid: number;
+  vekey: string;
+  outputs: Record<string, string| number| boolean>;
   constructor(data: IVMContext) {
     this.vmid = data.vmid;
     this.vekey = data.vekey;
-    this.data = data.data;
+    this.outputs = data.outputs || {};
   }
-  public vmid: number;
-  public vekey: string;
-  public data: any;
   getKey(): string {
     return `vm_${this.vmid}`;
-  }
+  } 
 }
 
 export class VMInstallContext implements IVMInstallContext {
@@ -180,6 +180,14 @@ export class StorageContext extends Context implements IContext {
     return null;
   }
   setVMContext(vmContext: IVMContext): string {
+    // Verify that the VE context referenced by vekey exists
+    const veContext = this.getVEContextByKey(vmContext.vekey);
+    if (!veContext) {
+      throw new Error(
+        `VE context not found for key: ${vmContext.vekey}. Please set the VE context using setVEContext() before setting the VM context.`,
+      );
+    }
+    
     const key = `vm_${vmContext.vmid}`;
     this.set(key, new VMContext(vmContext));
     return key;
@@ -208,7 +216,7 @@ export class StorageContext extends Context implements IContext {
       const value = this.get(key);
       if (value instanceof VMContext) {
         const vm = value as VMContext;
-        const h = (vm as any)?.data?.hostname;
+        const h = vm.outputs.hostname;
         if (typeof h === "string" && h === hostname) {
           return vm as IVMContext;
         }

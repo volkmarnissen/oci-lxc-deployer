@@ -50,7 +50,8 @@ export interface ICommand {
   properties?: IOutputObject | IOutputObject[];
   outputs?: Array<{ id: string; default?: boolean } | string>; // Expected outputs from this command/script
   description?: string;
-  execute_on?: string;
+  /** @internal execute_on is set internally from template.execute_on, not part of the schema */
+  execute_on?: "ve" | "lxc" | string;
 }
 
 export interface IVeExecuteMessage {
@@ -87,7 +88,7 @@ export interface IParameter {
 }
 
 export interface ITemplate {
-  execute_on: "ve" | "lxc";
+  execute_on: "ve" | "lxc" | string; // string allows "host:hostname" pattern
   skip_if_all_missing?: string[];
   skip_if_property_set?: string;
   name: string;

@@ -689,14 +689,18 @@ export class TemplateProcessor extends EventEmitter {
           opts.requestedIn,
           opts.parentTemplate,
         );
-        opts.commands.push({ ...cmd, execute_on: tmplData.execute_on });
+        const commandToAdd: ICommand = {
+          ...cmd,
+          execute_on: tmplData.execute_on,
+        };
+        opts.commands.push(commandToAdd);
       } else {
         // Handle properties-only commands or other command types
         // Ensure name is set (should already be set above, but ensure it's preserved)
         const commandToAdd: ICommand = {
           ...cmd,
-          execute_on: tmplData.execute_on,
           name: cmd.name || tmplData.name || "unnamed-template",
+          execute_on: tmplData.execute_on,
         };
         opts.commands.push(commandToAdd);
       }

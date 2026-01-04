@@ -35,7 +35,7 @@ export class VeExecution extends EventEmitter {
   private outputProcessor: OutputProcessor;
   private messageEmitter: VeExecutionMessageEmitter;
   private sshExecutor: VeExecutionSshExecutor;
-  private hostDiscovery: VeExecutionHostDiscovery;
+  protected hostDiscovery: VeExecutionHostDiscovery;
   private commandProcessor!: VeExecutionCommandProcessor;
   private stateManager: VeExecutionStateManager;
   
@@ -86,12 +86,7 @@ export class VeExecution extends EventEmitter {
         this.outputsRaw = raw;
       },
     });
-    this.hostDiscovery = new VeExecutionHostDiscovery({
-      sshExecutor: this.sshExecutor,
-      outputs: this.outputs,
-      variableResolver: this.variableResolver,
-      runOnLxc: (vm_id, command, tmplCommand) => this.runOnLxc(vm_id, command, tmplCommand),
-    });
+    this.hostDiscovery = this.createHostDiscovery();
     this.stateManager = new VeExecutionStateManager({
       outputs: this.outputs,
       outputsRaw: this.outputsRaw,
@@ -99,6 +94,19 @@ export class VeExecution extends EventEmitter {
       defaults: this.defaults,
       veContext: this.veContext,
       initializeVariableResolver: () => this.initializeVariableResolver(),
+    });
+  }
+
+  /**
+   * Creates the host discovery instance. Can be overridden in tests to provide a mock.
+   * @protected
+   */
+  protected createHostDiscovery(): VeExecutionHostDiscovery {
+    return new VeExecutionHostDiscovery({
+      sshExecutor: this.sshExecutor,
+      outputs: this.outputs,
+      variableResolver: this.variableResolver,
+      runOnLxc: (vm_id, command, tmplCommand, timeoutMs?, remoteCommand?) => this.runOnLxc(vm_id, command, tmplCommand, timeoutMs, remoteCommand),
     });
   }
 
@@ -132,14 +140,14 @@ export class VeExecution extends EventEmitter {
       sshExecutor: this.sshExecutor,
       outputs: this.outputs,
       variableResolver: this.variableResolver,
-      runOnLxc: (vm_id, cmd, tmplCmd) => this.runOnLxc(vm_id, cmd, tmplCmd),
+      runOnLxc: (vm_id, cmd, tmplCmd, timeoutMs?, remoteCommand?) => this.runOnLxc(vm_id, cmd, tmplCmd, timeoutMs, remoteCommand),
     });
     this.commandProcessor = new VeExecutionCommandProcessor({
       outputs: this.outputs,
       inputs: this.inputs,
       variableResolver: this.variableResolver,
       messageEmitter: this.messageEmitter,
-      runOnLxc: (vm_id, cmd, tmplCmd) => this.runOnLxc(vm_id, cmd, tmplCmd),
+      runOnLxc: (vm_id, cmd, tmplCmd, timeoutMs?, remoteCommand?) => this.runOnLxc(vm_id, cmd, tmplCmd, timeoutMs, remoteCommand),
       runOnVeHost: (input, cmd, timeout, remote) => this.runOnVeHost(input, cmd, timeout, remote),
       executeOnHost: (hostname, cmd, tmplCmd) => this.executeOnHost(hostname, cmd, tmplCmd),
       outputsRaw: this.outputsRaw,
@@ -258,11 +266,17 @@ export class VeExecution extends EventEmitter {
     command: string,
     tmplCommand: ICommand,
     timeoutMs?: number,
+    remoteCommand?: string[],
   ): Promise<IVeExecuteMessage> {
-    // Pass command and arguments as array
-    let lxcCmd: string[] | undefined = ["lxc-attach", "-n", String(vm_id)];
-    // For testing: just pass through when using another sshCommand, like /bin/sh
-    if (this.sshCommand !== "ssh") lxcCmd = undefined;
+    // If remoteCommand is provided, use it (allows tests to override)
+    // Otherwise, determine based on sshCommand
+    let lxcCmd: string[] | undefined = remoteCommand;
+    if (lxcCmd === undefined) {
+      // Pass command and arguments as array
+      lxcCmd = ["lxc-attach", "-n", String(vm_id)];
+      // For testing: just pass through when using another sshCommand, like /bin/sh
+      if (this.sshCommand !== "ssh") lxcCmd = undefined;
+    }
     return await this.runOnVeHost(command, tmplCommand, timeoutMs, lxcCmd);
   }
 
@@ -315,7 +329,58 @@ export class VeExecution extends EventEmitter {
       // Update helper modules in case state changed during execution
       this.updateHelperModules();
 
+      // Check if this command is part of a template with execute_on: "host:hostname"
+      // If so, group all commands with the same hostname and execute them as a separate VeExecution instance
+      // This check must happen BEFORE handling skipped commands, so we can group all template commands together
+      const executeOn = cmd.execute_on;
+      if (executeOn && typeof executeOn === "string" && /^host:.*/.test(executeOn)) {
+        const hostname = executeOn.split(":")[1] ?? "";
+        
+        // Collect all consecutive commands with the same execute_on: "host:hostname"
+        // This includes skipped commands, as they are part of the template
+        const templateCommands: ICommand[] = [];
+        let j = i;
+        while (j < this.commands.length) {
+          const nextCmd = this.commands[j];
+          if (!nextCmd || typeof nextCmd !== "object") break;
+          if (nextCmd.execute_on === cmd.execute_on) {
+            templateCommands.push(nextCmd);
+            j++;
+          } else {
+            break;
+          }
+        }
+        
+        // Execute the template as a separate VeExecution instance
+        try {
+          await this.hostDiscovery.executeTemplateOnHost(
+            hostname,
+            templateCommands,
+            this,
+            this.veContext,
+            this.sshCommand,
+          );
+          
+          // Update message index and restart info
+          msgIndex += templateCommands.length;
+          rcRestartInfo = this.stateManager.buildRestartInfo(j - 1);
+          
+          // Skip past all commands that were executed
+          i = j - 1; // Will be incremented by the for loop
+          continue;
+        } catch (err: any) {
+          // Handle execution errors
+          this.messageEmitter.emitErrorMessage(cmd, err, msgIndex++, hostname);
+          // Only set restartInfo if we've executed at least one command successfully
+          if (i > startIdx) {
+            rcRestartInfo = this.stateManager.buildRestartInfo(i - 1);
+          }
+          break outerloop;
+        }
+      }
+      
       // Check if this is a skipped command (has "(skipped)" in name)
+      // This is now AFTER the template check, so skipped commands within templates are handled by executeTemplateOnHost
       if (cmd.name && cmd.name.includes("(skipped)")) {
         msgIndex = this.commandProcessor.handleSkippedCommand(cmd, msgIndex);
         continue;
@@ -343,8 +408,8 @@ export class VeExecution extends EventEmitter {
           lastMsg = await this.commandProcessor.executeCommandByTarget(cmd, rawStr);
         } catch (err: any) {
           // Handle execution errors
-          if (typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
-            const hostname = (cmd.execute_on as string).split(":")[1] ?? "";
+          if (cmd.execute_on && typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
+            const hostname = cmd.execute_on.split(":")[1] ?? "";
             this.messageEmitter.emitErrorMessage(cmd, err, msgIndex++, hostname);
           } else {
             this.messageEmitter.emitErrorMessage(cmd, err, msgIndex++);

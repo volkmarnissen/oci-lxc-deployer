@@ -411,8 +411,8 @@ describe("VeExecutionCommandProcessor", () => {
       expect(content).toContain("test_function");
       expect(content).toContain("# --- Script starts here ---");
       // Library should come before script
-      const libraryIndex = content.indexOf("test_function()");
-      const scriptIndex = content.indexOf("test_function", libraryIndex + 1);
+      const libraryIndex = content!.indexOf("test_function()");
+      const scriptIndex = content!.indexOf("test_function", libraryIndex + 1);
       expect(libraryIndex).toBeLessThan(scriptIndex);
     });
 

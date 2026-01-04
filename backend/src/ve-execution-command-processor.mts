@@ -9,7 +9,7 @@ export interface CommandProcessorDependencies {
   inputs: Record<string, string | number | boolean>;
   variableResolver: VariableResolver;
   messageEmitter: VeExecutionMessageEmitter;
-  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand) => Promise<IVeExecuteMessage>;
+  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<IVeExecuteMessage>;
   runOnVeHost: (input: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<IVeExecuteMessage>;
   executeOnHost: (hostname: string, command: string, tmplCommand: ICommand) => Promise<void>;
   outputsRaw: { name: string; value: string | number | boolean }[] | undefined;
@@ -158,6 +158,10 @@ export class VeExecutionCommandProcessor {
     cmd: ICommand,
     rawStr: string,
   ): Promise<IVeExecuteMessage | undefined> {
+    if (!cmd.execute_on) {
+      throw new Error(cmd.name + " is missing the execute_on property");
+    }
+    
     switch (cmd.execute_on) {
       case "lxc": {
         const execStrLxc = this.deps.variableResolver.replaceVars(rawStr);
@@ -167,6 +171,8 @@ export class VeExecutionCommandProcessor {
           this.deps.messageEmitter.emitStandardMessage(cmd, msg, null, -1, -1);
           throw new Error(msg);
         }
+        // When sshCommand !== "ssh", runOnLxc will set remoteCommand to undefined
+        // to execute locally. We don't need to pass it explicitly here.
         await this.deps.runOnLxc(vm_id, execStrLxc, cmd);
         return undefined;
       }
@@ -176,12 +182,12 @@ export class VeExecutionCommandProcessor {
       }
       default: {
         if (typeof cmd.execute_on === "string" && /^host:.*/.test(cmd.execute_on)) {
-          const hostname = (cmd.execute_on as string).split(":")[1] ?? "";
+          const hostname = cmd.execute_on.split(":")[1] ?? "";
           // Pass raw (unreplaced) string; executeOnHost will replace with vmctx.data
           await this.deps.executeOnHost(hostname, rawStr, cmd);
           return undefined;
         } else {
-          throw new Error(cmd.name + " is missing the execute_on property");
+          throw new Error(cmd.name + " has invalid execute_on: " + cmd.execute_on);
         }
       }
     }

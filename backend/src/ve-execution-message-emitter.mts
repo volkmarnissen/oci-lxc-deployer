@@ -25,7 +25,7 @@ export class VeExecutionMessageEmitter {
       stderr,
       result,
       exitCode: -1, // Not finished yet
-      execute_on: tmplCommand.execute_on,
+      execute_on: tmplCommand.execute_on || undefined,
       partial: true,
     } as IVeExecuteMessage);
   }
@@ -46,7 +46,7 @@ export class VeExecutionMessageEmitter {
       result,
       exitCode,
       command: cmd.name,
-      execute_on: cmd.execute_on,
+      execute_on: (cmd as any).execute_on || undefined,
       host: hostname,
       index,
       partial: false,
@@ -70,7 +70,7 @@ export class VeExecutionMessageEmitter {
       result: null,
       exitCode: -1,
       command: cmd.name,
-      execute_on: cmd.execute_on,
+      execute_on: (cmd as any).execute_on || undefined,
       host: hostname,
       index: msgIndex,
       partial: false,
