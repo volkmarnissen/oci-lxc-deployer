@@ -21,6 +21,7 @@ import { ApplicationLoader } from "@src/apploader.mjs";
 import fs from "fs";
 import { ScriptValidator } from "@src/scriptvalidator.mjs";
 import { StorageContext } from "./storagecontext.mjs";
+import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 import { VeExecution } from "./ve-execution.mjs";
 import { TemplatePathResolver } from "./template-path-resolver.mjs";
 export interface ITemplateReference {
@@ -92,7 +93,11 @@ export class TemplateProcessor extends EventEmitter {
       error: new VEConfigurationError("", applicationName),
       taskTemplates: [],
     };
-    const appLoader = new ApplicationLoader(this.pathes);
+    const persistence = new FileSystemPersistence(
+      this.pathes,
+      this.storageContext.getJsonValidator(),
+    );
+    const appLoader = new ApplicationLoader(this.pathes, persistence);
     let application = appLoader.readApplicationJson(applicationName, readOpts);
     // Don't throw immediately - collect all errors first (including template processing errors)
     // Errors from readApplicationJson will be added to the errors array during template processing

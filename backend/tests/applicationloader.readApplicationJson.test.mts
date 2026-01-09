@@ -1,5 +1,6 @@
 import { ApplicationLoader, IReadApplicationOptions } from "@src/apploader.mjs";
 import { StorageContext } from "@src/storagecontext.mjs";
+import { FileSystemPersistence } from "@src/persistence/filesystem-persistence.mjs";
 import fs from "fs";
 import path from "path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -23,7 +24,12 @@ describe("ApplicationLoader.readApplicationJson", () => {
 
   beforeEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    loader = new ApplicationLoader({ schemaPath, jsonPath, localPath });
+    const storage = StorageContext.getInstance();
+    const persistence = new FileSystemPersistence(
+      { schemaPath, jsonPath, localPath },
+      storage.getJsonValidator(),
+    );
+    loader = new ApplicationLoader({ schemaPath, jsonPath, localPath }, persistence);
   });
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });

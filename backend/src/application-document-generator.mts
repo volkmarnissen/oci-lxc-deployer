@@ -8,6 +8,8 @@ import { DocumentationPathResolver } from "./documentation-path-resolver.mjs";
 import { TemplateAnalyzer } from "./template-analyzer.mjs";
 import { TemplatePathResolver } from "./template-path-resolver.mjs";
 import type { IParameter, ICommand, TaskType, ITemplate } from "./types.mjs";
+import { StorageContext } from "./storagecontext.mjs";
+import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 
 /**
  * Generates Markdown documentation for applications.
@@ -296,11 +298,23 @@ export class ApplicationDocumentGenerator {
     parentName: string,
   ): Promise<IApplication | null> {
     try {
-      const appLoader = new ApplicationLoader({
-        jsonPath: this.configuredPathes.jsonPath,
-        localPath: this.configuredPathes.localPath,
-        schemaPath: this.configuredPathes.schemaPath,
-      });
+      const storage = StorageContext.getInstance();
+      const persistence = new FileSystemPersistence(
+        {
+          jsonPath: this.configuredPathes.jsonPath,
+          localPath: this.configuredPathes.localPath,
+          schemaPath: this.configuredPathes.schemaPath,
+        },
+        storage.getJsonValidator(),
+      );
+      const appLoader = new ApplicationLoader(
+        {
+          jsonPath: this.configuredPathes.jsonPath,
+          localPath: this.configuredPathes.localPath,
+          schemaPath: this.configuredPathes.schemaPath,
+        },
+        persistence,
+      );
 
       const readOpts: IReadApplicationOptions = {
         applicationHierarchy: [],

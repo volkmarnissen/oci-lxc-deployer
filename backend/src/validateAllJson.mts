@@ -8,6 +8,7 @@ import { IReadApplicationOptions } from "./apploader.mjs";
 import { TaskType } from "./types.mjs";
 import { VEConfigurationError, VELoadApplicationError, IVEContext } from "./backend-types.mjs";
 import { TemplateProcessor } from "./templateprocessor.mjs";
+import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 
 function findTemplateDirs(dir: string): string[] {
   let results: string[] = [];
@@ -331,7 +332,12 @@ export async function validateAllJson(localPathArg?: string): Promise<void> {
     jsonPath: jsonPath,
     localPath: localPath,
   };
-  const appLoader = new ApplicationLoader(configuredPathes);
+  const storage = StorageContext.getInstance();
+  const persistence = new FileSystemPersistence(
+    configuredPathes,
+    storage.getJsonValidator(),
+  );
+  const appLoader = new ApplicationLoader(configuredPathes, persistence);
   
   const VALID_TASK_TYPES: TaskType[] = [
     "installation",

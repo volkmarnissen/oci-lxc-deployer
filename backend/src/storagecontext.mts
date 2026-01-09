@@ -17,6 +17,7 @@ import { IApplicationWeb, ISsh, TaskType } from "./types.mjs";
 import { Context } from "./context.mjs";
 import { Ssh } from "./ssh.mjs";
 import { ApplicationLoader } from "./apploader.mjs";
+import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 
 const baseSchemas: string[] = ["templatelist.schema.json"];
 
@@ -176,7 +177,11 @@ export class StorageContext extends Context implements IContext {
         error: new VEConfigurationError("", applicationName),
         taskTemplates: [],
       };
-      const appLoader = new ApplicationLoader(this.pathes);
+      const persistence = new FileSystemPersistence(
+        this.pathes,
+        this.getJsonValidator(),
+      );
+      const appLoader = new ApplicationLoader(this.pathes, persistence);
       try {
         let app = appLoader.readApplicationJson(applicationName, readOpts);
         app.description = app.description || "No desription available";

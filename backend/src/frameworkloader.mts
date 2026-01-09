@@ -12,6 +12,7 @@ import { JsonError } from "./jsonvalidator.mjs";
 import { TemplateProcessor } from "./templateprocessor.mjs";
 import { TaskType, IParameter, IPostFrameworkCreateApplicationBody } from "./types.mjs";
 import { IVEContext } from "./backend-types.mjs";
+import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 
 export interface IReadFrameworkOptions {
   framework?: IFramework;
@@ -25,8 +26,13 @@ export class FrameworkLoader {
     private storage: StorageContext = StorageContext.getInstance(),
     private applicationLoader?: ApplicationLoader,
   ) {
-    this.applicationLoader =
-      this.applicationLoader ?? new ApplicationLoader(this.pathes, this.storage);
+    if (!this.applicationLoader) {
+      const persistence = new FileSystemPersistence(
+        this.pathes,
+        this.storage.getJsonValidator(),
+      );
+      this.applicationLoader = new ApplicationLoader(this.pathes, persistence, this.storage);
+    }
   }
 
   public readFrameworkJson(

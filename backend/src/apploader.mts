@@ -3,11 +3,10 @@ import {
   IConfiguredPathes,
   VEConfigurationError,
 } from "@src/backend-types.mjs";
-import path from "path";
-import fs from "fs";
 import { StorageContext } from "./storagecontext.mjs";
 import { ITemplateReference } from "./templateprocessor.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
+import { IApplicationPersistence } from "./persistence/interfaces.mjs";
 export interface IReadApplicationOptions {
   applicationHierarchy: string[];
   application?: IApplication;
@@ -24,6 +23,7 @@ export interface IReadApplicationOptions {
 export class ApplicationLoader {
   constructor(
     private pathes: IConfiguredPathes,
+    private persistence: IApplicationPersistence,
     private storage: StorageContext = StorageContext.getInstance(),
   ) {}
   /**
@@ -35,114 +35,15 @@ export class ApplicationLoader {
     application: string,
     opts: IReadApplicationOptions,
   ): IApplication {
-    let appPath: string | undefined;
-    let appFile: string | undefined;
+    // Handle json: prefix
     let appName = application;
-
     if (application.startsWith("json:")) {
       appName = application.replace(/^json:/, "");
-      appPath = path.join(this.pathes.jsonPath, "applications", appName);
-      appFile = path.join(appPath, "application.json");
-      if (!fs.existsSync(appFile))
-        throw new Error(`application.json not found for ${application}`);
-    } else {
-      // First check local, then json
-      let localPath = path.join(
-        this.pathes.localPath,
-        "applications",
-        application,
-        "application.json",
-      );
-      let jsonPath = path.join(
-        this.pathes.jsonPath,
-        "applications",
-        application,
-        "application.json",
-      );
-      if (fs.existsSync(localPath)) {
-        appFile = localPath;
-        appPath = path.dirname(localPath);
-      } else if (fs.existsSync(this.pathes.jsonPath)) {
-        appFile = jsonPath;
-        appPath = path.dirname(jsonPath);
-      } else {
-        throw new Error(`application.json not found for ${application}`);
-      }
     }
-    if (opts.applicationHierarchy.includes(appPath)) {
-      throw new Error(
-        `Cyclic inheritance detected for application: ${appName}`,
-      );
-    }
-    // Read and validate file
-    const validator = this.storage.getJsonValidator();
-    let appData: IApplication;
-    try {
-      try{
-        appData = validator.serializeJsonFileWithSchema<IApplication>(
-          appFile,
-          "application",
-        );
-      } catch (e: Error | any) {
-        appData = {
-          id: application,
-          name: application
-        }
-        this.addErrorToOptions(opts, e);
-      }
 
-      appData.id = appName;
-
-      // Save the first application in the hierarchy
-      if (!opts.application) {
-        opts.application = appData;
-        opts.appPath = appPath;
-      }
-      // First application is first in hierarchy
-      opts.applicationHierarchy.push(appPath);
-
-      // Recursive inheritance - load parent first to get icon data
-      if (appData.extends) {
-        try {
-          this.readApplicationJson(appData.extends, opts);
-        } catch (e: Error | any) {
-          this.addErrorToOptions(opts, e);
-        }
-      }
-
-      // Check for icon in the application directory (supports .png and .svg)
-      let icon = appData?.icon ? appData.icon : "icon.png";
-      let iconFound = false;
-      if (appPath) {
-        const iconPath = path.join(appPath, icon);
-        if (fs.existsSync(iconPath)) {
-          appData.icon = icon;
-          appData.iconContent = fs.readFileSync(iconPath, {
-            encoding: "base64",
-          });
-          // Determine MIME type based on file extension
-          const ext = path.extname(icon).toLowerCase();
-          appData.iconType = ext === ".svg" ? "image/svg+xml" : "image/png";
-          iconFound = true;
-          // Store icon data for inheritance
-          opts.inheritedIcon = icon;
-          opts.inheritedIconContent = appData.iconContent;
-          opts.inheritedIconType = appData.iconType;
-        }
-      }
-
-      // If no icon found and we have inherited icon data from parent, use it
-      if (!iconFound && opts.inheritedIconContent) {
-        appData.icon = opts.inheritedIcon || "icon.png";
-        appData.iconContent = opts.inheritedIconContent;
-        appData.iconType = opts.inheritedIconType;
-      }
-      this.processTemplates(appData, opts);
-      return appData;
-    } catch (e: Error | any) {
-      this.addErrorToOptions(opts, e);
-    }
-    throw opts.error;
+    // Use persistence to read application
+    // This already handles inheritance, icons, and template processing
+    return this.persistence.readApplication(appName, opts);
   }
 
   /**
