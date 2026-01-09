@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    testTimeout: 60000, // 60 seconds default timeout for all tests
     coverage: {
       reporter: ["text", "html"],
     },

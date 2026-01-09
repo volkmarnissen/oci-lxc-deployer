@@ -42,7 +42,7 @@ describe("FrameworkLoader", () => {
       if (tempDir) {
         rmSync(tempDir, { recursive: true, force: true });
       }
-    } catch (e: any) {
+    } catch {
       // Ignore cleanup errors
     }
   });
