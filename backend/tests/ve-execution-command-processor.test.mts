@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { IVEContext } from "@src/backend-types.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 
 const dummyVE: IVEContext = { host: "localhost", port: 22 } as IVEContext;
 let testDir: string;
@@ -24,7 +24,13 @@ beforeAll(() => {
   const storageContextPath = path.join(testDir, "storagecontext.json");
   fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-  StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
+  // Close existing instance if any
+  try {
+    PersistenceManager.getInstance().close();
+  } catch {
+    // Ignore if not initialized
+  }
+  PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
 });
 
 afterAll(() => {

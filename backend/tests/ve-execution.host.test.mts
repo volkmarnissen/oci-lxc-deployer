@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { VeExecution } from "@src/ve-execution.mjs";
 import { ICommand, IVeExecuteMessage } from "@src/types.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -25,14 +25,21 @@ describe("VeExecution host: flow", () => {
       fs.mkdirSync(path.join(tmpDir, "local"), { recursive: true });
     const storageContextFilePath = path.join(tmpDir, "storagecontext.json");
     const secretFilePath = path.join(tmpDir, "secret.txt");
-    StorageContext.setInstance(tmpDir, storageContextFilePath, secretFilePath);
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(tmpDir, storageContextFilePath, secretFilePath);
   });
 
   /**
    * Helper function to set up VE context with default values.
    */
   function setupVEContext(): void {
-    const storage = StorageContext.getInstance();
+    const pm = PersistenceManager.getInstance();
+    const storage = pm.getContextManager();
     storage.setVEContext({
       host: "localhost",
       port: 22,
@@ -49,7 +56,8 @@ describe("VeExecution host: flow", () => {
     vekey: string,
     outputs: Record<string, string | number | boolean>,
   ): void {
-    const storage = StorageContext.getInstance();
+    const pm = PersistenceManager.getInstance();
+    const storage = pm.getContextManager();
     storage.setVMContext({
       vmid,
       vekey,
@@ -111,7 +119,8 @@ describe("VeExecution host: flow", () => {
       }
     }
 
-    const veContext = StorageContext.getInstance().getVEContextByKey("ve_localhost");
+    const pm = PersistenceManager.getInstance();
+    const veContext = pm.getContextManager().getVEContextByKey("ve_localhost");
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
@@ -139,7 +148,8 @@ describe("VeExecution host: flow", () => {
       execute_on: "host:apphost",
     };
     
-    const veContext = StorageContext.getInstance().getVEContextByKey("ve_localhost");
+    const pm = PersistenceManager.getInstance();
+    const veContext = pm.getContextManager().getVEContextByKey("ve_localhost");
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
@@ -215,7 +225,8 @@ describe("VeExecution host: flow", () => {
     }
     
     // Provide an input that would differ from vmctx.outputs to ensure outputs wins
-    const veContext = StorageContext.getInstance().getVEContextByKey("ve_localhost");
+    const pm = PersistenceManager.getInstance();
+    const veContext = pm.getContextManager().getVEContextByKey("ve_localhost");
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
@@ -289,7 +300,8 @@ describe("VeExecution host: flow", () => {
       }
     }
 
-    const veContext = StorageContext.getInstance().getVEContextByKey("ve_localhost");
+    const pm = PersistenceManager.getInstance();
+    const veContext = pm.getContextManager().getVEContextByKey("ve_localhost");
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
@@ -387,7 +399,8 @@ describe("VeExecution host: flow", () => {
       }
     }
     
-    const veContext = StorageContext.getInstance().getVEContextByKey("ve_localhost");
+    const pm = PersistenceManager.getInstance();
+    const veContext = pm.getContextManager().getVEContextByKey("ve_localhost");
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }

@@ -2,25 +2,30 @@ import * as path from "path";
 import { expect, describe, it, beforeEach, afterEach } from "vitest";
 import { ProxmoxTestHelper } from "@tests/ve-test-helper.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { ContextManager } from "@src/context-manager.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 
 declare module "@tests/ve-test-helper.mjs" {
   interface ProxmoxTestHelper {
-    createStorageContext(): StorageContext;
+    createStorageContext(): ContextManager;
   }
 }
 ProxmoxTestHelper.prototype.createStorageContext = function () {
   const localPath = path.join(__dirname, "../local/json");
-  // Constructor expects (localPath, jsonPath, schemaPath)
   const storageContextFilePath = path.join(localPath, "storagecontext.json");
   const secretFilePath = path.join(localPath, "secret.txt");
-  // Use setInstance instead of constructor to avoid DataCloneError
-  StorageContext.setInstance(
+  // Close existing instance if any
+  try {
+    PersistenceManager.getInstance().close();
+  } catch {
+    // Ignore if not initialized
+  }
+  PersistenceManager.initialize(
     localPath,
     storageContextFilePath,
     secretFilePath,
   );
-  return StorageContext.getInstance();
+  return PersistenceManager.getInstance().getContextManager();
 };
 
 describe("ProxmoxConfiguration.loadApplication", () => {

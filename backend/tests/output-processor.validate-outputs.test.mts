@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { OutputProcessor } from "@src/output-processor.mjs";
 import { ICommand } from "@src/types.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
@@ -17,7 +17,13 @@ describe("OutputProcessor - Validate Expected Outputs", () => {
     testDir = mkdtempSync(path.join(tmpdir(), "output-processor-test-"));
     secretFilePath = path.join(testDir, "secret.txt");
     const storageContextPath = path.join(testDir, "storagecontext.json");
-    StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
   });
 
   afterAll(() => {

@@ -4,7 +4,8 @@ import express from "express";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
+import { ContextManager } from "@src/context-manager.mjs";
 import { WebAppVE } from "@src/webapp-ve.mts";
 import { ApiUri, IPostVeConfigurationBody } from "@src/types.mjs";
 import { IVEContext } from "@src/backend-types.mjs";
@@ -14,7 +15,7 @@ import { IRestartInfo } from "@src/ve-execution.mjs";
 describe("WebAppVE API", () => {
   let app: express.Application;
   let helper: ProxmoxTestHelper;
-  let storageContext: StorageContext;
+  let storageContext: ContextManager;
   let veContextKey: string;
   let webAppVE: WebAppVE;
 
@@ -26,9 +27,7 @@ describe("WebAppVE API", () => {
     const secretFilePath = path.join(helper.localDir, "secret.txt");
     fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
     
-    // Create StorageContext with test paths
     // Use PersistenceManager to set up with test paths
-    const { PersistenceManager } = await import("@src/persistence/persistence-manager.mjs");
     // Close existing instance if any
     try {
       PersistenceManager.getInstance().close();
@@ -41,21 +40,20 @@ describe("WebAppVE API", () => {
       storageContextPath,
       secretFilePath,
     );
-    // Override paths in PersistenceManager
     const pm = PersistenceManager.getInstance();
+    // Override paths in PersistenceManager to use test directories
     (pm as any).pathes = {
       localPath: helper.localDir,
       jsonPath: helper.jsonDir,
       schemaPath: helper.schemaDir,
     };
     // Also update ContextManager paths
-    const contextManager = pm.getContextManager();
-    (contextManager as any).pathes = {
+    storageContext = pm.getContextManager();
+    (storageContext as any).pathes = {
       localPath: helper.localDir,
       jsonPath: helper.jsonDir,
       schemaPath: helper.schemaDir,
     };
-    storageContext = StorageContext.getInstance();
     
     // Create a test VE context using the proper method
     veContextKey = "ve_testhost";

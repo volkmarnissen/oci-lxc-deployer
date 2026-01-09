@@ -1,5 +1,6 @@
 import { IVEContext, IVMInstallContext, VEConfigurationError } from "./backend-types.mjs";
-import { StorageContext, VMInstallContext } from "./storagecontext.mjs";
+import { PersistenceManager } from "./persistence/persistence-manager.mjs";
+import { ContextManager, VMInstallContext } from "./context-manager.mjs";
 import { TaskType, IPostVeConfigurationBody, IVeExecuteMessagesResponse, IJsonError } from "./types.mjs";
 import { WebAppVeMessageManager } from "./webapp-ve-message-manager.mjs";
 import { WebAppVeRestartManager } from "./webapp-ve-restart-manager.mjs";
@@ -171,7 +172,7 @@ export class WebAppVeRouteHandlers {
 
     try {
       // Load application (provides commands)
-      const storageContext = StorageContext.getInstance();
+      const storageContext = PersistenceManager.getInstance().getContextManager();
       const ctx: IVEContext | null = storageContext.getVEContextByKey(veContextKey);
       if (!ctx) {
         return { success: false, error: "VE context not found", statusCode: 404 };

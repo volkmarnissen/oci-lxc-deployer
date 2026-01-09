@@ -6,7 +6,7 @@ import fs from "fs";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import * as path from "path";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { IVEContext } from "@src/backend-types.mjs";
 describe("ProxmoxExecution shell quoting", () => {
   const dummySSH: IVEContext = { host: "localhost", port: 22 } as IVEContext;
@@ -25,7 +25,14 @@ describe("ProxmoxExecution shell quoting", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    StorageContext.setInstance(testDir, secretFilePath);
+    const storageContextPath = path.join(testDir, "storagecontext.json");
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
     // Write dummy sshconfig.json for local test
     const dir = path.join(testDir, "local");
     const file = path.join(dir, "sshconfig.json");

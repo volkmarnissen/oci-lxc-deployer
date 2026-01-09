@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 
 let testDir: string;
 let secretFilePath: string;
@@ -17,8 +17,15 @@ beforeAll(() => {
   const storageContextPath = path.join(testDir, "storagecontext.json");
   fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-  // Ensure StorageContext is initialized (schemas + paths)
-  StorageContext.setInstance(testDir, secretFilePath);
+  // Ensure PersistenceManager is initialized (schemas + paths)
+  const storageContextPath = path.join(testDir, "storagecontext.json");
+  // Close existing instance if any
+  try {
+    PersistenceManager.getInstance().close();
+  } catch {
+    // Ignore if not initialized
+  }
+  PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
 });
 
 afterAll(() => {
@@ -58,7 +65,7 @@ describe("Template JSON validation", () => {
       .filter((p) => fs.existsSync(p))
       .flatMap((p) => findTemplateDirs(p));
 
-    const validator = StorageContext.getInstance().getJsonValidator();
+    const validator = PersistenceManager.getInstance().getJsonValidator();
     const schemaKey = "template.schema.json";
 
     const errors: { file: string; message: string }[] = [];

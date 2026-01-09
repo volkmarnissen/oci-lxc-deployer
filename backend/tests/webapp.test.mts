@@ -5,7 +5,7 @@ import express from "express";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { ApiUri } from "@src/types.mjs";
 
 function createTempDir(): string {
@@ -24,8 +24,15 @@ describe("WebApp API", () => {
     tmp = createTempDir();
     const storageContextFile = path.join(tmp, "storagecontext.json");
     const secretFile = path.join(tmp, "secret.txt");
-    StorageContext.setInstance(tmp, storageContextFile, secretFile);
-    app = new VEWebApp(StorageContext.getInstance()).app;
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(tmp, storageContextFile, secretFile);
+    const contextManager = PersistenceManager.getInstance().getContextManager();
+    app = new VEWebApp(contextManager as any).app;
   });
 
   describe("SshConfigs GET", () => {

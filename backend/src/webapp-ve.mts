@@ -11,7 +11,8 @@ import { WebAppVeRestartManager } from "./webapp-ve-restart-manager.mjs";
 import { WebAppVeParameterProcessor } from "./webapp-ve-parameter-processor.mjs";
 import { WebAppVeExecutionSetup } from "./webapp-ve-execution-setup.mjs";
 import { WebAppVeRouteHandlers } from "./webapp-ve-route-handlers.mjs";
-import { StorageContext, VMInstallContext } from "./storagecontext.mjs";
+import { PersistenceManager } from "./persistence/persistence-manager.mjs";
+import { ContextManager, VMInstallContext } from "./context-manager.mjs";
 
 export class WebAppVE {
   private messageManager: WebAppVeMessageManager;
@@ -73,11 +74,11 @@ export class WebAppVE {
     >(ApiUri.VeConfiguration, async (req, res) => {
       const { application, task, veContext: veContextKey } = req.params;
       
-      // Set vmInstallContext in StorageContext if changedParams are provided
+      // Set vmInstallContext in ContextManager if changedParams are provided
       // Only create new context if it doesn't exist yet (preserve existing context for restarts)
       let vmInstallKey: string | undefined;
       if (req.body.changedParams && req.body.changedParams.length > 0) {
-        const storageContext = StorageContext.getInstance();
+        const storageContext = PersistenceManager.getInstance().getContextManager();
         const veContext = storageContext.getVEContextByKey(veContextKey);
         if (veContext) {
           const hostname = typeof veContext.host === "string" 

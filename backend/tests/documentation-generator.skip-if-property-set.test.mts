@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { DocumentationGenerator } from "@src/documentation-generator.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -41,7 +41,13 @@ describe("DocumentationGenerator skip_if_property_set", () => {
     if (!fs.existsSync(secretFilePath)) {
       writeFileSync(secretFilePath, "", "utf-8");
     }
-    StorageContext.setInstance(localPath, storageContextPath, secretFilePath);
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(localPath, storageContextPath, secretFilePath);
 
     // Create test application.json
     const appJson = {

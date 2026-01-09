@@ -1,5 +1,5 @@
 import { ApplicationLoader, IReadApplicationOptions } from "@src/apploader.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { FileSystemPersistence } from "@src/persistence/filesystem-persistence.mjs";
 import fs from "fs";
 import path from "path";
@@ -12,7 +12,13 @@ const schemaPath = path.join(__dirname, "../schemas");
 
 const storageContextFilePath = path.join(localPath, "storagecontext.json");
 const secretFilePath = path.join(localPath, "secret.txt");
-StorageContext.setInstance(localPath, storageContextFilePath, secretFilePath);
+// Close existing instance if any
+try {
+  PersistenceManager.getInstance().close();
+} catch {
+  // Ignore if not initialized
+}
+PersistenceManager.initialize(localPath, storageContextFilePath, secretFilePath);
 
 function writeJson(filePath: string, data: any) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -24,10 +30,10 @@ describe("ApplicationLoader.readApplicationJson", () => {
 
   beforeEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    const storage = StorageContext.getInstance();
+    const pm = PersistenceManager.getInstance();
     const persistence = new FileSystemPersistence(
       { schemaPath, jsonPath, localPath },
-      storage.getJsonValidator(),
+      pm.getJsonValidator(),
     );
     loader = new ApplicationLoader({ schemaPath, jsonPath, localPath }, persistence);
   });

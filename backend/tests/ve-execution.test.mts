@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { IVEContext } from "@src/backend-types.mjs";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { getNextMessageIndex } from "@src/ve-execution-constants.mjs";
 
 // New test cases are implemented here using overridable execCommand method.
@@ -506,9 +506,15 @@ describe("VeExecution", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    // Set StorageContext to use the test directory
+    // Set PersistenceManager to use the test directory
     const secretFilePath = path.join(testDir, "secret.txt");
-    StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
 
     const commands: ICommand[] = [
       {
@@ -584,9 +590,15 @@ describe("VeExecution", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    // Set StorageContext to use the test directory
+    // Set PersistenceManager to use the test directory
     const secretFilePath = path.join(testDir, "secret.txt");
-    StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
 
     const commands: ICommand[] = [
       {

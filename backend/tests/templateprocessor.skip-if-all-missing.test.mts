@@ -2,13 +2,13 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "path";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
 
 describe("TemplateProcessor skip_if_all_missing", () => {
   let testDir: string;
   let secretFilePath: string;
-  let storage: StorageContext;
+  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
   let tp: TemplateProcessor;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -145,9 +145,16 @@ describe("TemplateProcessor skip_if_all_missing", () => {
       "utf-8"
     );
 
-    StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
-    storage = StorageContext.getInstance();
-    tp = storage.getTemplateProcessor();
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
+    const pm = PersistenceManager.getInstance();
+    contextManager = pm.getContextManager();
+    tp = contextManager.getTemplateProcessor();
   });
 
   afterAll(() => {

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import request from "supertest";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { VEWebApp } from "@src/webapp.mjs";
 
 describe("WebApp serves index.html", () => {
@@ -31,8 +31,15 @@ describe("WebApp serves index.html", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    // Minimal StorageContext init; paths won't be used for this test route
-    StorageContext.setInstance(testDir, secretFilePath);
+    // Minimal PersistenceManager init; paths won't be used for this test route
+    const storageContextPath = path.join(testDir, "storagecontext.json");
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
   });
 
   afterAll(() => {
@@ -48,7 +55,8 @@ describe("WebApp serves index.html", () => {
   });
 
   it("GET / returns 200 and HTML", async () => {
-    const app = new VEWebApp(StorageContext.getInstance()).app;
+    const contextManager = PersistenceManager.getInstance().getContextManager();
+    const app = new VEWebApp(contextManager as any).app;
     await request(app).get("/").expect(200).expect("Content-Type", /html/);
   });
 });

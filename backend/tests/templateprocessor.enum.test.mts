@@ -2,13 +2,13 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "path";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 // TaskType is a string union; use literal values
 
 describe("TemplateProcessor enum handling", () => {
   let testDir: string;
   let secretFilePath: string;
-  let storage: StorageContext;
+  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
   let tp: any;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -21,10 +21,18 @@ describe("TemplateProcessor enum handling", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    // Ensure global StorageContext instance is set for TemplateProcessor defaults
-    StorageContext.setInstance(testDir, secretFilePath);
-    storage = StorageContext.getInstance();
-    tp = storage.getTemplateProcessor();
+    // Ensure global PersistenceManager instance is set for TemplateProcessor defaults
+    const storageContextPath = path.join(testDir, "storagecontext.json");
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
+    const pm = PersistenceManager.getInstance();
+    contextManager = pm.getContextManager();
+    tp = contextManager.getTemplateProcessor();
   });
 
   afterAll(() => {

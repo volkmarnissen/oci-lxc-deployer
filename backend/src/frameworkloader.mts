@@ -8,6 +8,7 @@ import {
   IReadApplicationOptions,
 } from "./backend-types.mjs";
 import { StorageContext } from "./storagecontext.mjs";
+import { ContextManager } from "./context-manager.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
 import { TemplateProcessor } from "./templateprocessor.mjs";
 import { TaskType, IParameter, IPostFrameworkCreateApplicationBody } from "./types.mjs";
@@ -23,7 +24,7 @@ export interface IReadFrameworkOptions {
 export class FrameworkLoader {
   constructor(
     private pathes: IConfiguredPathes,
-    private storage: StorageContext = StorageContext.getInstance(),
+    private storage: StorageContext | ContextManager = StorageContext.getInstance(),
     private applicationLoader?: ApplicationLoader,
   ) {
     if (!this.applicationLoader) {

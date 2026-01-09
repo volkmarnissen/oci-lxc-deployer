@@ -1,7 +1,8 @@
 import fs from "fs-extra";
 import path from "path";
 import os from "os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
+import { ContextManager } from "@src/context-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
 
 export interface IApplication {
@@ -151,20 +152,25 @@ export class ProxmoxTestHelper {
     fs.writeFileSync(path.join(appScriptDir, scriptName), content, "utf-8");
   }
 
-  createStorageContext(): StorageContext {
+  createStorageContext(): ContextManager {
     // Create a valid storagecontext.json file
     const storageContextPath = path.join(this.localDir, "storagecontext.json");
     if (!fs.existsSync(storageContextPath)) {
       fs.writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
     }
     const secretFilePath = path.join(this.localDir, "secret.txt");
-    // Use setInstance instead of constructor
-    StorageContext.setInstance(
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(
       this.localDir,
       storageContextPath,
       secretFilePath,
     );
-    return StorageContext.getInstance();
+    return PersistenceManager.getInstance().getContextManager();
   }
 
   createTemplateProcessor(): TemplateProcessor {

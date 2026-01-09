@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { JsonError } from "./jsonvalidator.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
 import { promises, writeFileSync } from "node:fs";
-import { StorageContext } from "./storagecontext.mjs";
+import { PersistenceManager } from "./persistence/persistence-manager.mjs";
 function printUsageAndExit() {
   console.error(
     "Usage: lxc-exec <application> <task> <parameters.json> [--local <path>] [--secretsFilePath <path>] [--restartInfoFile <path>]",
@@ -54,13 +54,19 @@ export async function exec(
     const resolvedSecretFilePath =
       secretsFilePath || path.join(resolvedLocalPath, "secret.txt");
     JsonError.baseDir = projectRoot;
-    StorageContext.setInstance(
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(
       resolvedLocalPath,
       resolvedStorageContextFilePath,
       resolvedSecretFilePath,
     );
     // Get all apps (name -> path)
-    const allApps = StorageContext.getInstance().getAllAppNames();
+    const allApps = PersistenceManager.getInstance().getApplicationService().getAllAppNames();
     const appPath = allApps.get(application);
     if (!appPath) {
       console.error(
@@ -76,7 +82,7 @@ export async function exec(
     });
 
     if (!paramsFile) {
-      const veContext = StorageContext.getInstance().getCurrentVEContext();
+      const veContext = PersistenceManager.getInstance().getContextManager().getCurrentVEContext();
       if (!veContext) {
         console.error(
           "VE context not set. Please configure SSH host/port first.",

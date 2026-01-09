@@ -1,4 +1,4 @@
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -16,7 +16,13 @@ beforeAll(() => {
   const storageContextPath = join(testDir, "storagecontext.json");
   writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-  StorageContext.setInstance(testDir, secretFilePath);
+  // Close existing instance if any
+  try {
+    PersistenceManager.getInstance().close();
+  } catch {
+    // Ignore if not initialized
+  }
+  PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
 });
 
 afterAll(() => {
@@ -43,18 +49,18 @@ describe("JsonValidator", () => {
   const templateSchema = "template.schema.json";
 
   it("should construct and validate all schemas", () => {
-    expect(() => StorageContext.getInstance().getJsonValidator()).not.toThrow();
+    expect(() => PersistenceManager.getInstance().getJsonValidator()).not.toThrow();
   });
 
   it("should validate modbus2mqtt/application.json", () => {
-    const validator = StorageContext.getInstance().getJsonValidator();
+    const validator = PersistenceManager.getInstance().getJsonValidator();
     expect(() =>
       validator.serializeJsonFileWithSchema(appFile, appSchema),
     ).not.toThrow();
   });
 
   it("should validate a shared template", () => {
-    const validator = StorageContext.getInstance().getJsonValidator();
+    const validator = PersistenceManager.getInstance().getJsonValidator();
     expect(() =>
       validator.serializeJsonFileWithSchema(sharedTemplate, templateSchema),
     ).not.toThrow();
@@ -71,7 +77,7 @@ describe("JsonValidator", () => {
       '"installation": { "foo": 1 }',
     );
     writeFileSync(invalidAppFile, broken);
-    const validator = StorageContext.getInstance().getJsonValidator();
+    const validator = PersistenceManager.getInstance().getJsonValidator();
     let error: any = undefined;
     try {
       validator.serializeJsonFileWithSchema(invalidAppFile, appSchema);

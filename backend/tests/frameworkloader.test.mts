@@ -3,14 +3,14 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync } from "node:fs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { FrameworkLoader } from "@src/frameworkloader.mjs";
 import { VEConfigurationError, IVEContext } from "@src/backend-types.mjs";
 
 describe("FrameworkLoader", () => {
   let tempDir: string;
   let loader: FrameworkLoader;
-  let storage: StorageContext;
+  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
 
   beforeAll(() => {
     const __filename = fileURLToPath(import.meta.url);
@@ -20,19 +20,26 @@ describe("FrameworkLoader", () => {
     const storageContextFile = path.join(tempDir, "storagecontext.json");
     const secretFile = path.join(tempDir, "secret.txt");
 
-    StorageContext.setInstance(
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(
       path.join(repoRoot, "local"),
       storageContextFile,
       secretFile,
     );
-    storage = StorageContext.getInstance();
+    const pm = PersistenceManager.getInstance();
+    contextManager = pm.getContextManager();
     loader = new FrameworkLoader(
       {
         localPath: path.join(repoRoot, "local"),
         jsonPath: path.join(repoRoot, "json"),
         schemaPath: path.join(repoRoot, "schemas"),
       },
-      storage,
+      contextManager,
     );
   });
 
@@ -55,7 +62,7 @@ describe("FrameworkLoader", () => {
       });
       const veContext: IVEContext = {
         host: "validation-dummy",
-        getStorageContext: () => storage,
+        getStorageContext: () => contextManager as any,
         getKey: () => "ve_validation",
       };
 

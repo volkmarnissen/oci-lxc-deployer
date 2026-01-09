@@ -3,7 +3,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import fs, { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, copyFileSync } from "node:fs";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { FrameworkLoader } from "@src/frameworkloader.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
 import { IPostFrameworkCreateApplicationBody } from "@src/types.mjs";
@@ -12,7 +12,7 @@ describe("FrameworkLoader.createApplicationFromFramework", () => {
   let tempDir: string;
   let tempJsonDir: string;
   let repoRoot: string;
-  let storage: StorageContext;
+  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
   let loader: FrameworkLoader;
 
   beforeEach(() => {
@@ -53,15 +53,22 @@ describe("FrameworkLoader.createApplicationFromFramework", () => {
       copyDirectoryRecursive(sharedSource, sharedDest);
     }
 
-    StorageContext.setInstance(tempDir, storageContextFile, secretFile);
-    storage = StorageContext.getInstance();
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(tempDir, storageContextFile, secretFile);
+    const pm = PersistenceManager.getInstance();
+    contextManager = pm.getContextManager();
     loader = new FrameworkLoader(
       {
         localPath: tempDir,
         jsonPath: tempJsonDir,
         schemaPath: path.join(repoRoot, "schemas"),
       },
-      storage,
+      contextManager,
     );
   });
 
@@ -122,7 +129,7 @@ describe("FrameworkLoader.createApplicationFromFramework", () => {
     const appJsonPath = path.join(tempDir, "applications", "test-app", "application.json");
     expect(existsSync(appJsonPath)).toBe(true);
 
-    const validator = storage.getJsonValidator();
+    const validator = PersistenceManager.getInstance().getJsonValidator();
     const appData = validator.serializeJsonFileWithSchema(appJsonPath, "application.schema.json");
     expect(appData.name).toBe("Test Application");
     expect(appData.description).toBe("A test application created from framework");

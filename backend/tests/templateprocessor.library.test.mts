@@ -3,13 +3,13 @@ import path from "path";
 import fs from "fs";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
-import { StorageContext } from "@src/storagecontext.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
 
 describe("TemplateProcessor - Library support", () => {
   let testDir: string;
   let secretFilePath: string;
-  let storage: StorageContext;
+  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
   let tp: TemplateProcessor;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -20,9 +20,16 @@ describe("TemplateProcessor - Library support", () => {
     const storageContextPath = path.join(testDir, "storagecontext.json");
     writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    StorageContext.setInstance(testDir, storageContextPath, secretFilePath);
-    storage = StorageContext.getInstance();
-    tp = storage.getTemplateProcessor();
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
+    const pm = PersistenceManager.getInstance();
+    contextManager = pm.getContextManager();
+    tp = contextManager.getTemplateProcessor();
   });
 
   afterAll(() => {

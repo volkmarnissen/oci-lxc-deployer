@@ -21,6 +21,7 @@ import path from "path";
 import { fileURLToPath } from "node:url";
 import fs from "fs";
 import { StorageContext } from "./storagecontext.mjs";
+import { ContextManager } from "./context-manager.mjs";
 import { Ssh } from "./ssh.mjs";
 import { IVEContext, VEConfigurationError } from "./backend-types.mjs";
 import { ITemplateProcessorLoadResult } from "./templateprocessor.mjs";
@@ -157,7 +158,7 @@ export class VEWebApp {
       return { message: String(err) };
     }
   }
-  constructor(storageContext: StorageContext) {
+  constructor(storageContext: StorageContext | ContextManager) {
     this.app = express();
     this.httpServer = http.createServer(this.app);
     // No socket.io needed anymore
