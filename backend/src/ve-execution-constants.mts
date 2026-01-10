@@ -14,6 +14,32 @@ export interface IRestartInfo {
 }
 
 /**
+ * Execution mode for VeExecution.
+ * Determines how commands are executed (SSH to remote host or locally for tests).
+ */
+export enum ExecutionMode {
+  PRODUCTION = "production", // Uses SSH to connect to remote host
+  TEST = "test", // Executes commands locally without SSH
+}
+
+/**
+ * Determines execution mode from environment or explicit parameter.
+ * Defaults to PRODUCTION if not in test environment.
+ * @param explicitMode Optional explicit execution mode override
+ * @returns The determined execution mode
+ */
+export function determineExecutionMode(explicitMode?: ExecutionMode): ExecutionMode {
+  if (explicitMode !== undefined) {
+    return explicitMode;
+  }
+  // Automatically detect test mode from environment
+  if (process.env.NODE_ENV === "test" || process.env.LXC_MANAGER_TEST_MODE === "true") {
+    return ExecutionMode.TEST;
+  }
+  return ExecutionMode.PRODUCTION;
+}
+
+/**
  * Execution constants for VeExecution.
  */
 export class VeExecutionConstants {

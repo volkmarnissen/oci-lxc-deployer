@@ -105,6 +105,7 @@ export class VeExecutionCommandProcessor {
   /**
    * Loads command content from script file or command string.
    * If a library is specified, it will be prepended to the script content.
+   * Also extracts interpreter from shebang if present.
    */
   loadCommandContent(cmd: ICommand): string | null {
     if (cmd.script !== undefined) {
@@ -114,6 +115,36 @@ export class VeExecutionCommandProcessor {
         scriptContent = fs.readFileSync(cmd.script, "utf-8");
       } catch (e) {
         throw new Error(`Failed to read script file ${cmd.script}: ${e}`);
+      }
+
+      // Extract interpreter from shebang (first line)
+      const firstLine = scriptContent.split('\n')[0];
+      if (firstLine.startsWith('#!')) {
+        const shebang = firstLine.substring(2).trim();
+        // Parse shebang: /usr/bin/env python3 -> ['python3']
+        // or /usr/bin/python3 -> ['/usr/bin/python3']
+        // or /usr/bin/env -S perl -w -> ['perl', '-w']
+        let interpreter: string[] = [];
+        
+        if (shebang.includes(' ')) {
+          const parts = shebang.split(/\s+/).filter(s => s.length > 0);
+          // Handle /usr/bin/env python3 -> extract 'python3'
+          if (parts[0] === '/usr/bin/env' || parts[0] === '/bin/env' || parts[0] === 'env') {
+            interpreter = parts.slice(1); // Skip 'env', take rest
+          } else if (parts[0].endsWith('/env')) {
+            interpreter = parts.slice(1); // Handle any path ending with /env
+          } else {
+            interpreter = parts; // Use all parts for explicit paths
+          }
+        } else {
+          interpreter = [shebang];
+        }
+        
+        // Store interpreter internally (not in JSON schema)
+        // This will be used by runOnVeHost to determine the correct interpreter
+        if (interpreter.length > 0) {
+          (cmd as any)._interpreter = interpreter;
+        }
       }
 
       // If library is specified, load and prepend it

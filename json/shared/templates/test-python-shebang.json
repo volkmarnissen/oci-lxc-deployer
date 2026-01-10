@@ -1,0 +1,36 @@
+{
+  "name": "Test Python Shebang",
+  "description": "Test template for Python shebang execution",
+  "execute_on": "ve",
+  "commands": [
+    {
+      "name": "test-python-shebang",
+      "script": "test-python-shebang.py",
+      "outputs": [
+        "python_executed",
+        "test_param_value",
+        "test_value_value",
+        "python_version"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "id": "test_param",
+      "name": "Test Parameter",
+      "type": "string",
+      "default": "default_param",
+      "required": false,
+      "description": "Test parameter for Python script"
+    },
+    {
+      "id": "test_value",
+      "name": "Test Value",
+      "type": "string",
+      "default": "default_value",
+      "required": false,
+      "description": "Test value for Python script"
+    }
+  ]
+}
+

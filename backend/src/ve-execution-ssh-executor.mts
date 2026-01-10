@@ -2,13 +2,14 @@ import { ICommand, IVeExecuteMessage } from "./types.mjs";
 import { IVEContext } from "./backend-types.mjs";
 import { spawnAsync } from "./spawn-utils.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
-import { VeExecutionConstants, getNextMessageIndex } from "./ve-execution-constants.mjs";
+import { VeExecutionConstants, getNextMessageIndex, ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 import { OutputProcessor } from "./output-processor.mjs";
 
 export interface SshExecutorDependencies {
   veContext: IVEContext | null;
-  sshCommand: string;
+  sshCommand?: string; // Deprecated: use executionMode instead
+  executionMode?: ExecutionMode; // New: preferred way to specify execution mode
   scriptTimeoutMs: number;
   messageEmitter: VeExecutionMessageEmitter;
   outputProcessor: OutputProcessor;
@@ -20,23 +21,41 @@ export interface SshExecutorDependencies {
  * Handles SSH/remote command execution for VeExecution.
  */
 export class VeExecutionSshExecutor {
-  constructor(private deps: SshExecutorDependencies) {}
+  private executionMode: ExecutionMode;
+  private sshCommand: string; // Derived from executionMode for backward compatibility
+
+  constructor(private deps: SshExecutorDependencies) {
+    // Determine execution mode: prefer explicit executionMode, fallback to sshCommand, then auto-detect
+    if (deps.executionMode !== undefined) {
+      this.executionMode = deps.executionMode;
+    } else if (deps.sshCommand !== undefined) {
+      // Backward compatibility: derive from sshCommand
+      this.executionMode = deps.sshCommand === "ssh" ? ExecutionMode.PRODUCTION : ExecutionMode.TEST;
+    } else {
+      // Auto-detect from environment
+      this.executionMode = determineExecutionMode();
+    }
+    // Derive sshCommand for backward compatibility
+    this.sshCommand = this.executionMode === ExecutionMode.TEST ? "sh" : "ssh";
+  }
 
   /**
-   * Builds SSH arguments for connecting to the VE host.
-   * When sshCommand is "sh" (for testing), remoteCommand is used directly as command arguments.
+   * Builds execution arguments based on execution mode.
+   * In PRODUCTION mode: returns SSH arguments to connect to remote host.
+   * In TEST mode: returns local interpreter command (or empty for stdin).
+   * @param interpreter Optional interpreter command extracted from shebang (e.g., ["python3"])
    */
-  buildSshArgs(remoteCommand?: string[]): string[] {
-    let sshArgs: string[] = [];
-    if (this.deps.sshCommand === "ssh") {
-      if (!this.deps.veContext) throw new Error("SSH parameters not set");
+  buildExecutionArgs(interpreter?: string[]): string[] {
+    if (this.executionMode === ExecutionMode.PRODUCTION) {
+      // Production: SSH to remote host
+      if (!this.deps.veContext) throw new Error("VE context required for production mode");
       let host = this.deps.veContext.host;
       // Ensure root user is used when no user is specified
       if (typeof host === "string" && !host.includes("@")) {
         host = `root@${host}`;
       }
       const port = this.deps.veContext.port || 22;
-      sshArgs = [
+      const sshArgs = [
         "-o",
         "StrictHostKeyChecking=no",
         "-o",
@@ -57,17 +76,25 @@ export class VeExecutionSshExecutor {
         String(port),
         `${host}`,
       ];
-      // For SSH, remoteCommand is appended after the host
-      if (remoteCommand) {
-        sshArgs = sshArgs.concat(remoteCommand);
+      // Append interpreter if provided (e.g., ssh host python3)
+      if (interpreter) {
+        sshArgs.push(...interpreter);
       }
+      return sshArgs;
     } else {
-      // For non-SSH commands (e.g., "sh" for testing), remoteCommand is used directly
-      if (remoteCommand) {
-        sshArgs = remoteCommand;
-      }
+      // Test mode: execute locally
+      // If interpreter specified (from shebang), use it directly
+      // Otherwise return empty (will default to sh for stdin execution)
+      return interpreter || [];
     }
-    return sshArgs;
+  }
+
+  /**
+   * Builds SSH arguments for connecting to the VE host (backward compatibility).
+   * @deprecated Use buildExecutionArgs instead
+   */
+  buildSshArgs(remoteCommand?: string[]): string[] {
+    return this.buildExecutionArgs(remoteCommand);
   }
 
   /**
@@ -84,37 +111,94 @@ export class VeExecutionSshExecutor {
 
   /**
    * Executes a command with retry logic for connection errors.
+   * @param executionArgs Arguments for execution (SSH args in production, interpreter args in test)
+   * @param input Script content (without marker - marker will be added based on interpreter)
+   * @param timeoutMs Timeout in milliseconds
+   * @param tmplCommand Template command being executed
+   * @param originalInput Original input string (for logging)
+   * @param interpreter Optional interpreter extracted from shebang (for test mode)
+   * @param uniqueMarker Marker to identify output start
    */
   async executeWithRetry(
-    sshArgs: string[],
-    inputWithMarker: string,
+    executionArgs: string[],
+    input: string,
     timeoutMs: number,
     tmplCommand: ICommand,
-    input: string,
+    originalInput: string,
+    interpreter?: string[],
+    uniqueMarker?: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    // Build marker and determine command structure
+    // Strategy: Use "echo 'MARKER' && interpreter" as shell command in TEST mode
+    // The script content is passed via stdin, and interpreter will read it
+    // This works for all interpreters (Python, Perl, shell, etc.)
+    const marker = uniqueMarker || this.createUniqueMarker();
     const maxRetries = VeExecutionConstants.MAX_RETRIES;
     let proc;
     let retryCount = 0;
 
+    // Determine actual command, args, and input to use
+    let actualCommand: string;
+    let actualArgs: string[];
+    let actualInput: string;
+
+    // Check if executionArgs already contains a command (from remoteCommand backward compatibility)
+    // If executionArgs is ["-c", "command"], use it directly
+    if (executionArgs.length >= 2 && executionArgs[0] === "-c" && this.executionMode === ExecutionMode.TEST) {
+      // Backward compatibility: executionArgs already contains sh -c "command" format
+      // The command already has the marker prepended (done in runOnVeHost)
+      actualCommand = "sh";
+      actualArgs = executionArgs; // Use as-is: ["-c", "echo MARKER; command"]
+      actualInput = input; // Script content as stdin
+    } else if (this.executionMode === ExecutionMode.PRODUCTION) {
+      // Production: use ssh with executionArgs (which contains SSH args + optional interpreter)
+      actualCommand = "ssh";
+      actualArgs = executionArgs;
+      // For production, prepend marker to script for shell scripts
+      if (!interpreter || interpreter.length === 0 || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
+        actualInput = `echo "${marker}"\n${input}`;
+      } else {
+        // For non-shell interpreters in production, remote command handles it
+        actualInput = input;
+      }
+    } else {
+      // Test mode: use sh -c with "echo 'MARKER' && interpreter" for non-shell interpreters
+      if (!interpreter || interpreter.length === 0 || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
+        // Shell script: just prepend echo marker
+        actualCommand = "sh";
+        actualArgs = [];
+        actualInput = `echo "${marker}"\n${input}`;
+      } else {
+        // For non-shell interpreters: use sh -c with "echo 'MARKER' && interpreter"
+        // The script content goes via stdin to this command
+        // Format: sh -c 'echo "MARKER" && python3' < script.py
+        const interpreterCmd = interpreter.join(" ");
+        actualCommand = "sh";
+        actualArgs = ["-c", `echo "${marker}" && ${interpreterCmd}`];
+        // Script content goes via stdin (separate from the -c argument)
+        actualInput = input;
+      }
+    }
+
     while (retryCount < maxRetries) {
-      proc = await spawnAsync(this.deps.sshCommand, sshArgs, {
+      proc = await spawnAsync(actualCommand, actualArgs, {
         timeout: timeoutMs,
-        input: inputWithMarker,
+        input: actualInput,
         onStdout: (chunk: string) => {
           // Emit partial message for real-time output (especially useful for hanging scripts)
-          this.deps.messageEmitter.emitPartialMessage(tmplCommand, input, chunk, "");
+          this.deps.messageEmitter.emitPartialMessage(tmplCommand, originalInput, chunk, "");
         },
         onStderr: (chunk: string) => {
           // Emit partial message for real-time error output
-          this.deps.messageEmitter.emitPartialMessage(tmplCommand, input, null, chunk);
+          this.deps.messageEmitter.emitPartialMessage(tmplCommand, originalInput, null, chunk);
         },
       });
 
       // Exit 255 = SSH or lxc-attach connection issue, retry only for real SSH connections
-      // In test environments (sshCommand !== "ssh"), don't retry as there's no real network connection
+      // In test environments, don't retry as there's no real network connection
       if (
         proc.exitCode === VeExecutionConstants.SSH_EXIT_CODE_CONNECTION_ERROR &&
-        this.deps.sshCommand === "ssh"
+        this.executionMode === ExecutionMode.PRODUCTION
       ) {
         retryCount++;
         if (retryCount < maxRetries) {
@@ -197,26 +281,27 @@ export class VeExecutionSshExecutor {
    * @param input The command to execute
    * @param tmplCommand The template command
    * @param timeoutMs Timeout in milliseconds (defaults to scriptTimeoutMs if not provided)
-   * @param remoteCommand Optional remote command to prepend
    * @param eventEmitter EventEmitter for emitting messages
+   * @param interpreter Optional interpreter extracted from shebang (e.g., ["python3"])
    */
   async runOnVeHost(
     input: string,
     tmplCommand: ICommand,
     timeoutMs: number,
-    remoteCommand: string[] | undefined,
     eventEmitter: { emit: (event: string, data: any) => void },
+    interpreter?: string[],
   ): Promise<IVeExecuteMessage> {
-    const sshArgs = this.buildSshArgs(remoteCommand);
     const uniqueMarker = this.createUniqueMarker();
-    const inputWithMarker = `echo "${uniqueMarker}"\n${input}`;
+    const executionArgs = this.buildExecutionArgs(interpreter);
 
     const { stdout, stderr, exitCode } = await this.executeWithRetry(
-      sshArgs,
-      inputWithMarker,
+      executionArgs,
+      input,
       timeoutMs,
       tmplCommand,
       input,
+      interpreter,
+      uniqueMarker, // Pass marker to be added based on interpreter
     );
 
     const msg = this.createMessageFromResult(input, tmplCommand, stdout, stderr, exitCode);

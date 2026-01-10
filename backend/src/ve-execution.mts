@@ -11,6 +11,8 @@ import {
   VeExecutionConstants,
   getNextMessageIndex,
   resetMessageIndex,
+  ExecutionMode,
+  determineExecutionMode,
 } from "./ve-execution-constants.mjs";
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 import { VeExecutionSshExecutor } from "./ve-execution-ssh-executor.mjs";
@@ -39,18 +41,37 @@ export class VeExecution extends EventEmitter {
   private commandProcessor!: VeExecutionCommandProcessor;
   private stateManager: VeExecutionStateManager;
   
+  private executionMode: ExecutionMode;
+
   constructor(
     commands: ICommand[],
     inputs: { id: string; value: string | number | boolean }[],
     private veContext: IVEContext | null,
     private defaults: Map<string, string | number | boolean> = new Map(),
-    protected sshCommand: string = "ssh",
+    protected sshCommand?: string, // Deprecated: use executionMode instead
+    executionMode?: ExecutionMode, // New: preferred way to specify execution mode
   ) {
     super();
     this.commands = commands;
     this.inputs = {};
     for (const inp of inputs) {
       this.inputs[inp.id] = inp.value;
+    }
+    
+    // Determine execution mode: prefer explicit executionMode, fallback to sshCommand, then auto-detect
+    if (executionMode !== undefined) {
+      this.executionMode = executionMode;
+    } else if (sshCommand !== undefined) {
+      // Backward compatibility: derive from sshCommand
+      this.executionMode = sshCommand === "ssh" ? ExecutionMode.PRODUCTION : ExecutionMode.TEST;
+    } else {
+      // Auto-detect from environment
+      this.executionMode = determineExecutionMode();
+    }
+    
+    // Derive sshCommand for backward compatibility
+    if (!this.sshCommand) {
+      this.sshCommand = this.executionMode === ExecutionMode.TEST ? "sh" : "ssh";
     }
     
     // Get timeout from environment variable, default to 2 minutes
@@ -78,6 +99,7 @@ export class VeExecution extends EventEmitter {
     this.sshExecutor = new VeExecutionSshExecutor({
       veContext: this.veContext,
       sshCommand: this.sshCommand,
+      executionMode: this.executionMode,
       scriptTimeoutMs: this.scriptTimeoutMs,
       messageEmitter: this.messageEmitter,
       outputProcessor: this.outputProcessor,
@@ -128,6 +150,7 @@ export class VeExecution extends EventEmitter {
     this.sshExecutor = new VeExecutionSshExecutor({
       veContext: this.veContext,
       sshCommand: this.sshCommand,
+      executionMode: this.executionMode,
       scriptTimeoutMs: this.scriptTimeoutMs,
       messageEmitter: this.messageEmitter,
       outputProcessor: this.outputProcessor,
@@ -173,18 +196,21 @@ export class VeExecution extends EventEmitter {
     input: string,
     tmplCommand: ICommand,
     timeoutMs: number,
-    remoteCommand: string[] | undefined,
     uniqueMarker: string,
+    interpreter?: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const sshArgs = this.sshExecutor.buildSshArgs(remoteCommand);
-    const inputWithMarker = `echo "${uniqueMarker}"\n${input}`;
+    // Marker will be added in runOnVeHost where we know the interpreter
+    // For backward compatibility, we still accept uniqueMarker here but don't use it
+    const executionArgs = this.sshExecutor.buildExecutionArgs(interpreter);
 
     return await this.sshExecutor.executeWithRetry(
-      sshArgs,
-      inputWithMarker,
+      executionArgs,
+      input, // Pass input without marker - marker will be added in runOnVeHost
       timeoutMs,
       tmplCommand,
       input,
+      interpreter,
+      uniqueMarker, // Pass marker separately
     );
   }
 
@@ -193,13 +219,13 @@ export class VeExecution extends EventEmitter {
    * @param input The command to execute
    * @param tmplCommand The template command
    * @param timeoutMs Timeout in milliseconds (defaults to scriptTimeoutMs if not provided)
-   * @param remoteCommand Optional remote command to prepend
+   * @param remoteCommand Deprecated: Optional remote command override (for backward compatibility in tests)
    */
   protected async runOnVeHost(
     input: string,
     tmplCommand: ICommand,
     timeoutMs?: number,
-    remoteCommand?: string[],
+    remoteCommand?: string[], // Deprecated: kept for backward compatibility with tests
   ): Promise<IVeExecuteMessage> {
     // Use provided timeout or fall back to scriptTimeoutMs
     const actualTimeout = timeoutMs !== undefined ? timeoutMs : this.scriptTimeoutMs;
@@ -208,12 +234,81 @@ export class VeExecution extends EventEmitter {
     this.updateHelperModules();
     const uniqueMarker = this.sshExecutor.createUniqueMarker();
     
+    // Extract interpreter from command if available (set by loadCommandContent from shebang)
+    // But allow override via remoteCommand for backward compatibility with tests
+    let interpreter = (tmplCommand as any)._interpreter;
+    
+    // Backward compatibility: if remoteCommand is provided, use it for backward compatibility with tests
+    // This is used in tests where they override the command execution with sh -c
+    if (remoteCommand && remoteCommand.length > 0) {
+      // Format: ["-c", "command string"] for sh -c "command"
+      // For backward compatibility with existing tests, if remoteCommand starts with "-c", 
+      // we execute sh -c with the command string, and input is used as stdin
+      if (remoteCommand[0] === "-c" && remoteCommand.length >= 2) {
+        // Test mode with sh -c override: execute the command string directly
+        // remoteCommand[1] is the command to execute, input is stdin (may be empty)
+        const commandToExecute = remoteCommand[1];
+        
+        // For backward compatibility, execute sh -c "command" directly
+        // Build command with marker prepended: "echo MARKER; command"
+        const commandWithMarker = `echo "${uniqueMarker}"\n${commandToExecute}`;
+        const { stdout, stderr, exitCode } = await this.sshExecutor.executeWithRetry(
+          ["-c", commandWithMarker], // sh -c "echo MARKER; command" (executionArgs)
+          input || "", // Use input as stdin (may be empty for simple commands)
+          actualTimeout,
+          tmplCommand,
+          commandToExecute, // Use command string as originalInput for logging
+          undefined, // No interpreter from shebang - using sh -c override
+          uniqueMarker,
+        );
+        
+        const msg = this.sshExecutor.createMessageFromResult(commandToExecute, tmplCommand, stdout, stderr, exitCode);
+        
+        try {
+          if (stdout.trim().length === 0) {
+            const result = this.sshExecutor.handleEmptyOutput(msg, tmplCommand, exitCode, stderr, this);
+            if (result) return result;
+          } else {
+            // Parse and update outputs
+            this.outputProcessor.parseAndUpdateOutputs(stdout, tmplCommand, uniqueMarker);
+            const outputsRawResult = this.outputProcessor.getOutputsRawResult();
+            if (outputsRawResult) {
+              this.outputsRaw = outputsRawResult;
+            }
+          }
+        } catch (e: any) {
+          msg.index = getNextMessageIndex();
+          if (e instanceof JsonError) {
+            msg.error = e;
+          } else {
+            msg.error = new JsonError(e.message);
+          }
+          msg.exitCode = -1;
+          msg.partial = false;
+          this.emit("message", msg);
+          throw new Error("An error occurred during command execution.");
+        }
+        if (exitCode !== 0) {
+          throw new Error(
+            `Command "${tmplCommand.name}" failed with exit code ${exitCode}: ${stderr}`,
+          );
+        } else msg.index = getNextMessageIndex();
+        msg.partial = false;
+        this.emit("message", msg);
+        return msg;
+      } else {
+        // For other remoteCommand formats, use as interpreter override
+        // This is for cases where remoteCommand is used as interpreter directly
+        interpreter = remoteCommand;
+      }
+    }
+    
     const { stdout, stderr, exitCode } = await this.executeSshCommand(
       input,
       tmplCommand,
       actualTimeout,
-      remoteCommand,
       uniqueMarker,
+      interpreter,
     );
 
     const msg = this.sshExecutor.createMessageFromResult(input, tmplCommand, stdout, stderr, exitCode);
@@ -260,6 +355,7 @@ export class VeExecution extends EventEmitter {
    * @param command Command to execute
    * @param tmplCommand The template command
    * @param timeoutMs Timeout in ms (defaults to scriptTimeoutMs if not provided)
+   * @param remoteCommand Optional remote command (deprecated, kept for backward compatibility)
    */
   protected async runOnLxc(
     vm_id: string | number,
@@ -268,16 +364,84 @@ export class VeExecution extends EventEmitter {
     timeoutMs?: number,
     remoteCommand?: string[],
   ): Promise<IVeExecuteMessage> {
-    // If remoteCommand is provided, use it (allows tests to override)
-    // Otherwise, determine based on sshCommand
+    // In test mode, lxc-attach is not needed - execute locally
+    if (this.executionMode === ExecutionMode.TEST) {
+      // Execute command locally (simulating LXC execution)
+      return await this.runOnVeHost(command, tmplCommand, timeoutMs);
+    }
+    
+    // Production: use lxc-attach
+    // For backward compatibility, if remoteCommand is provided, use it
+    // Otherwise build lxc-attach command
     let lxcCmd: string[] | undefined = remoteCommand;
     if (lxcCmd === undefined) {
-      // Pass command and arguments as array
       lxcCmd = ["lxc-attach", "-n", String(vm_id)];
-      // For testing: just pass through when using another sshCommand, like /bin/sh
-      if (this.sshCommand !== "ssh") lxcCmd = undefined;
     }
-    return await this.runOnVeHost(command, tmplCommand, timeoutMs, lxcCmd);
+    
+    // In production mode, we need to execute via SSH with lxc-attach
+    // But interpreter from shebang should still be respected
+    const interpreter = (tmplCommand as any)._interpreter;
+    
+    // Build SSH command with lxc-attach and optional interpreter
+    const actualTimeout = timeoutMs !== undefined ? timeoutMs : this.scriptTimeoutMs;
+    this.updateHelperModules();
+    const uniqueMarker = this.sshExecutor.createUniqueMarker();
+    const inputWithMarker = `echo "${uniqueMarker}"\n${command}`;
+    
+    // For LXC execution in production, we need: ssh host lxc-attach -n vm_id -- interpreter < script
+    // But since we're using stdin, we need to handle this differently
+    // The lxcCmd already contains lxc-attach args, we need to append interpreter if available
+    let finalLxcCmd = [...lxcCmd, "--"];
+    if (interpreter) {
+      finalLxcCmd.push(...interpreter);
+    } else {
+      finalLxcCmd.push("sh"); // Default to sh if no interpreter
+    }
+    
+    const executionArgs = this.sshExecutor.buildExecutionArgs(finalLxcCmd);
+    const { stdout, stderr, exitCode } = await this.sshExecutor.executeWithRetry(
+      executionArgs,
+      inputWithMarker,
+      actualTimeout,
+      tmplCommand,
+      command,
+      interpreter,
+    );
+    
+    const msg = this.sshExecutor.createMessageFromResult(command, tmplCommand, stdout, stderr, exitCode);
+    
+    try {
+      if (stdout.trim().length === 0) {
+        const result = this.sshExecutor.handleEmptyOutput(msg, tmplCommand, exitCode, stderr, this);
+        if (result) return result;
+      } else {
+        // Parse and update outputs
+        this.outputProcessor.parseAndUpdateOutputs(stdout, tmplCommand, uniqueMarker);
+        const outputsRawResult = this.outputProcessor.getOutputsRawResult();
+        if (outputsRawResult) {
+          this.outputsRaw = outputsRawResult;
+        }
+      }
+    } catch (e: any) {
+      msg.index = getNextMessageIndex();
+      if (e instanceof JsonError) {
+        msg.error = e;
+      } else {
+        msg.error = new JsonError(e.message);
+      }
+      msg.exitCode = -1;
+      msg.partial = false;
+      this.emit("message", msg);
+      throw new Error("An error occurred during command execution.");
+    }
+    if (exitCode !== 0) {
+      throw new Error(
+        `Command "${tmplCommand.name}" failed with exit code ${exitCode}: ${stderr}`,
+      );
+    } else msg.index = getNextMessageIndex();
+    msg.partial = false;
+    this.emit("message", msg);
+    return msg;
   }
 
   /**
