@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor properties outputs generation", () => {
   let testDir: string;
@@ -156,7 +157,7 @@ describe("TemplateProcessor properties outputs generation", () => {
         "test-app",
         "installation",
         veContext,
-        "sh",
+        ExecutionMode.TEST,
       );
     } catch (err: any) {
       console.error("Error loading application:", err);
@@ -200,7 +201,7 @@ describe("TemplateProcessor properties outputs generation", () => {
       "test-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // uid and gid should be in resolvedParams even though they reference variables

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor skip_if_property_set", () => {
   let testDir: string;
@@ -147,7 +148,7 @@ describe("TemplateProcessor skip_if_property_set", () => {
       "test-skip-property-set-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // Verify myvariable is in resolvedParams (it should be, because set-parameters.json outputs it)
@@ -263,7 +264,7 @@ describe("TemplateProcessor skip_if_property_set", () => {
       "test-skip-property-set-app-2",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // myvariable is NOT provided, so the template should NOT be skipped

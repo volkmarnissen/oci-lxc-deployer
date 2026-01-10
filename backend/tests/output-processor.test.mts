@@ -5,6 +5,7 @@ import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 let testDir: string;
 let secretFilePath: string;
@@ -43,9 +44,9 @@ describe("OutputProcessor", () => {
     const outputs = new Map<string, string | number | boolean>();
     const outputsRaw: { name: string; value: string | number | boolean }[] | undefined = undefined;
     const defaults = new Map<string, string | number | boolean>();
-    // Use "ssh" as sshCommand to prevent processLocalFileValue from trying to read files locally
-    // When sshCommand is "ssh", processLocalFileValue returns the value as-is (with "local:" prefix)
-    const processor = new OutputProcessor(outputs, outputsRaw, defaults, "ssh");
+    // Use ExecutionMode.PRODUCTION to prevent processLocalFileValue from trying to read files locally
+    // When executionMode is PRODUCTION, processLocalFileValue returns the value as-is (with "local:" prefix)
+    const processor = new OutputProcessor(outputs, outputsRaw, defaults, ExecutionMode.PRODUCTION);
 
     // Simulate get-latest-os-template.sh output: array with template_path and ostype
     // This matches the exact format from get-latest-os-template.sh
@@ -81,7 +82,7 @@ describe("OutputProcessor", () => {
     const outputs = new Map<string, string | number | boolean>();
     const outputsRaw: { name: string; value: string | number | boolean }[] | undefined = undefined;
     const defaults = new Map<string, string | number | boolean>();
-    const processor = new OutputProcessor(outputs, outputsRaw, defaults, "ssh");
+    const processor = new OutputProcessor(outputs, outputsRaw, defaults, ExecutionMode.PRODUCTION);
 
     // Simulate output with uniqueMarker (as it would come from SSH)
     const uniqueMarker = "UNIQUE_MARKER_12345";

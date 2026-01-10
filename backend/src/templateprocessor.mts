@@ -20,12 +20,11 @@ import { IVEContext } from "@src/backend-types.mjs";
 import { ApplicationLoader } from "@src/apploader.mjs";
 import fs from "fs";
 import { ScriptValidator } from "@src/scriptvalidator.mjs";
-import { StorageContext } from "./storagecontext.mjs";
 import { ContextManager } from "./context-manager.mjs";
-import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 import { ITemplatePersistence, IApplicationPersistence } from "./persistence/interfaces.mjs";
 import { VeExecution } from "./ve-execution.mjs";
 import { TemplatePathResolver } from "./template-path-resolver.mjs";
+import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
 // ITemplateReference moved to backend-types.mts
 import { ITemplateReference } from "./backend-types.mjs";
 interface IProcessTemplateOpts {
@@ -43,7 +42,7 @@ interface IProcessTemplateOpts {
   scriptPathes: string[];
   webuiTemplates: string[];
   veContext?: IVEContext;
-  sshCommand: string | undefined;
+  executionMode?: ExecutionMode;  // Execution mode for VeExecution
   processedTemplates?: Map<string, IProcessedTemplate>;  // NEU: Sammelt Template-Informationen
   templateReferences?: Map<string, Set<string>>;  // NEU: Template-Referenzen (template -> referenzierte Templates)
 }
@@ -85,7 +84,7 @@ export class TemplateProcessor extends EventEmitter {
     applicationName: string,
     task: TaskType,
     veContext?: IVEContext,
-    sshCommand?: string,
+    executionMode?: ExecutionMode,
     initialInputs?: Array<{ id: string; value: string | number | boolean }>,
   ): Promise<ITemplateProcessorLoadResult> {
     const readOpts: IReadApplicationOptions = {
@@ -171,7 +170,7 @@ export class TemplateProcessor extends EventEmitter {
         templatePathes,
         scriptPathes,
         webuiTemplates,
-        sshCommand,
+        executionMode: executionMode !== undefined ? executionMode : determineExecutionMode(),
         processedTemplates,
         templateReferences,
       };
@@ -663,7 +662,8 @@ export class TemplateProcessor extends EventEmitter {
                 [],
                 opts.veContext,
                 undefined,
-                opts.sshCommand ?? "ssh",
+                undefined, // sshCommand deprecated - use executionMode instead
+                opts.executionMode ?? determineExecutionMode(),
               );
                 const rc = await ve.run(null);
                 if (rc && Array.isArray(rc.outputs) && rc.outputs.length > 0) {

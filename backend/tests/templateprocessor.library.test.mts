@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor - Library support", () => {
   let testDir: string;
@@ -89,7 +90,7 @@ describe("TemplateProcessor - Library support", () => {
     );
 
     try {
-      await tp.loadApplication("test-library-app", "installation", veContext, "sh");
+      await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
       expect.fail("Should have thrown an error");
     } catch (e: any) {
       // VEConfigurationError contains details array
@@ -142,7 +143,7 @@ describe("TemplateProcessor - Library support", () => {
     );
 
     try {
-      await tp.loadApplication("test-library-app", "installation", veContext, "sh");
+      await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
       expect.fail("Should have thrown an error");
     } catch (e: any) {
       const errorMessage = e.message || String(e) || JSON.stringify(e);
@@ -191,7 +192,7 @@ describe("TemplateProcessor - Library support", () => {
       "utf-8"
     );
 
-    const result = await tp.loadApplication("test-library-app", "installation", veContext, "sh");
+    const result = await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
     
     expect(result.commands.length).toBe(1);
     expect(result.commands[0].script).toBeDefined();

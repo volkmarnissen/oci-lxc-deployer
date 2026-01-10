@@ -11,7 +11,7 @@ export interface HostDiscoveryDependencies {
   variableResolver: {
     replaceVarsWithContext: (str: string, ctx: Record<string, any>) => string;
   };
-  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<any>;
+  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number) => Promise<any>;
 }
 
 /**
@@ -134,9 +134,8 @@ export class VeExecutionHostDiscovery {
       ),
       Object.fromEntries(this.deps.outputs) || {},
     );
-    // Use remoteCommand trick: if sshCommand !== "ssh", pass undefined to execute locally
-    // This is handled by the runOnLxc implementation, but we need to pass it through
-    // The runOnLxc function will determine remoteCommand based on sshCommand
+    // Execute command on LXC container
+    // In TEST mode, runOnLxc will execute locally; in PRODUCTION mode, it uses lxc-attach via SSH
     await this.deps.runOnLxc(vmctx.vmid, execCmd, tmplCommand);
   }
 
@@ -210,11 +209,8 @@ export class VeExecutionHostDiscovery {
 
     // Create a new VeExecution instance for the template
     // This will execute commands directly on the LXC container via lxc-attach
-    // When sshCommand !== "ssh", runOnLxc will use the same trick as in VeExecution.runOnLxc
-    // (lxcCmd = undefined, so runOnVeHost executes locally via buildSshArgs)
-    // The new VeExecution instance will automatically use local execution when sshCommand="sh"
-    // We override runOnLxc to use the parent's runOnLxc function from deps, which already
-    // handles the sshCommand !== "ssh" case by setting lxcCmd = undefined
+    // The new VeExecution instance will automatically use ExecutionMode.TEST for local execution
+    // We override runOnLxc to use the parent's runOnLxc function from deps
     // Define TemplateVeExecution inside the method to avoid circular import issues
     // Use a function to defer class definition until runtime when VeExecution is available
     const TemplateVeExecution = (function() {
@@ -226,7 +222,7 @@ export class VeExecutionHostDiscovery {
         veContext: IVEContext | null,
         defaults: Map<string, string | number | boolean>,
         sshCommand: string,
-        private parentRunOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<any>,
+        private parentRunOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number) => Promise<any>,
       ) {
         super(commands, inputs, veContext, defaults, sshCommand);
       }
@@ -236,12 +232,9 @@ export class VeExecutionHostDiscovery {
         command: string,
         tmplCommand: ICommand,
         timeoutMs?: number,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
-        // Use parent's runOnLxc function, which already handles sshCommand !== "ssh"
-        // by setting lxcCmd = undefined, so runOnVeHost executes locally
-        // Pass through remoteCommand to allow tests to override
-        return await this.parentRunOnLxc(vm_id, command, tmplCommand, timeoutMs, remoteCommand);
+        // Use parent's runOnLxc function, which handles execution mode automatically
+        return await this.parentRunOnLxc(vm_id, command, tmplCommand, timeoutMs);
       }
     };
     })();

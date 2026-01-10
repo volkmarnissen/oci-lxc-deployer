@@ -9,8 +9,8 @@ export interface CommandProcessorDependencies {
   inputs: Record<string, string | number | boolean>;
   variableResolver: VariableResolver;
   messageEmitter: VeExecutionMessageEmitter;
-  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<IVeExecuteMessage>;
-  runOnVeHost: (input: string, tmplCommand: ICommand, timeoutMs?: number, remoteCommand?: string[]) => Promise<IVeExecuteMessage>;
+  runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number) => Promise<IVeExecuteMessage>;
+  runOnVeHost: (input: string, tmplCommand: ICommand, timeoutMs?: number) => Promise<IVeExecuteMessage>;
   executeOnHost: (hostname: string, command: string, tmplCommand: ICommand) => Promise<void>;
   outputsRaw: { name: string; value: string | number | boolean }[] | undefined;
   setOutputsRaw: (raw: { name: string; value: string | number | boolean }[]) => void;

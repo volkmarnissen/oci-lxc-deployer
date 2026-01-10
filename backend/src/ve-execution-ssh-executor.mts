@@ -93,8 +93,8 @@ export class VeExecutionSshExecutor {
    * Builds SSH arguments for connecting to the VE host (backward compatibility).
    * @deprecated Use buildExecutionArgs instead
    */
-  buildSshArgs(remoteCommand?: string[]): string[] {
-    return this.buildExecutionArgs(remoteCommand);
+  buildSshArgs(interpreter?: string[]): string[] {
+    return this.buildExecutionArgs(interpreter);
   }
 
   /**
@@ -142,20 +142,12 @@ export class VeExecutionSshExecutor {
     let actualArgs: string[];
     let actualInput: string;
 
-    // Check if executionArgs already contains a command (from remoteCommand backward compatibility)
-    // If executionArgs is ["-c", "command"], use it directly
-    if (executionArgs.length >= 2 && executionArgs[0] === "-c" && this.executionMode === ExecutionMode.TEST) {
-      // Backward compatibility: executionArgs already contains sh -c "command" format
-      // The command already has the marker prepended (done in runOnVeHost)
-      actualCommand = "sh";
-      actualArgs = executionArgs; // Use as-is: ["-c", "echo MARKER; command"]
-      actualInput = input; // Script content as stdin
-    } else if (this.executionMode === ExecutionMode.PRODUCTION) {
+    if (this.executionMode === ExecutionMode.PRODUCTION) {
       // Production: use ssh with executionArgs (which contains SSH args + optional interpreter)
       actualCommand = "ssh";
       actualArgs = executionArgs;
       // For production, prepend marker to script for shell scripts
-      if (!interpreter || interpreter.length === 0 || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
+      if (!interpreter || interpreter.length === 0 || !interpreter[0] || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
         actualInput = `echo "${marker}"\n${input}`;
       } else {
         // For non-shell interpreters in production, remote command handles it
@@ -163,7 +155,7 @@ export class VeExecutionSshExecutor {
       }
     } else {
       // Test mode: use sh -c with "echo 'MARKER' && interpreter" for non-shell interpreters
-      if (!interpreter || interpreter.length === 0 || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
+      if (!interpreter || interpreter.length === 0 || !interpreter[0] || interpreter[0] === "sh" || interpreter[0].endsWith("/sh")) {
         // Shell script: just prepend echo marker
         actualCommand = "sh";
         actualArgs = [];

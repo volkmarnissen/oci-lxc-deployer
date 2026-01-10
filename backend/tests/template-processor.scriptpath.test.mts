@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "fs";
 import * as path from "path";
 import { ProxmoxTestHelper } from "@tests/ve-test-helper.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("ProxmoxConfiguration script path resolution", () => {
   const appName = "testapp";
@@ -56,7 +57,7 @@ describe("ProxmoxConfiguration script path resolution", () => {
       appName,
       "installation",
       { host: "localhost", port: 22 } as any,
-      "sh",
+      ExecutionMode.TEST,
     );
     const scriptCmd = result.commands.find((cmd) => cmd.script !== undefined);
     expect(scriptCmd).toBeDefined();

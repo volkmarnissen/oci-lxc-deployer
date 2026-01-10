@@ -5,6 +5,7 @@ import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("OutputProcessor - Validate Expected Outputs", () => {
   let outputProcessor: OutputProcessor;
@@ -39,7 +40,7 @@ describe("OutputProcessor - Validate Expected Outputs", () => {
   beforeEach(() => {
     outputs = new Map();
     defaults = new Map();
-    outputProcessor = new OutputProcessor(outputs, undefined, defaults, "sh");
+    outputProcessor = new OutputProcessor(outputs, undefined, defaults, ExecutionMode.TEST);
   });
 
   it("should not throw when all expected outputs are present", () => {

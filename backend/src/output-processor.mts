@@ -3,6 +3,7 @@ import path from "node:path";
 import { JsonValidator } from "./jsonvalidator.mjs";
 import { StorageContext } from "./storagecontext.mjs";
 import { ICommand } from "./types.mjs";
+import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
 
 // IOutput interface moved here to avoid circular dependency
 export interface IOutput {
@@ -21,14 +22,18 @@ export class OutputProcessor {
     private outputs: Map<string, string | number | boolean>,
     private outputsRaw: { name: string; value: string | number | boolean }[] | undefined,
     private defaults: Map<string, string | number | boolean>,
-    private sshCommand: string,
+    private executionMode?: ExecutionMode,
   ) {
     this.validator = StorageContext.getInstance().getJsonValidator();
+    // Default to PRODUCTION if not specified
+    if (!this.executionMode) {
+      this.executionMode = determineExecutionMode();
+    }
   }
 
   /**
    * Processes a value: if it's a string starting with "local:", reads the file and returns base64 encoded content.
-   * Only processes files when executing locally (sshCommand !== "ssh"). When executing on VE host,
+   * Only processes files when executing locally (ExecutionMode.TEST). When executing on VE host,
    * the "local:" prefix is preserved so the file can be read on the VE host.
    */
   processLocalFileValue(
@@ -37,7 +42,7 @@ export class OutputProcessor {
     if (typeof value === "string" && value.startsWith("local:")) {
       // Only process local files when executing locally (e.g., in tests)
       // When executing on VE host, preserve the "local:" prefix so the file can be read on the VE host
-      if (this.sshCommand !== "ssh") {
+      if (this.executionMode === ExecutionMode.TEST) {
         const filePath = value.substring(6); // Remove "local:" prefix
         const storageContext = StorageContext.getInstance();
         const localPath = storageContext.getLocalPath();
@@ -143,7 +148,6 @@ export class OutputProcessor {
       );
 
       const actualOutputIds = new Set<string>();
-      let isNameValueFormat = false;
       
       if (Array.isArray(outputsJson)) {
         const first = outputsJson[0];
@@ -155,7 +159,6 @@ export class OutputProcessor {
         ) {
           // name/value array: pass through 1:1 to outputsRaw and also map for substitutions
           // Note: outputsRaw is managed by the caller, so we need to return this
-          isNameValueFormat = true;
           const raw: { name: string; value: string | number | boolean }[] = [];
           for (const nv of outputsJson as {
             name: string;

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor - Parameters from skipped templates should not appear in unresolved parameters", () => {
   let testDir: string;
@@ -152,7 +153,7 @@ describe("TemplateProcessor - Parameters from skipped templates should not appea
       "test-skip-unresolved-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // Verify that skipped-template.json was actually skipped

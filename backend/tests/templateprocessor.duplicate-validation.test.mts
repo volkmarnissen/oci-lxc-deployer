@@ -6,6 +6,7 @@ import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
 import { VELoadApplicationError, VEConfigurationError } from "@src/backend-types.mjs";
 import { JsonError } from "@src/jsonvalidator.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor duplicate validation", () => {
   let testDir: string;
@@ -136,11 +137,11 @@ describe("TemplateProcessor duplicate validation", () => {
     // Try to load the application - should throw error about duplicate template
     // The error is thrown during readApplicationJson, so it's a JsonError wrapped in VELoadApplicationError
     await expect(
-      tp.loadApplication("test-duplicate-app", "installation", veContext)
+      tp.loadApplication("test-duplicate-app", "installation", veContext, ExecutionMode.TEST)
     ).rejects.toThrow();
 
     try {
-      await tp.loadApplication("test-duplicate-app", "installation", veContext);
+      await tp.loadApplication("test-duplicate-app", "installation", veContext, ExecutionMode.TEST);
     } catch (err: any) {
       // The error can be either JsonError (from readApplicationJson) or VELoadApplicationError
       expect(err).toBeInstanceOf(Error);
@@ -241,7 +242,7 @@ describe("TemplateProcessor duplicate validation", () => {
     ).rejects.toThrow(VEConfigurationError);
 
     try {
-      await tp.loadApplication("test-duplicate-app", "installation", veContext);
+      await tp.loadApplication("test-duplicate-app", "installation", veContext, ExecutionMode.TEST);
     } catch (err: any) {
       expect(err).toBeInstanceOf(VEConfigurationError);
       expect(err.details).toBeDefined();

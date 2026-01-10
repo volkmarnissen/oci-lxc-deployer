@@ -3,6 +3,7 @@ import path from "path";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 // TaskType is a string union; use literal values
 
 describe("TemplateProcessor enum handling", () => {
@@ -50,7 +51,7 @@ describe("TemplateProcessor enum handling", () => {
       "test-enum",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
     const staticParam = loaded.parameters.find(
       (p: { id: string }) => p.id === "color",
@@ -68,7 +69,7 @@ describe("TemplateProcessor enum handling", () => {
       "test-enum",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
     const dynParam = loaded.parameters.find(
       (p: { id: string }) => p.id === "iface",

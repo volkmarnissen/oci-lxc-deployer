@@ -1,11 +1,10 @@
 // TESTING STRATEGY FOR execute_on: "host:hostname"
 //
 // We test the logic, not the external dependencies.
-// External dependencies (SSH, LXC) are executed locally via sshCommand="sh".
+// External dependencies (SSH, LXC) are executed locally via ExecutionMode.TEST.
 //
-// IMPORTANT: sshCommand is set to "sh" to avoid SSH calls.
-// runOnVeHost and runOnLxc will then automatically execute locally (see buildSshArgs and runOnLxc).
-// remoteCommand is automatically set by runOnLxc when sshCommand !== "ssh".
+// IMPORTANT: ExecutionMode.TEST is used to avoid SSH calls.
+// runOnVeHost and runOnLxc will then automatically execute locally (see buildExecutionArgs and runOnLxc).
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { VeExecution } from "@src/ve-execution.mjs";
@@ -14,7 +13,7 @@ import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { getNextMessageIndex } from "@src/ve-execution-constants.mjs";
+import { getNextMessageIndex, ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("VeExecution host: flow", () => {
   beforeEach(() => {
@@ -74,8 +73,8 @@ describe("VeExecution host: flow", () => {
    * 
    * TO TEST:
    * - executeTemplateOnHost is called
-   * - Command is executed on LXC (via runOnLxc with remoteCommand)
-   * - sshCommand="sh" leads to local execution without SSH
+   * - Command is executed on LXC (via runOnLxc)
+   * - ExecutionMode.TEST leads to local execution without SSH
    */
   it("executes command on LXC via executeTemplateOnHost", async () => {
     setupVEContext();
@@ -87,19 +86,18 @@ describe("VeExecution host: flow", () => {
       execute_on: "host:apphost",
     };
 
-    // Create VeExecution with "sh" instead of "ssh"
+    // Create VeExecution with ExecutionMode.TEST instead of ExecutionMode.PRODUCTION
     // runOnVeHost and runOnLxc will then automatically execute locally
-    // remoteCommand is automatically set by runOnLxc when sshCommand !== "ssh"
     // Mock runOnVeHost for probe (write-vmids-json.sh) - it can use a command instead of a script
     class TestExec extends VeExecution {
       protected async runOnVeHost(
         input: string,
         tmplCommand: ICommand,
         timeoutMs = 300000,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
         // Mock probe: return VM IDs directly via command instead of script
-        if (remoteCommand && remoteCommand.length > 0 && remoteCommand[0]?.includes("write-vmids-json.sh")) {
+        // Check if this is the write-vmids-json.sh probe script
+        if (tmplCommand.script && tmplCommand.script.includes("write-vmids-json.sh")) {
           return {
             stderr: "",
             result: JSON.stringify([{ hostname: "apphost", pve: "pve-1", vmid: 101 }]),
@@ -109,12 +107,11 @@ describe("VeExecution host: flow", () => {
             index: 0,
           } as IVeExecuteMessage;
         }
-        // For other calls, use sh -c to execute locally
+        // For other calls, execute locally using ExecutionMode.TEST
         return await super.runOnVeHost(
-          "",
+          input,
           tmplCommand,
           timeoutMs,
-          remoteCommand || ["-c", input],
         );
       }
     }
@@ -124,7 +121,7 @@ describe("VeExecution host: flow", () => {
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
-    const exec = new TestExec([command], [{id:"vm_id", value: 101}], veContext, undefined, "sh");
+    const exec = new TestExec([command], [{id:"vm_id", value: 101}], veContext, undefined, undefined, ExecutionMode.TEST);
 
     const rc = await exec.run();
 
@@ -153,7 +150,7 @@ describe("VeExecution host: flow", () => {
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
-    const exec = new VeExecution([command], [], veContext, undefined, "sh");
+    const exec = new VeExecution([command], [], veContext, undefined, undefined, ExecutionMode.TEST);
     
     // Listen for error messages
     const messages: any[] = [];
@@ -195,10 +192,10 @@ describe("VeExecution host: flow", () => {
         input: string,
         tmplCommand: ICommand,
         timeoutMs = 300000,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
-        // Mock probe
-        if (remoteCommand && remoteCommand.length > 0 && remoteCommand[0]?.includes("write-vmids-json.sh")) {
+        // Mock probe: return VM IDs directly via command instead of script
+        // Check if this is the write-vmids-json.sh probe script
+        if (tmplCommand.script && tmplCommand.script.includes("write-vmids-json.sh")) {
           return {
             stderr: "",
             result: JSON.stringify([{ hostname: "apphost", pve: "pve-1", vmid: 101 }]),
@@ -208,7 +205,7 @@ describe("VeExecution host: flow", () => {
             index: 0,
           } as IVeExecuteMessage;
         }
-        return await super.runOnVeHost("", tmplCommand, timeoutMs, remoteCommand || ["-c", input]);
+        return await super.runOnVeHost(input, tmplCommand, timeoutMs);
       }
 
       protected async runOnLxc(
@@ -216,11 +213,10 @@ describe("VeExecution host: flow", () => {
         command: string,
         tmplCommand: ICommand,
         timeoutMs?: number,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
         // Capture the command to verify variable replacement
         this.captured = command;
-        return await super.runOnLxc(vm_id, command, tmplCommand, timeoutMs, remoteCommand);
+        return await super.runOnLxc(vm_id, command, tmplCommand, timeoutMs);
       }
     }
     
@@ -235,7 +231,8 @@ describe("VeExecution host: flow", () => {
       [{ id: "app_name", value: "inputApp" }],
       veContext,
       undefined,
-      "sh",
+      undefined,
+      ExecutionMode.TEST,
     );
     
     const rc = await exec.run();
@@ -271,10 +268,10 @@ describe("VeExecution host: flow", () => {
         input: string,
         tmplCommand: ICommand,
         timeoutMs = 300000,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
-        // Mock probe
-        if (remoteCommand && remoteCommand.length > 0 && remoteCommand[0]?.includes("write-vmids-json.sh")) {
+        // Mock probe: return VM IDs directly via command instead of script
+        // Check if this is the write-vmids-json.sh probe script
+        if (tmplCommand.script && tmplCommand.script.includes("write-vmids-json.sh")) {
           return {
             stderr: "",
             result: JSON.stringify([{ hostname: "apphost", pve: "pve-1", vmid: 101 }]),
@@ -284,7 +281,7 @@ describe("VeExecution host: flow", () => {
             index: 0,
           } as IVeExecuteMessage;
         }
-        return await super.runOnVeHost("", tmplCommand, timeoutMs, remoteCommand || ["-c", input]);
+        return await super.runOnVeHost(input, tmplCommand, timeoutMs);
       }
 
       protected async runOnLxc(
@@ -292,11 +289,10 @@ describe("VeExecution host: flow", () => {
         command: string,
         tmplCommand: ICommand,
         timeoutMs?: number,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
         // Capture the command to verify variable replacement
         this.captured = command;
-        return await super.runOnLxc(vm_id, command, tmplCommand, timeoutMs, remoteCommand);
+        return await super.runOnLxc(vm_id, command, tmplCommand, timeoutMs);
       }
     }
 
@@ -305,7 +301,7 @@ describe("VeExecution host: flow", () => {
     if (!veContext) {
       throw new Error("VE context not found for key: ve_localhost");
     }
-    const exec = new TestExec([command], [{ id: "vm_id", value: "999" }], veContext, undefined, "sh");
+    const exec = new TestExec([command], [{ id: "vm_id", value: "999" }], veContext, undefined, undefined, ExecutionMode.TEST);
     
     const rc = await exec.run();
     expect(rc).toBeDefined();
@@ -357,10 +353,10 @@ describe("VeExecution host: flow", () => {
         input: string,
         tmplCommand: ICommand,
         timeoutMs = 300000,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
-        // Mock probe
-        if (remoteCommand && remoteCommand.length > 0 && remoteCommand[0]?.includes("write-vmids-json.sh")) {
+        // Mock probe: return VM IDs directly via command instead of script
+        // Check if this is the write-vmids-json.sh probe script
+        if (tmplCommand.script && tmplCommand.script.includes("write-vmids-json.sh")) {
           return {
             stderr: "",
             result: JSON.stringify([{ hostname: "testhost", pve: "pve-1", vmid: 101 }]),
@@ -370,7 +366,7 @@ describe("VeExecution host: flow", () => {
             index: 0,
           } as IVeExecuteMessage;
         }
-        return await super.runOnVeHost("", tmplCommand, timeoutMs, remoteCommand || ["-c", input]);
+        return await super.runOnVeHost(input, tmplCommand, timeoutMs);
       }
 
       protected async runOnLxc(
@@ -378,7 +374,6 @@ describe("VeExecution host: flow", () => {
         command: string,
         tmplCommand: ICommand,
         timeoutMs?: number,
-        remoteCommand?: string[],
       ): Promise<IVeExecuteMessage> {
         this.capturedVmId = Number(vmid);
         this.capturedCommands.push(command);
@@ -409,7 +404,8 @@ describe("VeExecution host: flow", () => {
       [],
       veContext,
       undefined,
-      "sh", // Use sh instead of ssh
+      undefined,
+      ExecutionMode.TEST, // Use ExecutionMode.TEST instead of ExecutionMode.PRODUCTION
     );
 
     const rc = await exec.run();

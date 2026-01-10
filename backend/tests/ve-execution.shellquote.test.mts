@@ -8,6 +8,7 @@ import { tmpdir } from "os";
 import * as path from "path";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { IVEContext } from "@src/backend-types.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 describe("ProxmoxExecution shell quoting", () => {
   const dummySSH: IVEContext = { host: "localhost", port: 22 } as IVEContext;
   const defaults = new Map<string, string | number | boolean>();
@@ -112,7 +113,8 @@ describe("ProxmoxExecution shell quoting", () => {
       [{ id: "vm_id", value: "dummy" }],
       dummySSH,
       defaults,
-      "sh",
+      undefined,
+      ExecutionMode.TEST,
     );
     (exec as any).ssh = { host: "localhost", port: 22 };
     exec.run = async function () {

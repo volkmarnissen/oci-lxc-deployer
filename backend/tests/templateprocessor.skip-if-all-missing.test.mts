@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor skip_if_all_missing", () => {
   let testDir: string;
@@ -183,7 +184,7 @@ describe("TemplateProcessor skip_if_all_missing", () => {
       "test-skip-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // Verify test_param is in resolvedParams (it should be, because set-parameters.json outputs it)
@@ -299,7 +300,7 @@ describe("TemplateProcessor skip_if_all_missing", () => {
       "test-skip-app-2",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // test_param is NOT provided, so the template should be skipped
@@ -323,7 +324,7 @@ describe("TemplateProcessor skip_if_all_missing", () => {
       "test-skip-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // param1 and param2 are not provided, so the template should be skipped
@@ -386,7 +387,7 @@ describe("TemplateProcessor skip_if_all_missing", () => {
       "test-skip-app",
       "installation",
       veContext,
-      "sh",
+      ExecutionMode.TEST,
     );
 
     // param1 is provided, so the template should NOT be skipped

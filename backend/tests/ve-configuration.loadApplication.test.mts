@@ -4,6 +4,7 @@ import { ProxmoxTestHelper } from "@tests/ve-test-helper.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
 import { ContextManager } from "@src/context-manager.mjs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
+import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 declare module "@tests/ve-test-helper.mjs" {
   interface ProxmoxTestHelper {
@@ -52,7 +53,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         "modbus2mqtt",
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh",
+        ExecutionMode.TEST,
       );
 
       expect(result.parameters.length).toBeGreaterThan(0);
@@ -100,7 +101,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         "modbus2mqtt",
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh",
+        ExecutionMode.TEST,
       );
     } catch (err) {
       expect(err).toBeInstanceOf(VEConfigurationError);
@@ -144,7 +145,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         appName,
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh",
+        ExecutionMode.TEST,
       );
     } catch (err: any) {
       expect(err).toBeInstanceOf(VEConfigurationError);
@@ -188,7 +189,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         appName,
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh",
+        ExecutionMode.TEST,
       );
     } catch (err: any) {
       // Validation error is acceptable here when script is missing
@@ -243,7 +244,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         appName,
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh",
+        ExecutionMode.TEST,
       );
     } catch (err: any) {
       expect(err).toBeInstanceOf(VEConfigurationError);
@@ -272,7 +273,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
     const templateProcessor = config.getTemplateProcessor();
     
     // This test expects the loadApplication to fail with an error when trying to execute
-    // list-available-storage.json enumValuesTemplate in test context (sshCommand: "sh")
+    // list-available-storage.json enumValuesTemplate in test context (ExecutionMode.TEST)
     // The template tries to execute a script that should fail without proper VE context
     
     try {
@@ -280,7 +281,7 @@ describe("ProxmoxConfiguration.loadApplication", () => {
         "modbus2mqtt",
         "installation",
         { host: "localhost", port: 22 } as any,
-        "sh", // Using "sh" instead of "ssh" means it will try to execute locally
+        ExecutionMode.TEST, // Using ExecutionMode.TEST means it will try to execute locally
       );
       expect.fail("Expected loadApplication to throw an error when executing enumValuesTemplate in test context");
     } catch (err: any) {
