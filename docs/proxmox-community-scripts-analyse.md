@@ -627,7 +627,7 @@ Diese Tabelle zeigt alle verfügbaren Installation-Scripts aus dem [community-sc
 | elementsynapse | ✅ |  | Node.js | Node.js  | `elementsynapse` |
 | emby | ✅ |  | Other |   | `emby` |
 | emqx | ✅ |  | Simple Package | Simple Package  | `emqx` |
-| endurain | ✅ |  | Python | Python  | `endurain` |
+| endurain | ✅ |  | Python | Python  | `dk2077392/endurain` |
 | ersatztv | ✅ |  | Other |   | `ersatztv` |
 | esphome | ✅ |  | Python | Python  | `esphome` |
 | evcc | ✅ |  | Simple Package | Simple Package  | `evcc` |
