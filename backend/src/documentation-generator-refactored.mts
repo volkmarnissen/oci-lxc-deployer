@@ -263,7 +263,7 @@ export class DocumentationGenerator {
     const htmlReadmePath = path.join(this.htmlPath, `${applicationName}.md`);
     const readmeContent = this.applicationDocGenerator.generateReadme(
       applicationName,
-      appData || { name: applicationName, id: applicationName },
+      appData || { name: applicationName, id: applicationName } as IApplication,
       parentApp,
       appPath,
       commands,

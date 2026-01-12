@@ -5,7 +5,6 @@ import { DocumentationPathResolver } from "./documentation-path-resolver.mjs";
 import { TemplateAnalyzer } from "./template-analyzer.mjs";
 import type { IProcessedTemplate } from "./templateprocessor.mjs";
 import type { IParameter, ITemplate } from "./types.mjs";
-import type { ITemplate as ITemplateFromBackend } from "./backend-types.mjs";
 
 /**
  * Generates Markdown documentation for templates.

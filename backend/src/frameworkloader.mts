@@ -211,16 +211,48 @@ export class FrameworkLoader {
     );
 
     // Create application.json
-    // Get installation templates from base application
-    // Note: 'id' is not part of the schema - it's added when reading the application
-    const baseInstallation = baseApplication.installation || [];
-    const applicationJson = {
+    // Note: Templates from the extended application (framework.extends) are automatically
+    // loaded through the 'extends' mechanism. We should NOT add them to the installation
+    // list again, as this would cause duplicates.
+    // The installation list should only contain templates specific to this application,
+    // which can use 'before' or 'after' to position themselves relative to templates
+    // from the extended application.
+    const applicationJson: any = {
       name: request.name,
       description: request.description,
       extends: framework.extends,
       icon: request.icon || baseApplication.icon || "icon.png",
-      installation: [prependTemplateName, ...baseInstallation],
+      // Only include the prepend template, positioned before the first template from extends
+      // If baseApplication has installation templates, we can reference the first one
+      installation: baseApplication.installation && baseApplication.installation.length > 0
+        ? [{
+            name: prependTemplateName,
+            before: typeof baseApplication.installation[0] === 'string' 
+              ? baseApplication.installation[0] 
+              : (baseApplication.installation[0] as any).name || (baseApplication.installation[0] as any).id
+          }]
+        : [prependTemplateName],
     };
+
+    // Optional OCI / metadata fields: prefer request overrides, then framework, then base application
+    const url = request.url ?? (framework as any).url ?? (baseApplication as any).url;
+    const documentation =
+      request.documentation ?? (framework as any).documentation ?? (baseApplication as any).documentation;
+    const source = request.source ?? (framework as any).source ?? (baseApplication as any).source;
+    const vendor = request.vendor ?? (framework as any).vendor ?? (baseApplication as any).vendor;
+
+    if (url) {
+      applicationJson.url = url;
+    }
+    if (documentation) {
+      applicationJson.documentation = documentation;
+    }
+    if (source) {
+      applicationJson.source = source;
+    }
+    if (vendor) {
+      applicationJson.vendor = vendor;
+    }
 
     // Write application.json using persistence
     // Note: We pass applicationJson without 'id' - it will be added when reading

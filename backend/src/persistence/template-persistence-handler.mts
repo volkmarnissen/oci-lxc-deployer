@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
-import { IConfiguredPathes, ITemplate } from "../backend-types.mjs";
+import { IConfiguredPathes } from "../backend-types.mjs";
+import { ITemplate } from "../types.mjs";
 import { JsonValidator } from "../jsonvalidator.mjs";
 
 /**

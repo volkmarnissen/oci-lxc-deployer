@@ -140,3 +140,4 @@ Siehe: `json/shared/scripts/get-oci-image.py` - Implementierung mit `skopeo`-Fal
 - [container/image Library](https://github.com/containers/image)
 - [Proxmox Development Mailing List - OCI Implementation](https://lore.proxmox.com/pve-devel/20251008171028.196998-1-f.schauer%40proxmox.com/)
 
+

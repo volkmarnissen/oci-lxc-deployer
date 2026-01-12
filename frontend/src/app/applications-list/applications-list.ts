@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { CommonModule } from '@angular/common';
 import { VeConfigurationService } from '../ve-configuration.service';
+import { CacheService } from '../shared/services/cache.service';
 import { ErrorDialog } from './error-dialog';
 import { VeConfigurationDialog } from '../ve-configuration-dialog/ve-configuration-dialog';
 import { IApplicationWeb } from '../../shared/types';
@@ -26,6 +27,7 @@ export class ApplicationsList implements OnInit {
   private proxmoxService = inject(VeConfigurationService);
   private router = inject(Router);
   private dialog = inject(MatDialog);
+  private cacheService = inject(CacheService);
 
   openProxmoxConfigDialog(app: IApplicationWebIntern) {
     this.dialog.open(VeConfigurationDialog, { data: { app } });
@@ -40,6 +42,9 @@ export class ApplicationsList implements OnInit {
     this.proxmoxService.getApplications().subscribe({
       next: (apps) => {
         this.applications = apps.map((app) => ({ ...app, showErrors: false }));
+        // Update cache with application IDs for validation in create-application
+        const applicationIds = apps.map(app => app.id);
+        this.cacheService.setApplicationIds(applicationIds);
         this.loading = false;
       },
       error: () => {

@@ -32,7 +32,8 @@ from typing import Optional, Tuple
 
 def log(message: str) -> None:
     """Print message to stderr (for logging/progress)."""
-    print(message, file=sys.stderr)
+    # Always use stderr for non-JSON output (equivalent to >&2 in shell scripts)
+    print(message, file=sys.stderr, flush=True)
 
 def error(message: str, exit_code: int = 1) -> None:
     """Print error to stderr and exit."""
@@ -187,16 +188,19 @@ def skopeo_inspect(image_ref: str, username: Optional[str] = None, password: Opt
 def skopeo_copy(image_ref: str, output_path: str, username: Optional[str] = None, 
                 password: Optional[str] = None, platform: Optional[str] = None) -> None:
     """
-    Copy image using skopeo to oci-archive format.
+    Copy image using skopeo to oci-archive format (tarball).
+    
+    The format is specified by the 'oci-archive:' prefix in the destination URL,
+    not by the --format flag.
     
     Args:
         image_ref: Source image reference (docker://image:tag)
-        output_path: Output path for oci-archive
+        output_path: Output path for oci-archive tarball
         username: Registry username (optional)
         password: Registry password (optional)
         platform: Target platform (e.g., linux/amd64) (optional)
     """
-    cmd = ['skopeo', 'copy', '--format', 'oci-archive']
+    cmd = ['skopeo', 'copy']
     
     # Add platform override if specified
     if platform:
@@ -217,12 +221,19 @@ def skopeo_copy(image_ref: str, output_path: str, username: Optional[str] = None
     elif username:
         cmd.extend(['--creds', f'{username}'])
     
+    # Use oci-archive: prefix (creates a tarball) - format is determined by the prefix, not --format flag
     cmd.extend([image_ref, f'oci-archive:{output_path}'])
     
     log(f"Downloading image with skopeo...")
     try:
         # skopeo copy outputs progress to stderr, which is fine
-        result = subprocess.run(cmd, timeout=1800, check=True)
+        # Capture both stdout and stderr to prevent any output from going to stdout
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, check=True)
+        # Log any stdout/stderr output from skopeo to stderr (not stdout)
+        if result.stdout:
+            log(f"skopeo stdout: {result.stdout}")
+        if result.stderr:
+            log(f"skopeo stderr: {result.stderr}")
         log("Image downloaded successfully")
     except subprocess.TimeoutExpired:
         error(f"Timeout downloading image {image_ref}")
@@ -233,8 +244,8 @@ def import_to_proxmox(storage: str, tarball_path: str, image_name: str, tag: str
     """
     Import OCI tarball to Proxmox storage.
     
-    Proxmox stores OCI images in the vztmpl directory of the storage.
-    For local storage, this is typically /var/lib/vz/template/oci/
+    Proxmox stores OCI images in the vztmpl cache directory of the storage.
+    For local storage, this is typically /var/lib/vz/template/cache/
     
     Returns the template path in format: storage:vztmpl/image_tag.tar
     """
@@ -246,17 +257,17 @@ def import_to_proxmox(storage: str, tarball_path: str, image_name: str, tag: str
     
     # Try to determine storage path
     if storage == "local":
-        storage_dir = "/var/lib/vz/template/oci"
+        storage_dir = "/var/lib/vz/template/cache"
     else:
         # Try to get storage path from pvesm status
         try:
             result = subprocess.run(['pvesm', 'status', '-storage', storage], 
                                   capture_output=True, text=True, check=True)
-            # For non-local storage, use /mnt/pve/<storage>/template/oci
-            storage_dir = f"/mnt/pve/{storage}/template/oci"
+            # For non-local storage, use /mnt/pve/<storage>/template/cache
+            storage_dir = f"/mnt/pve/{storage}/template/cache"
         except (subprocess.CalledProcessError, FileNotFoundError):
             # Fallback to local path structure
-            storage_dir = f"/var/lib/vz/template/oci"
+            storage_dir = f"/var/lib/vz/template/cache"
             log(f"Warning: Could not determine storage path for {storage}, using {storage_dir}")
     
     # Ensure storage directory exists
@@ -290,27 +301,30 @@ def main() -> None:
     registry_password = "{{ registry_password }}"
     platform = "{{ platform }}"
     
-    # Check if template variables are still present (not substituted = error)
-    if oci_image.startswith('{{') or not oci_image or oci_image == "{{ oci_image }}":
+    # Check if template variables were not substituted
+    # VariableResolver returns "NOT_DEFINED" when a variable is not found
+    # We only check for "NOT_DEFINED" to avoid issues with variable substitution
+    # (other checks like oci_image == "{{ oci_image }}" would be replaced by the resolver)
+    if not oci_image or oci_image == "NOT_DEFINED":
         error("oci_image parameter is required!")
     
-    if storage.startswith('{{') or storage == "{{ storage }}":
+    # Normalize optional parameters (only check for NOT_DEFINED, as other checks would be replaced)
+    if not storage or storage == "NOT_DEFINED":
         storage = 'local'  # Default
     
-    # Normalize optional parameters
-    if registry_username.startswith('{{') or registry_username == "{{ registry_username }}":
+    if not registry_username or registry_username == "NOT_DEFINED":
         registry_username = None
-    elif not registry_username or registry_username.strip() == "":
+    elif registry_username.strip() == "":
         registry_username = None
     
-    if registry_password.startswith('{{') or registry_password == "{{ registry_password }}":
+    if not registry_password or registry_password == "NOT_DEFINED":
         registry_password = None
-    elif not registry_password or registry_password.strip() == "":
+    elif registry_password.strip() == "":
         registry_password = None
     
-    if platform.startswith('{{') or platform == "{{ platform }}":
+    if not platform or platform == "NOT_DEFINED":
         platform = None
-    elif not platform or platform.strip() == "":
+    elif platform.strip() == "":
         platform = 'linux/amd64'  # Default platform
     
     log(f"Downloading OCI image: {oci_image}")

@@ -87,7 +87,7 @@ export class ApplicationPersistenceHandler {
     const allApps = this.getAllAppNames();
 
     // Für jede Application: application.json laden (OHNE Templates!)
-    for (const [applicationName, appPath] of allApps) {
+    for (const [applicationName] of allApps) {
       const readOpts: IReadApplicationOptions = {
         applicationHierarchy: [],
         error: new VEConfigurationError("", applicationName),
@@ -96,8 +96,18 @@ export class ApplicationPersistenceHandler {
 
       try {
         const app = this.readApplication(applicationName, readOpts);
-        app.description = app.description || "No description available";
-        applications.push(app as IApplicationWeb);
+        const appWeb: IApplicationWeb = {
+          id: app.id,
+          name: app.name,
+          description: app.description || "No description available",
+          icon: app.icon,
+          iconContent: app.iconContent,
+          iconType: app.iconType,
+          ...(app.errors && app.errors.length > 0 && {
+            errors: app.errors.map(e => ({ message: e, name: "Error", details: undefined }))
+          }),
+        };
+        applications.push(appWeb);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e: Error | any) {
         // Errors werden unten behandelt
@@ -188,7 +198,7 @@ export class ApplicationPersistenceHandler {
         appData = {
           id: applicationName,
           name: applicationName,
-        };
+        } as IApplication;
         this.addErrorToOptions(opts, e);
       }
 
@@ -393,59 +403,64 @@ export class ApplicationPersistenceHandler {
           } else if (typeof entry === "object" && entry !== null) {
             const name = (entry as ITemplateReference).name;
             if (!name) continue;
-            if (
-              (entry as ITemplateReference).before &&
-              Array.isArray((entry as ITemplateReference).before) &&
-              (entry as ITemplateReference).before!.length > 0
-            ) {
-              // before is an array, use the first element
-              const beforeName = (entry as ITemplateReference).before?.[0];
-              if (!beforeName) return;
-              const existingTemplates = taskEntry.templates.map((t) =>
-                typeof t === "string" ? t : (t as ITemplateReference).name,
-              );
-              // Check for duplicates before inserting
-              if (existingTemplates.includes(name)) {
-                const error = new JsonError(
-                  `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
+            // Handle before: support both string and array
+            const beforeValue = (entry as ITemplateReference).before;
+            if (beforeValue) {
+              const beforeName = Array.isArray(beforeValue) && beforeValue.length > 0
+                ? beforeValue[0]
+                : (typeof beforeValue === "string" ? beforeValue : null);
+              
+              if (beforeName) {
+                const existingTemplates = taskEntry.templates.map((t) =>
+                  typeof t === "string" ? t : (t as ITemplateReference).name,
                 );
-                this.addErrorToOptions(opts, error);
-                return; // Don't add duplicate
+                // Check for duplicates before inserting
+                if (existingTemplates.includes(name)) {
+                  const error = new JsonError(
+                    `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
+                  );
+                  this.addErrorToOptions(opts, error);
+                  return; // Don't add duplicate
+                }
+                const idx = existingTemplates.indexOf(beforeName);
+                if (idx !== -1) {
+                  taskEntry.templates.splice(idx, 0, name);
+                } else {
+                  this.addTemplateToTask(name, taskEntry, key, opts);
+                }
+                continue; // Template added, skip to next entry
               }
-              const idx = existingTemplates.indexOf(beforeName);
-              if (idx !== -1) {
-                taskEntry.templates.splice(idx, 0, name);
-              } else {
-                this.addTemplateToTask(name, taskEntry, key, opts);
-              }
-            } else if (
-              (entry as ITemplateReference).after &&
-              Array.isArray((entry as ITemplateReference).after) &&
-              (entry as ITemplateReference).after!.length > 0
-            ) {
-              // after is an array, use the first element
-              const afterName = (entry as ITemplateReference).after?.[0];
-              if (!afterName) return;
-              const existingTemplates = taskEntry.templates.map((t) =>
-                typeof t === "string" ? t : (t as ITemplateReference).name,
-              );
-              // Check for duplicates before inserting
-              if (existingTemplates.includes(name)) {
-                const error = new JsonError(
-                  `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
-                );
-                this.addErrorToOptions(opts, error);
-                return; // Don't add duplicate
-              }
-              const idx = existingTemplates.indexOf(afterName);
-              if (idx !== -1) {
-                taskEntry.templates.splice(idx + 1, 0, name);
-              } else {
-                this.addTemplateToTask(name, taskEntry, key, opts);
-              }
-            } else {
-              this.addTemplateToTask(name, taskEntry, key, opts);
             }
+            // Handle after: support both string and array
+            const afterValue = (entry as ITemplateReference).after;
+            if (afterValue) {
+              const afterName = Array.isArray(afterValue) && afterValue.length > 0
+                ? afterValue[0]
+                : (typeof afterValue === "string" ? afterValue : null);
+              
+              if (afterName) {
+                const existingTemplates = taskEntry.templates.map((t) =>
+                  typeof t === "string" ? t : (t as ITemplateReference).name,
+                );
+                // Check for duplicates before inserting
+                if (existingTemplates.includes(name)) {
+                  const error = new JsonError(
+                    `Template '${name}' appears multiple times in ${key} task. Each template can only appear once per task.`,
+                  );
+                  this.addErrorToOptions(opts, error);
+                  return; // Don't add duplicate
+                }
+                const idx = existingTemplates.indexOf(afterName);
+                if (idx !== -1) {
+                  taskEntry.templates.splice(idx + 1, 0, name);
+                } else {
+                  this.addTemplateToTask(name, taskEntry, key, opts);
+                }
+                continue; // Template added, skip to next entry
+              }
+            }
+            // No before/after specified, add at end
+            this.addTemplateToTask(name, taskEntry, key, opts);
           }
         }
       }

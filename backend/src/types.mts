@@ -15,6 +15,11 @@ export interface IApplicationBase {
   name: string;
   description: string;
   icon?: string | undefined;
+  extends?: string;
+  url?: string;
+  documentation?: string;
+  source?: string;
+  vendor?: string;
   errors?: string[];
 }
 export interface IApplicationWeb {
@@ -116,6 +121,7 @@ export enum ApiUri {
   FrameworkNames = "/api/framework-names",
   FrameworkParameters = "/api/framework-parameters/:frameworkId",
   FrameworkCreateApplication = "/api/framework-create-application",
+  FrameworkFromImage = "/api/framework-from-image",
 }
 
 // Response interfaces for all backend endpoints (frontend mirror)
@@ -208,6 +214,10 @@ export interface IPostFrameworkCreateApplicationBody {
   applicationId: string;
   name: string;
   description: string;
+  url?: string;
+  documentation?: string;
+  source?: string;
+  vendor?: string;
   icon?: string;
   iconContent?: string;
   parameterValues: Array<{ id: string; value: string | number | boolean }>;
@@ -230,7 +240,20 @@ export interface IPostFrameworkFromImageBody {
   tag?: string;
 }
 
+export interface IApplicationDefaults {
+  applicationProperties?: {
+    name?: string;
+    applicationId?: string;
+    description?: string;
+    url?: string;
+    documentation?: string;
+    source?: string;
+    vendor?: string;
+  };
+  parameters?: Record<string, string | number | boolean>;
+}
+
 export interface IPostFrameworkFromImageResponse {
-  framework: Partial<IFramework>;
   annotations: IOciImageAnnotations;
+  defaults: IApplicationDefaults;
 }

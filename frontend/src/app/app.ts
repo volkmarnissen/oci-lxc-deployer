@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { VeConfigurationService } from './ve-configuration.service';
+import { CacheService } from './shared/services/cache.service';
 import { ISsh } from '../shared/types';
 
 @Component({
@@ -18,11 +19,15 @@ import { ISsh } from '../shared/types';
 export class App implements OnInit {
   private cfg = inject(VeConfigurationService);
   private router = inject(Router);
+  private cacheService = inject(CacheService);
   
   sshConfigs: ISsh[] = [];
   currentHost: string = '';
   
   ngOnInit(): void {
+    // Preload cache in background for faster UI loading
+    this.cacheService.preloadAll();
+    
     this.loadSshConfigs();
     this.cfg.initVeContext().subscribe({
       next: (sshs) => {

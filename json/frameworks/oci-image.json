@@ -4,13 +4,7 @@
   "properties": [
     "hostname",
     "oci_image",
-    "packages",
-    "command",
-    "command_args",
-    "package",
-    "owned_paths",
     "uid",
-    "group",
     "username",
     "volumes"
   ]

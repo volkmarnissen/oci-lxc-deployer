@@ -28,7 +28,7 @@ Requirements:
 import json
 import sys
 import subprocess
-import argparse
+import os
 from typing import Optional, Dict
 
 def log(message: str) -> None:
@@ -139,26 +139,77 @@ def extract_annotations(inspect_output: Dict) -> Dict:
     
     return annotations
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Extract OCI image annotations using skopeo',
-        formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument('image', help='OCI image reference (e.g., mariadb:latest, ghcr.io/home-assistant/home-assistant:latest)')
-    parser.add_argument('--tag', default='latest', help='Image tag (default: latest)')
-    parser.add_argument('--platform', default='linux/amd64', help='Target platform (default: linux/amd64)')
+def check_image_exists(image_ref: str, platform: str = 'linux/amd64') -> bool:
+    """
+    Quickly check if image exists using skopeo inspect --raw.
+    This is much faster than full inspection.
     
-    args = parser.parse_args()
+    Args:
+        image_ref: Image reference (e.g., docker://image:tag)
+        platform: Target platform (e.g., linux/amd64, linux/arm64)
+    
+    Returns:
+        True if image exists, False otherwise
+    """
+    cmd = ['skopeo', 'inspect', '--raw']
+    
+    # Add platform override if specified
+    if platform:
+        if '/' in platform:
+            os_type, arch = platform.split('/', 1)
+            cmd.extend(['--override-os', os_type, '--override-arch', arch])
+        else:
+            cmd.extend(['--override-os', 'linux', '--override-arch', platform])
+    else:
+        cmd.extend(['--override-os', 'linux', '--override-arch', 'amd64'])
+    
+    cmd.append(image_ref)
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, check=True)
+        return True
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        return False
+
+def main():
+    # Template variables: {{ image }}, {{ tag }}, {{ platform }}
+    # These are replaced in the script content before execution via stdin
+    # If not replaced, fall back to environment variables
+    image = "{{ image }}"
+    tag = "{{ tag }}"
+    platform = "{{ platform }}"
+    
+    # Check if template variables were replaced
+    # If not, try environment variables as fallback
+    if '{{' in image or not image:
+        image = os.environ.get('LXC_MANAGER_image', '')
+        if not image or '{{' in image:
+            error("Image is required. Template variable {{ image }} must be replaced before execution.", 1)
+    
+    if '{{' in tag or not tag:
+        tag = os.environ.get('LXC_MANAGER_tag', 'latest')
+        if '{{' in tag:
+            tag = 'latest'
+    
+    if '{{' in platform or not platform:
+        platform = os.environ.get('LXC_MANAGER_platform', 'linux/amd64')
+        if '{{' in platform:
+            platform = 'linux/amd64'
     
     # Check if skopeo is available
     if not check_skopeo():
         error("skopeo is required but not found. Please install it with: apt install skopeo")
     
     # Parse image reference
-    image_ref = parse_image_ref(args.image, args.tag)
+    image_ref = parse_image_ref(image, tag)
     
-    # Inspect image
-    inspect_output = skopeo_inspect(image_ref, args.platform)
+    # First, quickly check if image exists using --raw (fast check)
+    if not check_image_exists(image_ref, platform):
+        # Image does not exist, exit with error code 1
+        error(f"Image {image_ref} not found", 1)
+    
+    # Image exists, now do full inspection for annotations
+    inspect_output = skopeo_inspect(image_ref, platform)
     
     # Extract annotations
     annotations = extract_annotations(inspect_output)

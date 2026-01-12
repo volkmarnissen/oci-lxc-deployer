@@ -10,30 +10,17 @@ export class VEConfigurationError extends JsonError {
     this.filename = application;
   }
 }
+import { IApplicationBase, ITemplate } from "./types.mjs";
+
 export interface IResolvedParam {
   id: string;
   template: string;
-}
-export interface IApplicationBase {
-  name: string;
-  extends?: string;
-  description?: string;
-  icon?: string;
 }
 
 export interface IConfiguredPathes {
   schemaPath: string;
   jsonPath: string;
   localPath: string;
-}
-export interface ITemplate {
-  execute_on?: "ve" | "lxc" | string; // string allows "host:hostname" pattern. Optional if template only has properties commands
-  skip_if_all_missing?: string[];
-  skip_if_property_set?: string;
-  name: string;
-  description?: string;
-  parameters?: IParameter[];
-  commands: ICommand[];
 }
 export const storageKey = "global_storage_context";
 export interface IContext {
@@ -51,13 +38,9 @@ export interface IVMInstallContext {
   task: TaskType;
   changedParams: Array<{ name: string; value: string | number | boolean }>;
 }
-export interface IApplicationBase {
-  name: string;
-  extends?: string;
-  description?: string;
-  icon?: string;
-}
+
 // Interface generated from application.schema.json
+// Extends IApplicationBase from types.mts (which includes url, documentation, source, vendor)
 export type IApplicationSchema = IApplicationBase & {
   [key in TaskType]?: string[];
 };

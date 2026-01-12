@@ -17,6 +17,7 @@ import {
   IPostFrameworkCreateApplicationResponse,
   IPostFrameworkFromImageBody,
   IPostFrameworkFromImageResponse,
+  IOciImageAnnotations,
 } from "@src/types.mjs";
 import http from "http";
 import path from "path";
@@ -618,21 +619,36 @@ export class VEWebApp {
           }
           
           // Get annotations from OCI image
-          const annotations = await FrameworkFromImage.getAnnotationsFromImage(
-            veContext,
-            body.image,
-            tag,
-          );
+          // The script automatically checks if image exists first (fast --raw check),
+          // then performs full inspection if the image exists
+          let annotations: IOciImageAnnotations;
+          try {
+            annotations = await FrameworkFromImage.getAnnotationsFromImage(
+              veContext,
+              body.image,
+              tag,
+            );
+          } catch (err: any) {
+            // Check if error is "image not found"
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            if (errorMessage.includes("not found") || errorMessage.includes("Image")) {
+              return res.status(404).json({ 
+                error: `Image ${body.image}:${tag} not found` 
+              });
+            }
+            // Re-throw other errors
+            throw err;
+          }
           
-          // Build framework object from annotations
-          const framework = FrameworkFromImage.buildFrameworkFromAnnotations(
+          // Build application defaults from annotations
+          const defaults = FrameworkFromImage.buildApplicationDefaultsFromAnnotations(
             body.image,
             annotations,
           );
           
           this.returnResponse<IPostFrameworkFromImageResponse>(res, {
-            framework,
             annotations,
+            defaults,
           });
         } catch (err: any) {
           const statusCode = this.getErrorStatusCode(err);
