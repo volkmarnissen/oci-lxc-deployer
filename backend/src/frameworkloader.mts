@@ -3,10 +3,10 @@ import fs from "fs";
 import { ApplicationLoader } from "./apploader.mjs";
 import {
   IConfiguredPathes,
-  IFramework,
   VEConfigurationError,
   IReadApplicationOptions,
 } from "./backend-types.mjs";
+import { IFramework } from "./types.mjs";
 import { StorageContext } from "./storagecontext.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { JsonError } from "./jsonvalidator.mjs";

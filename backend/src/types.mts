@@ -175,6 +175,24 @@ export interface IVeConfigurationResponse {
   restartKey?: string;
   vmInstallKey?: string;
 }
+export interface IFrameworkPropertyObject {
+  id: string;
+  default: boolean;
+}
+export type IFrameworkProperty = string | IFrameworkPropertyObject;
+export interface IFramework {
+  id: string;
+  name: string;
+  extends: string;
+  properties: IFrameworkProperty[];
+  icon?: string;
+  url?: string;
+  documentation?: string;
+  source?: string;
+  vendor?: string;
+  description?: string;
+}
+
 export interface IFrameworkName {
   id: string;
   name: string;
@@ -197,4 +215,22 @@ export interface IPostFrameworkCreateApplicationBody {
 export interface IPostFrameworkCreateApplicationResponse {
   success: boolean;
   applicationId?: string;
+}
+
+export interface IOciImageAnnotations {
+  url?: string;
+  documentation?: string;
+  source?: string;
+  vendor?: string;
+  description?: string;
+}
+
+export interface IPostFrameworkFromImageBody {
+  image: string;
+  tag?: string;
+}
+
+export interface IPostFrameworkFromImageResponse {
+  framework: Partial<IFramework>;
+  annotations: IOciImageAnnotations;
 }

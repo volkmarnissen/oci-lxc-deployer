@@ -2,9 +2,9 @@ import path from "path";
 import fs from "fs";
 import {
   IConfiguredPathes,
-  IFramework,
   VEConfigurationError,
 } from "../backend-types.mjs";
+import { IFramework } from "../types.mjs";
 import { JsonValidator } from "../jsonvalidator.mjs";
 
 /**

@@ -1,7 +1,5 @@
-import {
-  IFramework,
-  VEConfigurationError,
-} from "../backend-types.mjs";
+import { IFramework } from "../types.mjs";
+import { VEConfigurationError } from "../backend-types.mjs";
 import { IFrameworkPersistence } from "../persistence/interfaces.mjs";
 
 export interface IReadFrameworkOptions {

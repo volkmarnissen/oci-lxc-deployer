@@ -10,6 +10,8 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.config.integration.mts",
+    "test:all": "vitest run --config vitest.config.all.mts",
     "build": "tsc --project tsconfig.production.json && tsc-alias -p tsconfig.production.json",
     "postbuild": "chmod +x ./dist/lxc-manager.mjs",
     "prettier": "prettier --write ."

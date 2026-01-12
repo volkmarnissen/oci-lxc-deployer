@@ -26,6 +26,6 @@
       "@tests/*": ["tests/*"]
     }
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "vitest.config*.mts"],
   "exclude": ["dist"]
 }

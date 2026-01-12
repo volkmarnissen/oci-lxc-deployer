@@ -15,6 +15,8 @@ import {
   IFrameworkParametersResponse,
   IPostFrameworkCreateApplicationBody,
   IPostFrameworkCreateApplicationResponse,
+  IPostFrameworkFromImageBody,
+  IPostFrameworkFromImageResponse,
 } from "@src/types.mjs";
 import http from "http";
 import path from "path";
@@ -28,6 +30,7 @@ import { ITemplateProcessorLoadResult } from "./templateprocessor.mjs";
 import { WebAppVE } from "./webapp-ve.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
 import { FrameworkLoader } from "./frameworkloader.mjs";
+import { FrameworkFromImage } from "./framework-from-image.mjs";
 export class VEWebApp {
   app: express.Application;
   public httpServer: http.Server;
@@ -579,6 +582,53 @@ export class VEWebApp {
           this.returnResponse<IPostFrameworkCreateApplicationResponse>(res, {
             success: true,
             applicationId: applicationId,
+          });
+        } catch (err: any) {
+          const statusCode = this.getErrorStatusCode(err);
+          const serializedError = this.serializeError(err);
+          res.status(statusCode).json({
+            error: err instanceof Error ? err.message : String(err),
+            serializedError: serializedError,
+          });
+        }
+      },
+    );
+
+    // POST /api/framework-from-image - Get framework metadata from OCI image annotations
+    this.app.post(
+      "/api/framework-from-image",
+      express.json(),
+      async (req, res) => {
+        try {
+          const body = req.body as IPostFrameworkFromImageBody;
+          
+          if (!body.image) {
+            return res.status(400).json({ error: "Missing image" });
+          }
+          
+          const tag = body.tag || "latest";
+          const veContext = storageContext.getCurrentVEContext();
+          
+          if (!veContext) {
+            return res.status(400).json({ error: "No VE context configured. Please configure SSH connection first." });
+          }
+          
+          // Get annotations from OCI image
+          const annotations = await FrameworkFromImage.getAnnotationsFromImage(
+            veContext,
+            body.image,
+            tag,
+          );
+          
+          // Build framework object from annotations
+          const framework = FrameworkFromImage.buildFrameworkFromAnnotations(
+            body.image,
+            annotations,
+          );
+          
+          this.returnResponse<IPostFrameworkFromImageResponse>(res, {
+            framework,
+            annotations,
           });
         } catch (err: any) {
           const statusCode = this.getErrorStatusCode(err);

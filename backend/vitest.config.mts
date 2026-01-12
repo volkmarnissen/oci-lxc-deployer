@@ -1,23 +1,13 @@
-import path from "path";
-import { defineConfig } from "vitest/config";
+import { mergeConfig } from "vitest/config";
+import { baseConfig } from "./vitest.config.base.mjs";
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      "@src": path.resolve(__dirname, "src"),
-      "@tests": path.resolve(__dirname, "tests"),
-    },
-  },
-  esbuild: {
-    sourcemap: "inline",
-  },
+/**
+ * Default Vitest configuration for unit tests.
+ * Excludes integration tests for faster test runs.
+ */
+export default mergeConfig(baseConfig, {
   test: {
-    environment: "node",
-    globals: true,
-    testTimeout: 60000, // 60 seconds default timeout for all tests
-    coverage: {
-      reporter: ["text", "html"],
-    },
     include: ["tests/**/*.test.mts"],
+    exclude: ["tests/integration/**", "**/node_modules/**", "**/.git/**"],
   },
 });

@@ -20,18 +20,6 @@ export interface IApplicationBase {
   description?: string;
   icon?: string;
 }
-export interface IFrameworkPropertyObject {
-  id: string;
-  default: boolean;
-}
-export type IFrameworkProperty = string | IFrameworkPropertyObject;
-export interface IFramework {
-  id: string;
-  name: string;
-  extends: string;
-  properties: IFrameworkProperty[];
-  icon?: string;
-}
 
 export interface IConfiguredPathes {
   schemaPath: string;

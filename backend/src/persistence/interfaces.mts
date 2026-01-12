@@ -1,11 +1,11 @@
 import {
   IApplication,
   IConfiguredPathes,
-  IFramework,
   ITemplate,
   IReadApplicationOptions,
   VEConfigurationError,
 } from "../backend-types.mjs";
+import { IFramework } from "../types.mjs";
 import { IApplicationWeb } from "../types.mjs";
 import { JsonValidator } from "../jsonvalidator.mjs";
 
