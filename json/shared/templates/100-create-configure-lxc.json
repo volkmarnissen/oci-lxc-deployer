@@ -83,7 +83,7 @@
     },    
     {
       "name": "Setup UID/GID mapping",
-      "script": "setup-lxc-uid-mapping.sh"
+      "script": "setup-lxc-uid-mapping.py"
     },
     {
       "name": "Compute Static IPs",

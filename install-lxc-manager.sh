@@ -6,10 +6,11 @@ set -eu
 # Downloads OCI image, creates container, mounts volumes, and writes storagecontext.json
 
 # Static GitHub source configuration
-OWNER="modbus2mqtt"
+OCI_OWNER="modbus2mqtt"
+OWNER="volkmarnissen"
 REPO="lxc-manager"
 BRANCH="main"
-OCI_IMAGE="ghcr.io/${OWNER}/lxc-manager:latest"
+OCI_IMAGE="ghcr.io/${OCI_OWNER}/lxc-manager:latest"
 
 # Helper functions
 execute_script_from_github() {
@@ -19,7 +20,7 @@ execute_script_from_github() {
   fi
   path="$1"; output_id="$2"; shift 2
 
-  raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}"
+  raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/refs/heads/${BRANCH}/${path}"
   sed_args=""
   for kv in "$@"; do
     key="${kv%%=*}"
@@ -27,14 +28,22 @@ execute_script_from_github() {
     esc_val=$(printf '%s' "$val" | sed 's/[\\&/]/\\&/g')
     sed_args="$sed_args -e s/{{[[:space:]]*$key[[:space:]]*}}/$esc_val/g"
   done
+
+  # Determine interpreter based on file extension
+  case "$path" in
+    *.py) interpreter="python3" ;;
+    *.sh) interpreter="sh" ;;
+    *) interpreter="sh" ;;
+  esac
+
   script_content=$(curl -fsSL "$raw_url" | sed $sed_args)
 
   if [ "$output_id" = "-" ]; then
-    printf '%s' "$script_content" | sh
+    printf '%s' "$script_content" | $interpreter
     return $?
   fi
 
-  script_output=$(printf '%s' "$script_content" | sh)
+  script_output=$(printf '%s' "$script_content" | $interpreter)
   output_value=$(printf '%s\n' "$script_output" \
     | awk -v ID="$output_id" '
       BEGIN { FS="\"" }
@@ -216,7 +225,7 @@ fi
 # 1) Download OCI image
 echo "Step 1: Downloading OCI image..." >&2
 # Download and execute Python script with variable substitution
-raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/get-oci-image.py"
+raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/refs/heads/${BRANCH}/json/shared/scripts/get-oci-image.py"
 script_content=$(curl -fsSL "$raw_url" | \
   sed "s|{{ oci_image }}|${OCI_IMAGE}|g" | \
   sed "s|{{ storage }}|${storage}|g" | \
@@ -258,14 +267,6 @@ fi
 
 echo "  OCI image ready: ${template_path}" >&2
 
-# 2) Configure UID/GID mapping (subuid/subgid only, container config after creation)
-echo "Step 2: Configuring UID/GID mapping..." >&2
-execute_script_from_github \
-  "json/shared/scripts/setup-lxc-uid-mapping.sh" \
-  "-" \
-  "uid=${LXC_UID}" \
-  "gid=${LXC_GID}"
-echo "  UID/GID ranges configured in /etc/subuid and /etc/subgid" >&2
 
 # 3) Create LXC container from OCI image
 echo "Step 3: Creating LXC container..." >&2
@@ -286,13 +287,15 @@ if [ -z "$vm_id" ]; then
 fi
 
 echo "  Container created: ${vm_id}" >&2
-
-# 3.5) Update container config with UID/GID mapping
-echo "Step 3.5: Applying UID/GID mapping to container..." >&2
-# Use the new script with vm_id to update container config
-raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/setup-lxc-uid-mapping.sh"
-curl -fsSL "$raw_url" | env uid="${LXC_UID}" gid="${LXC_GID}" vm_id="${vm_id}" python3
-echo "  Container config updated with 1:1 UID/GID mapping" >&2
+# 3) Configure UID/GID mapping (subuid/subgid only, container config after creation)
+echo "Step 3: Configuring UID/GID mapping..." >&2
+execute_script_from_github \
+  "json/shared/scripts/setup-lxc-uid-mapping.py" \
+  "-" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}" \
+  "vm_id=${vm_id}"
+echo "  UID/GID ranges configured in /etc/subuid and /etc/subgid and /etc/pve/lxc/${vm_id}.conf" >&2
 
 # 4) Mount ZFS pool if using ZFS storage
 echo "Step 4: Preparing storage..." >&2
@@ -324,7 +327,7 @@ fi
 # 5) Bind volumes to container
 echo "Step 5: Binding volumes to container..." >&2
 # Download and execute bind-multiple-volumes script with volumes as environment variable
-raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/bind-multiple-volumes-to-lxc.sh"
+raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/refs/heads/${BRANCH}/json/shared/scripts/bind-multiple-volumes-to-lxc.sh"
 
 # Set volumes as environment variable (multiline)
 export VOLUMES="config=config
