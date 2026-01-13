@@ -258,8 +258,17 @@ fi
 
 echo "  OCI image ready: ${template_path}" >&2
 
-# 2) Create LXC container from OCI image
-echo "Step 2: Creating LXC container..." >&2
+# 2) Configure subuid/subgid before container creation
+echo "Step 2: Configuring subuid/subgid..." >&2
+execute_script_from_github \
+  "json/shared/scripts/configure-subuid-subgid.sh" \
+  "-" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}"
+echo "  subuid/subgid configured" >&2
+
+# 3) Create LXC container from OCI image
+echo "Step 3: Creating LXC container..." >&2
 vm_id=$(execute_script_from_github \
   "json/shared/scripts/create-lxc-container.sh" \
   "vm_id" \
@@ -278,85 +287,111 @@ fi
 
 echo "  Container created: ${vm_id}" >&2
 
-# 3) Create and set permissions on volume directories
-echo "Step 3: Setting up volumes..." >&2
-# Create parent directories first
-mkdir -p "$(dirname "${config_volume_path}")" "$(dirname "${secure_volume_path}")"
-mkdir -p "${config_volume_path}" "${secure_volume_path}"
-chown -R ${LXC_UID}:${LXC_GID} "${config_volume_path}" "${secure_volume_path}" 2>/dev/null || {
-  # If chown fails, try with sudo (may be needed for ZFS)
-  sudo chown -R ${LXC_UID}:${LXC_GID} "${config_volume_path}" "${secure_volume_path}" 2>/dev/null || {
-    echo "Warning: Could not set ownership on volumes (may need manual chown)" >&2
-  }
-}
-chmod 755 "${config_volume_path}" "${secure_volume_path}"
+# 3.5) Configure UID/GID mapping in container config
+echo "Step 3.5: Configuring UID/GID mapping..." >&2
+config_file="/etc/pve/lxc/${vm_id}.conf"
 
-# 4) Mount volumes into container
-echo "Step 4: Mounting volumes..." >&2
-# Stop container if running (required for mount changes)
+# Stop container to modify config
 pct stop "${vm_id}" 2>/dev/null || true
 
-# Find next free mountpoint
-find_next_mp() {
-  for i in 0 1 2 3 4 5 6 7 8 9; do
-    if ! pct config "${vm_id}" | grep -q "^mp${i}:"; then
-      echo "mp${i}"
-      return 0
+# Remove any automatically created idmap entries
+sed -i '/^lxc\.idmap/d' "$config_file" 2>/dev/null || true
+
+# Add 1:1 mapping for UID/GID 1000 (lxc user)
+cat >> "$config_file" <<EOF
+lxc.idmap: u 0 100000 ${LXC_UID}
+lxc.idmap: g 0 100000 ${LXC_GID}
+lxc.idmap: u ${LXC_UID} ${LXC_UID} 1
+lxc.idmap: g ${LXC_GID} ${LXC_GID} 1
+lxc.idmap: u $((LXC_UID + 1)) $((100000 + LXC_UID + 1)) $((65536 - LXC_UID - 1))
+lxc.idmap: g $((LXC_GID + 1)) $((100000 + LXC_GID + 1)) $((65536 - LXC_GID - 1))
+EOF
+
+echo "  UID/GID mapping configured: Container UID ${LXC_UID} <-> Host UID ${LXC_UID} (1:1)" >&2
+
+# 4) Mount ZFS pool if using ZFS storage
+echo "Step 4: Preparing storage..." >&2
+# Determine if we're using ZFS
+host_mountpoint=""
+if echo "$volume_base" | grep -q "^/"; then
+  # Check if this is a ZFS mountpoint
+  if command -v zfs >/dev/null 2>&1; then
+    zfs_pool=$(echo "$volume_base" | cut -d'/' -f2)
+    if zpool list "$zfs_pool" >/dev/null 2>&1; then
+      echo "  Detected ZFS pool: $zfs_pool" >&2
+      host_mountpoint=$(execute_script_from_github \
+        "json/shared/scripts/mount-zfs-pool.sh" \
+        "host_mountpoint" \
+        "storage_selection=zfs:${zfs_pool}" \
+        "uid=${LXC_UID}" \
+        "gid=${LXC_GID}")
+      echo "  ZFS pool mounted at: ${host_mountpoint}" >&2
+    else
+      # Not ZFS, use volume_base directly
+      host_mountpoint=$(dirname "$volume_base")
     fi
-  done
-  return 1
-}
-
-MP_CONFIG=$(find_next_mp)
-if [ -z "$MP_CONFIG" ]; then
-  echo "Error: No free mountpoint available" >&2
-  exit 1
-fi
-
-MP_SECURE=$(find_next_mp)
-if [ -z "$MP_SECURE" ]; then
-  echo "Error: No free mountpoint available for secure volume" >&2
-  exit 1
-fi
-
-# Set mount points
-pct set "${vm_id}" -${MP_CONFIG} "${config_volume_path},mp=/config" || {
-  echo "Error: Failed to mount config volume" >&2
-  exit 1
-}
-
-pct set "${vm_id}" -${MP_SECURE} "${secure_volume_path},mp=/secure" || {
-  echo "Error: Failed to mount secure volume" >&2
-  exit 1
-}
-
-echo "  Volumes mounted: /config -> ${config_volume_path}, /secure -> ${secure_volume_path}" >&2
-
-# 5) Start container
-echo "Step 5: Starting container..." >&2
-pct start "${vm_id}" || {
-  echo "Error: Failed to start container" >&2
-  exit 1
-}
-
-# Wait for container to be ready
-echo "  Waiting for container to be ready..." >&2
-sleep 3
-for i in 1 2 3 4 5; do
-  if pct status "${vm_id}" | grep -q "running"; then
-    break
+  else
+    # No ZFS tools, use volume_base directly
+    host_mountpoint=$(dirname "$volume_base")
   fi
-  sleep 2
-done
+fi
+
+# 5) Bind volumes to container
+echo "Step 5: Binding volumes to container..." >&2
+# Download and execute bind-multiple-volumes script with volumes as environment variable
+raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/bind-multiple-volumes-to-lxc.sh"
+
+# Set volumes as environment variable (multiline)
+export VOLUMES="config=config
+secure=secure"
+
+# Download script, replace all variables except volumes, and execute with VOLUMES env var
+# Note: Platzhalter im Script haben kein Leerzeichen nach {{ und vor }}
+curl -fsSL "$raw_url" | \
+  sed "s|{{ vm_id}}|${vm_id}|g" | \
+  sed "s|{{ hostname}}|${hostname}|g" | \
+  sed "s|{{ base_path}}|lxc-manager|g" | \
+  sed "s|{{ host_mountpoint}}|${host_mountpoint}|g" | \
+  sed "s|{{ username}}||g" | \
+  sed "s|{{ uid}}|${LXC_UID}|g" | \
+  sed "s|{{ gid}}|${LXC_GID}|g" | \
+  sed 's|VOLUMES="{{ volumes}}"|VOLUMES="$VOLUMES"|g' | \
+  sh
+
+echo "  Volumes bound successfully" >&2
+
+# Update volume paths to match what was created
+if [ -n "$host_mountpoint" ]; then
+  config_volume_path="${host_mountpoint}/lxc-manager/${hostname}/config"
+  secure_volume_path="${host_mountpoint}/lxc-manager/${hostname}/secure"
+fi
+
+# 6) Ensure container is running
+echo "Step 6: Ensuring container is running..." >&2
+if ! pct status "${vm_id}" | grep -q "running"; then
+  pct start "${vm_id}" || {
+    echo "Error: Failed to start container" >&2
+    exit 1
+  }
+  # Wait for container to be ready
+  echo "  Waiting for container to be ready..." >&2
+  sleep 3
+  for i in 1 2 3 4 5; do
+    if pct status "${vm_id}" | grep -q "running"; then
+      break
+    fi
+    sleep 2
+  done
+fi
 
 if ! pct status "${vm_id}" | grep -q "running"; then
   echo "Warning: Container may not be fully ready" >&2
+else
+  echo "  Container is running" >&2
 fi
 
-echo "  Container started" >&2
-
-# 6) Get SSH public key from container and add to root authorized_keys
-echo "Step 6: Setting up SSH access..." >&2
+# 7) Get SSH public key from container and add to root authorized_keys
+echo "Step 7: Setting up SSH access..." >&2
 # Wait for container and application to be ready
 echo "  Waiting for container application to start..." >&2
 sleep 5
@@ -415,22 +450,50 @@ if [ -n "$container_pubkey" ]; then
   mkdir -p "${root_ssh_dir}"
   chmod 700 "${root_ssh_dir}"
   
+  # Resolve symlink to get actual file path
+  if [ -L "${root_auth_keys}" ]; then
+    actual_auth_keys=$(readlink -f "${root_auth_keys}")
+    echo "  authorized_keys is a symlink to: ${actual_auth_keys}" >&2
+  else
+    actual_auth_keys="${root_auth_keys}"
+  fi
+  
   # Check if key already exists
-  if [ -f "${root_auth_keys}" ] && grep -qF "${container_pubkey}" "${root_auth_keys}" 2>/dev/null; then
+  if [ -f "${actual_auth_keys}" ] && grep -qF "${container_pubkey}" "${actual_auth_keys}" 2>/dev/null; then
     echo "  SSH key already in root authorized_keys" >&2
   else
-    echo "${container_pubkey}" >> "${root_auth_keys}"
-    chmod 600 "${root_auth_keys}"
+    echo "${container_pubkey}" >> "${actual_auth_keys}"
     echo "  Added SSH key to root authorized_keys" >&2
   fi
+  
+  # Check and fix permissions only if needed
+  current_owner=$(stat -c '%U:%G' "${actual_auth_keys}" 2>/dev/null || stat -f '%Su:%Sg' "${actual_auth_keys}" 2>/dev/null || echo "")
+  current_perms=$(stat -c '%a' "${actual_auth_keys}" 2>/dev/null || stat -f '%Lp' "${actual_auth_keys}" 2>/dev/null || echo "")
+  
+  if [ "$current_owner" != "root:root" ]; then
+    echo "  Fixing ownership of ${actual_auth_keys}" >&2
+    chown root:root "${actual_auth_keys}" 2>/dev/null || true
+  fi
+  
+  if [ "$current_perms" != "600" ]; then
+    echo "  Fixing permissions of ${actual_auth_keys}" >&2
+    chmod 600 "${actual_auth_keys}" 2>/dev/null || true
+  fi
+  
+  # Restart SSH server to ensure changes take effect
+  echo "  Restarting SSH server..." >&2
+  systemctl restart ssh >/dev/null 2>&1 || systemctl restart sshd >/dev/null 2>&1 || \
+  service ssh restart >/dev/null 2>&1 || service sshd restart >/dev/null 2>&1 || {
+    echo "  Warning: Failed to restart SSH server" >&2
+  }
 else
   echo "  Warning: Could not retrieve SSH public key from container after ${max_attempts} attempts" >&2
   echo "  The key will be generated when the application starts" >&2
   echo "  You can add it later using the SSH config page in the web interface" >&2
 fi
 
-# 7) Wait for application to start and configure via API
-echo "Step 7: Configuring via API..." >&2
+# 8) Wait for application to start and configure via API
+echo "Step 8: Configuring via API..." >&2
 
 # Check if curl is available
 if ! command -v curl >/dev/null 2>&1; then

@@ -171,6 +171,49 @@ function readServicePublicKey(): string | null {
   return null;
 }
 
+/**
+ * Resolve a suitable HOME directory for the service user (e.g. lxc)
+ * without relying on the current process HOME.
+ */
+function resolveServiceHome(): string | null {
+  const envServiceHome = process.env.LXC_MANAGER_USER_HOME;
+  const candidates = envServiceHome
+    ? [envServiceHome]
+    : ["/var/lib/lxc-manager", "/home/lxc-manager", "/home/lxc"];
+
+  for (const h of candidates) {
+    try {
+      if (existsSync(h)) return h;
+    } catch {}
+  }
+  const currentHome = process.env.HOME || homedir();
+  return currentHome || null;
+}
+
+/**
+ * Find a private key path to use for ssh (prefers ed25519).
+ * Allows explicit override via LXC_MANAGER_PRIVKEY_FILE.
+ */
+function getPrivateKeyPath(): string | null {
+  const explicit = process.env.LXC_MANAGER_PRIVKEY_FILE;
+  if (explicit && existsSync(explicit)) return explicit;
+
+  const home = resolveServiceHome();
+  if (!home) return null;
+
+  const candidates = [
+    path.join(home, ".ssh", "id_ed25519"),
+    path.join(home, ".ssh", "id_rsa"),
+    path.join(home, ".ssh", "id_ecdsa"),
+  ];
+  for (const p of candidates) {
+    try {
+      if (existsSync(p)) return p;
+    } catch {}
+  }
+  return null;
+}
+
 function buildAppendCommand(
   pubKey: string,
   targetFile: string = "~/.ssh/authorized_keys",
@@ -248,11 +291,22 @@ export class Ssh {
         "-o",
         "UserKnownHostsFile=/dev/null",
       ];
+      const serviceHome = resolveServiceHome();
+      const privKey = getPrivateKeyPath();
+      if (privKey) {
+        args.push("-o", "IdentitiesOnly=yes");
+        args.push("-i", privKey);
+      }
       if (port && Number.isFinite(port)) {
         args.push("-p", String(port));
       }
-      args.push(`root@${host}`, "true");
-      const res = spawnSync(sshCmd, args, { encoding: "utf-8", timeout: 3000 });
+      const remoteUser = process.env.LXC_MANAGER_REMOTE_USER || "root";
+      args.push(`${remoteUser}@${host}`, "true");
+      const res = spawnSync(sshCmd, args, {
+        encoding: "utf-8",
+        timeout: 3000,
+        env: serviceHome ? { ...process.env, HOME: serviceHome } : process.env,
+      });
       const result: { permissionOk: boolean; stderr?: string } = {
         permissionOk: res.status === 0,
       };
