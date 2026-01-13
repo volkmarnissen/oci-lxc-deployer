@@ -10,9 +10,8 @@ The **framework-based approach** is the simplest way to create a new application
 2. **Volumes** that need to be persisted (e.g., `/data`)
 3. **UID/GID** of the user inside the container (e.g., `1000:1000`)
 
-### Method 1: Web UI (Recommended)
 
-The **easiest way** to create a new application is using the Web UI:
+###Use the Web UI to create a new application:
 
 1. **Open the Framework UI** in LXC Manager web interface (usually under "Create Application" or "Frameworks")
 2. **Select the OCI Image Framework** (`framework-oci-volumes`)
@@ -27,46 +26,6 @@ The **easiest way** to create a new application is using the Web UI:
 6. **Save the application**: The result is a complete application definition that can be installed like any other application
 
 **That's it!** The Web UI handles all the complexity of creating the JSON structure and ensures all required fields are filled.
-
-### Method 2: Manual JSON (Advanced)
-
-For advanced users or automation, you can create the application JSON manually:
-
-```json
-{
-  "name": "your-app",
-  "label": "Your App",
-  "description": "Your application description",
-  "extends": "framework-oci-volumes",
-  "installation": {
-    "parameters": [
-      {
-        "name": "oci_image",
-        "value": "docker.io/your-org/your-app:latest"
-      },
-      {
-        "name": "volumes",
-        "value": "data=/data\nconfig=/config"
-      },
-      {
-        "name": "uid",
-        "value": "1000"
-      },
-      {
-        "name": "gid",
-        "value": "1000"
-      }
-    ]
-  }
-}
-```
-
-**That's it!** This creates a fully functional LXC container with:
-- Automatic OCI image download and conversion
-- Proper UID/GID mapping (1:1 mapping for the specified user)
-- Persistent volumes mounted to the container
-- Network configuration (DHCP or static IP)
-- Automatic startup and service management
 
 ### Why the OCI Image Framework is So Powerful
 
