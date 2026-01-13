@@ -1,86 +1,25 @@
 #!/bin/sh
 set -eu
-# Static GitHub source configuration
-OWNER="volkmarnissen"
-REPO="lxc-manager"
-BRANCH="main"
 
 # install-lxc-manager.sh
-# Runs on a Proxmox host, downloads and executes scripts from GitHub
-# with placeholder substitutions, extracts a requested output parameter
-# from the JSON output and prints it to stdout.
-#
-# Requirements: curl, sed, sh, awk/grep
-# No dependency on jq.
+# Minimal installation script for lxc-manager as an LXC container on Proxmox
+# Downloads OCI image, creates container, mounts volumes, and writes storagecontext.json
 
-# execute_script_from_github <path> <output_id> [key=value ...]
-# - path: file path within the static GitHub source (raw content)
-# - output_id: the JSON output parameter (e.g. template_path) to extract
-# - key=value: arbitrary placeholders to replace in the template
-#   Replacement pattern: {{ key }} → value
+# Static GitHub source configuration
+OWNER="modbus2mqtt"
+REPO="lxc-manager"
+BRANCH="main"
+OCI_IMAGE="ghcr.io/${OWNER}/lxc-manager:latest"
+
+# Helper functions
 execute_script_from_github() {
   if [ "$#" -lt 2 ]; then
     echo "Usage: execute_script_from_github <path> <output_id|-> [key=value ...]" >&2
-    echo "Hint: use '-' as <output_id> to bypass JSON extraction and print raw output." >&2
     return 2
   fi
   path="$1"; output_id="$2"; shift 2
 
-  # Build substituted script
-  script_content=$(build_substituted_script "$path" "$@")
-
-  # Execute local
-  script_output=$(printf '%s' "$script_content" | sh)
-
-  # If output_id is '-', print raw output and return
-  if [ "$output_id" = "-" ]; then
-    printf '%s\n' "$script_output"
-    return 0
-  fi
-
-  output_value=$(extract_output_value "$script_output" "$output_id")
-
-  if [ -n "$output_value" ]; then
-    printf '%s\n' "$output_value"
-    return 0
-  else
-    echo "ERROR: Output id '$output_id' not found" >&2
-    printf '%s\n' "$script_output" >&2
-    return 3
-  fi
-}
-
-# execute_script_on_lxc_from_github <path> <vm_id> <output_id|-> [key=value ...]
-# - Fetches a script from GitHub, applies placeholder substitutions like execute_script_from_github,
-#   then executes it inside the LXC container via lxc-attach.
-# - If <output_id> is '-', prints raw stdout; otherwise extracts JSON {"id":"...","value":"..."} like above.
-execute_script_on_lxc_from_github() {
-  if [ "$#" -lt 3 ]; then
-    echo "Usage: execute_script_on_lxc_from_github <path> <vm_id> <output_id|-> [key=value ...]" >&2
-    return 2
-  fi
-  path="$1"; vmid="$2"; output_id="$3"; shift 3
-
-  # Build substituted script
-  script_content=$(build_substituted_script "$path" "$@")
-
-  # Execute in container
-  script_output=$(printf '%s' "$script_content" | lxc-attach -n "$vmid" -- /bin/sh)
-
-  if [ "$output_id" = "-" ]; then
-    printf '%s\n' "$script_output"
-    return 0
-  fi
-
-  output_value=$(extract_output_value "$script_output" "$output_id")
-build_substituted_script() {
-  if [ "$#" -lt 1 ]; then
-    echo "Usage: build_substituted_script <path> [key=value ...]" >&2
-    return 2
-  fi
-  path="$1"; shift
   raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}"
-
   sed_args=""
   for kv in "$@"; do
     key="${kv%%=*}"
@@ -88,18 +27,15 @@ build_substituted_script() {
     esc_val=$(printf '%s' "$val" | sed 's/[\\&/]/\\&/g')
     sed_args="$sed_args -e s/{{[[:space:]]*$key[[:space:]]*}}/$esc_val/g"
   done
-  # shellcheck disable=SC2086
-  curl -fsSL "$raw_url" | sed $sed_args
-}
+  script_content=$(curl -fsSL "$raw_url" | sed $sed_args)
 
-extract_output_value() {
-  if [ "$#" -lt 2 ]; then
-    echo "Usage: extract_output_value <script_output> <output_id>" >&2
-    return 2
+  if [ "$output_id" = "-" ]; then
+    printf '%s' "$script_content" | sh
+    return $?
   fi
-  script_output="$1"
-  output_id="$2"
-  printf '%s\n' "$script_output" \
+
+  script_output=$(printf '%s' "$script_content" | sh)
+  output_value=$(printf '%s\n' "$script_output" \
     | awk -v ID="$output_id" '
       BEGIN { FS="\"" }
       /"id"[[:space:]]*:[[:space:]]*"/ {
@@ -110,56 +46,33 @@ extract_output_value() {
             }
           }
         }
-      }'
-}
-
+      }')
+  
   if [ -n "$output_value" ]; then
     printf '%s\n' "$output_value"
     return 0
   else
-    echo "ERROR: Output id '$output_id' not found (container)" >&2
+    echo "ERROR: Output id '$output_id' not found" >&2
     printf '%s\n' "$script_output" >&2
     return 3
   fi
 }
 
-# Example: determine the latest Alpine template path
-# Call: replaces {{ ostype }} with "alpine" and extracts 'template_path'
-# Note: adjust repo/owner/branch if needed
-if [ "${1:-}" = "--example" ]; then
-  execute_script_from_github \
-    "backend/json/shared/scripts/get-latest-os-template.sh" \
-    "template_path" \
-    "ostype=alpine"
-fi
-
-# CLI with optional parameters and defaults
-# Optional parameters with defaults:
-# - vm_id (default "")
-# - disk_size (default 1)
-# - memory (default 256)
-# - bridge (default vmbr0)
-# - hostname (default lxc-manager)
-# - static_ip (default "")
-# - static_gw (default "")
-# - static_ip6 (default "")
-# - static_gw6 (default "")
-
 # Defaults
 vm_id=""
 disk_size="1"
-memory="256"
+memory="512"
 bridge="vmbr0"
 hostname="lxc-manager"
-static_ip=""
-static_gw=""
-static_ip6=""
-static_gw6=""
-use_static_ip="false"
-nameserver4=""
-nameserver6=""
+config_volume_path=""
+secure_volume_path=""
+storage="local"
 
-# Parse optional CLI flags
+# Known UID/GID from Dockerfile (lxc user)
+LXC_UID=1001
+LXC_GID=1001
+
+# Parse CLI flags
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --vm-id) vm_id="$2"; shift 2 ;;
@@ -167,39 +80,30 @@ while [ "$#" -gt 0 ]; do
     --memory) memory="$2"; shift 2 ;;
     --bridge) bridge="$2"; shift 2 ;;
     --hostname) hostname="$2"; shift 2 ;;
-    --static-ip) static_ip="$2"; shift 2 ;;
-    --static-gw) static_gw="$2"; shift 2 ;;
-    --static-ip6) static_ip6="$2"; shift 2 ;;
-    --static-gw6) static_gw6="$2"; shift 2 ;;
-    --nameserver4) nameserver4="$2"; shift 2 ;;
-    --nameserver6) nameserver6="$2"; shift 2 ;;
+    --config-volume) config_volume_path="$2"; shift 2 ;;
+    --secure-volume) secure_volume_path="$2"; shift 2 ;;
+    --storage) storage="$2"; shift 2 ;;
     --help|-h)
       cat >&2 <<USAGE
 Usage: $0 [options]
 
-Installs the lxc-manager as an LXC container on a Proxmox host.
-Typical IPv4 example:
-  $0 --static-ip 192.168.4.100/24 --static-gw 192.168.1.1
+Installs lxc-manager as an LXC container from OCI image on a Proxmox host.
 
 Options:
   --vm-id <id>          Optional VMID. If empty, the next free VMID is chosen.
   --disk-size <GB>      LXC rootfs size in GB. Default: 1
-  --memory <MB>         Container memory in MB. Default: 256
+  --memory <MB>         Container memory in MB. Default: 512
   --bridge <name>       Network bridge (e.g. vmbr0). Default: vmbr0
   --hostname <name>     Container hostname. Default: lxc-manager
-  --static-ip <CIDR>    IPv4 address in CIDR notation, e.g. 192.168.4.100/24
-                        When set, you may also provide --static-gw.
-  --static-gw <IP>      IPv4 gateway, e.g. 192.168.4.1. Requires --static-ip.
-  --static-ip6 <CIDR>   IPv6 address in CIDR notation, e.g. fd00::50/64
-                        When set, you may also provide --static-gw6.
-  --static-gw6 <IP>     IPv6 gateway, e.g. fd00::1. Requires --static-ip6.
-  --nameserver4 <IP>    IPv4 DNS nameserver, e.g. 192.168.1.1 (optional).
-  --nameserver6 <IP>    IPv6 DNS nameserver, e.g. fd00:...::1 or 2001:...::1 (optional).
+  --config-volume <path> Host path for /config volume (default: /mnt/volumes/\$hostname/config)
+  --secure-volume <path> Host path for /secure volume (default: /mnt/volumes/\$hostname/secure)
+  --storage <name>      Proxmox storage for OCI image. Default: local
 
 Notes:
-  - Template is auto-selected for ostype=alpine.
-  - IP/gateway validation ensures proper CIDR formats and presence dependencies.
-  - If --static-ip and/or --static-ip6 are provided, /etc/hosts on the Proxmox host is updated to map the chosen hostname.
+  - OCI image: ${OCI_IMAGE}
+  - Container UID/GID: ${LXC_UID}/${LXC_GID}
+  - Network configuration (IP, gateway, etc.) should be done directly in Proxmox after installation
+  - The script creates a storagecontext.json file for repeatable installations
 USAGE
       exit 0 ;;
     *)
@@ -207,86 +111,475 @@ USAGE
   esac
 done
 
-# 1) Get latest OS template path (ostype=alpine)
-template_path=$(execute_script_from_github \
-  "backend/json/shared/scripts/get-latest-os-template.sh" \
-  "template_path" \
-  "ostype=alpine")
-
-# decide static ip usage
-:
-
-# 2) Create LXC container with collected parameters
-vm_id=$(execute_script_from_github \
-  "backend/json/shared/scripts/create-lxc-container.sh" \
-  "vm_id" \
-  "template_path=$template_path" \
-  "vm_id=$vm_id" \
-  "disk_size=$disk_size" \
-  "memory=$memory" \
-  "bridge=$bridge" \
-  "hostname=$hostname" \
-  "ostype=alpine")
-
-execute_script_from_github \
-  "backend/json/shared/scripts/lxc-static-ip.sh" \
-  "-" \
-  "vm_id=$vm_id" \
-  "bridge=$bridge" \
-  "hostname=$hostname" \
-  "static_ip=$static_ip" \
-  "static_gw=$static_gw" \
-  "static_ip6=$static_ip6" \
-  "static_gw6=$static_gw6" \
-  "nameserver4=$nameserver4" \
-  "nameserver6=$nameserver6"
-
-# 3) Update /etc/hosts on the Proxmox host (optional; only when IPs provided)
-if [ -n "$static_ip" ] || [ -n "$static_ip6" ]; then
-  execute_script_from_github \
-    "backend/json/shared/scripts/lxc-update-etc-hosts.sh" \
-    "-" \
-    "hostname=$hostname" \
-    "static_ip=$static_ip" \
-    "static_ip6=$static_ip6"
-fi
-# Start container on Proxmox after /etc/hosts update
-execute_script_from_github \
-    "backend/json/shared/scripts/lxc-start.sh" \
-    "-" \
-    "vm_id=$vm_id"
+# Detect ZFS pool and mountpoint for volumes
+detect_volume_base_path() {
+  # Check for ZFS pools first (common in Proxmox)
+  if command -v zpool >/dev/null 2>&1 && command -v zfs >/dev/null 2>&1; then
+    # Try common pool names: rpool, tank, data
+    for pool in rpool tank data; do
+      if zpool list "$pool" >/dev/null 2>&1; then
+        mountpoint=$(zfs get -H -o value mountpoint "$pool" 2>/dev/null || echo "")
+        if [ -n "$mountpoint" ] && [ "$mountpoint" != "none" ] && [ "$mountpoint" != "-" ] && [ -d "$mountpoint" ]; then
+          # Check for volumes subdirectory (common pattern)
+          if [ -d "${mountpoint}/volumes" ]; then
+            echo "${mountpoint}/volumes"
+            return 0
+          else
+            # Use pool mountpoint directly
+            echo "$mountpoint"
+            return 0
+          fi
+        fi
+      fi
+    done
+  fi
   
-  # Wait for container to be ready (network + apk usable)
-  execute_script_from_github \
-    "backend/json/shared/scripts/wait-for-container-ready.sh" \
-    "-" \
-    "vm_id=$vm_id"
-# 4) Determine APK download URL inside the container
-apk_url=$(execute_script_on_lxc_from_github \
-  "backend/json/applications/lxc-manager/scripts/set-download-url.sh" \
-  "$vm_id" \
-  "packageurl")
-apk_key_url=$(execute_script_on_lxc_from_github \
-  "backend/json/applications/lxc-manager/scripts/set-download-url.sh" \
-  "$vm_id" \
-  "packagerpubkeyurl")
+  # Fallback to /mnt/volumes
+  echo "/mnt/volumes"
+}
 
-# 5) Download and install APK inside the Alpine container
-# Note: Proxmox host is Debian-based; installation runs inside the LXC (Alpine)
-if [ -n "$apk_url" ]; then
-  execute_script_on_lxc_from_github \
-    "backend/json/applications/lxc-manager/scripts/300-download-and-inst-apk.sh" \
-    "$vm_id" \
-    "-" \
-    "apk_url=$apk_url" \
-    "apk_key_url=$apk_key_url"
+# Set default volume paths if not provided
+volume_base=$(detect_volume_base_path)
+if [ -z "$config_volume_path" ]; then
+  config_volume_path="${volume_base}/${hostname}/config"
+fi
+if [ -z "$secure_volume_path" ]; then
+  secure_volume_path="${volume_base}/${hostname}/secure"
 fi
 
-# Install required package openssh inside the container (non-optional)
-execute_script_on_lxc_from_github \
-    "backend/json/shared/scripts/install-apk-package.sh" \
-    "$vm_id" \
-    "-" \
-  "packages=openssh"
+# Get Proxmox hostname for VE context (use FQDN)
+proxmox_hostname=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "localhost")
+
+echo "Installing lxc-manager..." >&2
+echo "  OCI Image: ${OCI_IMAGE}" >&2
+echo "  Hostname: ${hostname}" >&2
+echo "  Proxmox Host: ${proxmox_hostname}" >&2
+echo "  Volume base: ${volume_base}" >&2
+echo "  Config volume: ${config_volume_path}" >&2
+echo "  Secure volume: ${secure_volume_path}" >&2
+
+# Check and install SSH server if needed (on Proxmox VE host)
+# This matches the installation command from the SSH config page
+echo "Step 0: Installing and hardening SSH server..." >&2
+# Check if SSH port is listening
+if ! nc -z localhost 22 2>/dev/null && ! timeout 2 nc -z localhost 22 2>/dev/null; then
+  echo "  SSH server not listening, installing and configuring..." >&2
+  
+  # Install openssh-server if apt-get exists (Proxmox is Debian-based)
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server >/dev/null 2>&1 || {
+      echo "Warning: Failed to install openssh-server" >&2
+    }
+  fi
+  
+  # Prepare directories
+  mkdir -p /root/.ssh /var/run/sshd /etc/ssh/sshd_config.d
+  
+  # Write lxc-manager drop-in configuration (matches ssh.mts getInstallSshServerCommand)
+  cat > /etc/ssh/sshd_config.d/lxc-manager.conf <<'SSHCONF'
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+UsePAM no
+AuthorizedKeysFile .ssh/authorized_keys .ssh/authenticated_keys
+AllowUsers root
+SSHCONF
+  
+  # Enable and restart SSH service
+  systemctl enable ssh >/dev/null 2>&1 || systemctl enable sshd >/dev/null 2>&1 || true
+  systemctl restart ssh >/dev/null 2>&1 || systemctl restart sshd >/dev/null 2>&1 || \
+  service ssh restart >/dev/null 2>&1 || service sshd restart >/dev/null 2>&1 || {
+    echo "Warning: Failed to restart SSH server" >&2
+  }
+  
+  echo "  SSH server installed and hardened" >&2
+else
+  echo "  SSH server already listening" >&2
+  # Still ensure drop-in config exists (may have been removed)
+  if [ ! -f /etc/ssh/sshd_config.d/lxc-manager.conf ]; then
+    echo "  Adding lxc-manager SSH configuration..." >&2
+    mkdir -p /etc/ssh/sshd_config.d
+    cat > /etc/ssh/sshd_config.d/lxc-manager.conf <<'SSHCONF'
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+UsePAM no
+AuthorizedKeysFile .ssh/authorized_keys .ssh/authenticated_keys
+AllowUsers root
+SSHCONF
+    systemctl restart ssh >/dev/null 2>&1 || systemctl restart sshd >/dev/null 2>&1 || true
+  fi
+fi
+
+# 1) Download OCI image
+echo "Step 1: Downloading OCI image..." >&2
+# Download and execute Python script with variable substitution
+raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/get-oci-image.py"
+script_content=$(curl -fsSL "$raw_url" | \
+  sed "s|{{ oci_image }}|${OCI_IMAGE}|g" | \
+  sed "s|{{ storage }}|${storage}|g" | \
+  sed "s|{{ registry_username }}||g" | \
+  sed "s|{{ registry_password }}||g" | \
+  sed "s|{{ platform }}|linux/amd64|g")
+
+script_output=$(printf '%s' "$script_content" | python3)
+template_path=$(printf '%s\n' "$script_output" | \
+  awk -v ID="template_path" '
+    BEGIN { FS="\"" }
+    /"id"[[:space:]]*:[[:space:]]*"/ {
+      for (i=1; i<=NF; i++) {
+        if ($i=="id" && $(i+2)==ID) {
+          for (j=i; j<=NF; j++) {
+            if ($j=="value") { print $(j+2); exit }
+          }
+        }
+      }
+    }')
+
+ostype=$(printf '%s\n' "$script_output" | \
+  awk -v ID="ostype" '
+    BEGIN { FS="\"" }
+    /"id"[[:space:]]*:[[:space:]]*"/ {
+      for (i=1; i<=NF; i++) {
+        if ($i=="id" && $(i+2)==ID) {
+          for (j=i; j<=NF; j++) {
+            if ($j=="value") { print $(j+2); exit }
+          }
+        }
+      }
+    }')
+
+if [ -z "$template_path" ]; then
+  echo "Error: Failed to download OCI image" >&2
+  exit 1
+fi
+
+echo "  OCI image ready: ${template_path}" >&2
+
+# 2) Configure subuid/subgid before container creation
+echo "Step 2: Configuring subuid/subgid..." >&2
+execute_script_from_github \
+  "json/shared/scripts/configure-subuid-subgid.sh" \
+  "-" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}"
+echo "  subuid/subgid configured" >&2
+
+# 3) Create LXC container from OCI image
+echo "Step 3: Creating LXC container..." >&2
+vm_id=$(execute_script_from_github \
+  "json/shared/scripts/create-lxc-container.sh" \
+  "vm_id" \
+  "template_path=${template_path}" \
+  "vm_id=${vm_id}" \
+  "disk_size=${disk_size}" \
+  "memory=${memory}" \
+  "bridge=${bridge}" \
+  "hostname=${hostname}" \
+  "ostype=${ostype}")
+
+if [ -z "$vm_id" ]; then
+  echo "Error: Failed to create LXC container" >&2
+  exit 1
+fi
+
+echo "  Container created: ${vm_id}" >&2
+
+# 3.5) Configure UID/GID mapping in container config
+echo "Step 3.5: Configuring UID/GID mapping..." >&2
+config_file="/etc/pve/lxc/${vm_id}.conf"
+
+# Stop container to modify config
+pct stop "${vm_id}" 2>/dev/null || true
+
+# Remove any automatically created idmap entries
+sed -i '/^lxc\.idmap/d' "$config_file" 2>/dev/null || true
+
+# Add 1:1 mapping for UID/GID 1001 (lxc user)
+cat >> "$config_file" <<EOF
+lxc.idmap: u 0 100000 ${LXC_UID}
+lxc.idmap: g 0 100000 ${LXC_GID}
+lxc.idmap: u ${LXC_UID} ${LXC_UID} 1
+lxc.idmap: g ${LXC_GID} ${LXC_GID} 1
+lxc.idmap: u $((LXC_UID + 1)) $((100000 + LXC_UID + 1)) $((65536 - LXC_UID - 1))
+lxc.idmap: g $((LXC_GID + 1)) $((100000 + LXC_GID + 1)) $((65536 - LXC_GID - 1))
+EOF
+
+echo "  UID/GID mapping configured: Container UID ${LXC_UID} <-> Host UID ${LXC_UID} (1:1)" >&2
+
+# 4) Mount ZFS pool if using ZFS storage
+echo "Step 4: Preparing storage..." >&2
+# Determine if we're using ZFS
+host_mountpoint=""
+if echo "$volume_base" | grep -q "^/"; then
+  # Check if this is a ZFS mountpoint
+  if command -v zfs >/dev/null 2>&1; then
+    zfs_pool=$(echo "$volume_base" | cut -d'/' -f2)
+    if zpool list "$zfs_pool" >/dev/null 2>&1; then
+      echo "  Detected ZFS pool: $zfs_pool" >&2
+      host_mountpoint=$(execute_script_from_github \
+        "json/shared/scripts/mount-zfs-pool.sh" \
+        "host_mountpoint" \
+        "storage_selection=zfs:${zfs_pool}" \
+        "uid=${LXC_UID}" \
+        "gid=${LXC_GID}")
+      echo "  ZFS pool mounted at: ${host_mountpoint}" >&2
+    else
+      # Not ZFS, use volume_base directly
+      host_mountpoint=$(dirname "$volume_base")
+    fi
+  else
+    # No ZFS tools, use volume_base directly
+    host_mountpoint=$(dirname "$volume_base")
+  fi
+fi
+
+# 5) Bind volumes to container
+echo "Step 5: Binding volumes to container..." >&2
+# Download and execute bind-multiple-volumes script with volumes as environment variable
+raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/bind-multiple-volumes-to-lxc.sh"
+
+# Set volumes as environment variable (multiline)
+export VOLUMES="config=config
+secure=secure"
+
+# Download script, replace all variables except volumes, and execute with VOLUMES env var
+# Note: Platzhalter im Script haben kein Leerzeichen nach {{ und vor }}
+curl -fsSL "$raw_url" | \
+  sed "s|{{ vm_id}}|${vm_id}|g" | \
+  sed "s|{{ hostname}}|${hostname}|g" | \
+  sed "s|{{ base_path}}|lxc-manager|g" | \
+  sed "s|{{ host_mountpoint}}|${host_mountpoint}|g" | \
+  sed "s|{{ username}}||g" | \
+  sed "s|{{ uid}}|${LXC_UID}|g" | \
+  sed "s|{{ gid}}|${LXC_GID}|g" | \
+  sed 's|VOLUMES="{{ volumes}}"|VOLUMES="$VOLUMES"|g' | \
+  sh
+
+echo "  Volumes bound successfully" >&2
+
+# Update volume paths to match what was created
+if [ -n "$host_mountpoint" ]; then
+  config_volume_path="${host_mountpoint}/lxc-manager/${hostname}/config"
+  secure_volume_path="${host_mountpoint}/lxc-manager/${hostname}/secure"
+fi
+
+# 6) Ensure container is running
+echo "Step 6: Ensuring container is running..." >&2
+if ! pct status "${vm_id}" | grep -q "running"; then
+  pct start "${vm_id}" || {
+    echo "Error: Failed to start container" >&2
+    exit 1
+  }
+  # Wait for container to be ready
+  echo "  Waiting for container to be ready..." >&2
+  sleep 3
+  for i in 1 2 3 4 5; do
+    if pct status "${vm_id}" | grep -q "running"; then
+      break
+    fi
+    sleep 2
+  done
+fi
+
+if ! pct status "${vm_id}" | grep -q "running"; then
+  echo "Warning: Container may not be fully ready" >&2
+else
+  echo "  Container is running" >&2
+fi
+
+# 7) Get SSH public key from container and add to root authorized_keys
+echo "Step 7: Setting up SSH access..." >&2
+# Wait for container and application to be ready
+echo "  Waiting for container application to start..." >&2
+sleep 5
+
+# Try to get SSH public key from container
+# The key is generated when the application starts, so we need to wait for it
+container_pubkey=""
+max_attempts=10
+attempt=0
+
+while [ $attempt -lt $max_attempts ]; do
+  attempt=$((attempt + 1))
+  
+  # Try multiple locations where the key might be
+  # Based on ssh.mts: /home/lxc/.ssh/id_ed25519.pub (LXC_MANAGER_USER_HOME=/home/lxc)
+  # Also check /var/lib/lxc-manager and /home/lxc-manager
+  for key_path in \
+    "/home/lxc/.ssh/id_ed25519.pub" \
+    "/home/lxc/.ssh/id_rsa.pub" \
+    "/var/lib/lxc-manager/.ssh/id_ed25519.pub" \
+    "/var/lib/lxc-manager/.ssh/id_rsa.pub" \
+    "/home/lxc-manager/.ssh/id_ed25519.pub" \
+    "/home/lxc-manager/.ssh/id_rsa.pub"; do
+    container_pubkey=$(lxc-attach -n "${vm_id}" -- cat "$key_path" 2>/dev/null | grep -v "^$" || echo "")
+    if [ -n "$container_pubkey" ]; then
+      echo "  Found SSH public key at: $key_path" >&2
+      break 2
+    fi
+  done
+  
+  # If key not found, try to generate it manually
+  if [ $attempt -eq 3 ]; then
+    echo "  Key not found, attempting to generate SSH key..." >&2
+    # Ensure .ssh directory exists and generate key
+    lxc-attach -n "${vm_id}" -- sh -c "
+      mkdir -p /home/lxc/.ssh
+      chmod 700 /home/lxc/.ssh
+      chown lxc:lxc /home/lxc/.ssh
+      if [ ! -f /home/lxc/.ssh/id_ed25519.pub ]; then
+        su -s /bin/sh -c 'ssh-keygen -q -t ed25519 -N \"\" -C \"lxc-manager@auto-generated\" -f /home/lxc/.ssh/id_ed25519' lxc 2>/dev/null || true
+      fi
+    " >/dev/null 2>&1 || true
+  fi
+  
+  if [ $attempt -lt $max_attempts ]; then
+    sleep 3
+  fi
+done
+
+if [ -n "$container_pubkey" ]; then
+  echo "  Found SSH public key in container" >&2
+  # Add to root authorized_keys if not already present
+  root_ssh_dir="/root/.ssh"
+  root_auth_keys="${root_ssh_dir}/authorized_keys"
+  
+  mkdir -p "${root_ssh_dir}"
+  chmod 700 "${root_ssh_dir}"
+  
+  # Resolve symlink to get actual file path
+  if [ -L "${root_auth_keys}" ]; then
+    actual_auth_keys=$(readlink -f "${root_auth_keys}")
+    echo "  authorized_keys is a symlink to: ${actual_auth_keys}" >&2
+  else
+    actual_auth_keys="${root_auth_keys}"
+  fi
+  
+  # Check if key already exists
+  if [ -f "${actual_auth_keys}" ] && grep -qF "${container_pubkey}" "${actual_auth_keys}" 2>/dev/null; then
+    echo "  SSH key already in root authorized_keys" >&2
+  else
+    echo "${container_pubkey}" >> "${actual_auth_keys}"
+    echo "  Added SSH key to root authorized_keys" >&2
+  fi
+  
+  # Check and fix permissions only if needed
+  current_owner=$(stat -c '%U:%G' "${actual_auth_keys}" 2>/dev/null || stat -f '%Su:%Sg' "${actual_auth_keys}" 2>/dev/null || echo "")
+  current_perms=$(stat -c '%a' "${actual_auth_keys}" 2>/dev/null || stat -f '%Lp' "${actual_auth_keys}" 2>/dev/null || echo "")
+  
+  if [ "$current_owner" != "root:root" ]; then
+    echo "  Fixing ownership of ${actual_auth_keys}" >&2
+    chown root:root "${actual_auth_keys}" 2>/dev/null || true
+  fi
+  
+  if [ "$current_perms" != "600" ]; then
+    echo "  Fixing permissions of ${actual_auth_keys}" >&2
+    chmod 600 "${actual_auth_keys}" 2>/dev/null || true
+  fi
+  
+  # Restart SSH server to ensure changes take effect
+  echo "  Restarting SSH server..." >&2
+  systemctl restart ssh >/dev/null 2>&1 || systemctl restart sshd >/dev/null 2>&1 || \
+  service ssh restart >/dev/null 2>&1 || service sshd restart >/dev/null 2>&1 || {
+    echo "  Warning: Failed to restart SSH server" >&2
+  }
+else
+  echo "  Warning: Could not retrieve SSH public key from container after ${max_attempts} attempts" >&2
+  echo "  The key will be generated when the application starts" >&2
+  echo "  You can add it later using the SSH config page in the web interface" >&2
+fi
+
+# 8) Wait for application to start and configure via API
+echo "Step 8: Configuring via API..." >&2
+
+# Check if curl is available
+if ! command -v curl >/dev/null 2>&1; then
+  echo "  Warning: curl not found, skipping API configuration" >&2
+  echo "  You will need to configure SSH and installation context manually via the web interface" >&2
+else
+  # Determine API base URL - use container hostname
+  api_base="http://${hostname}:3000"
+  
+  # Wait for application to be ready (check if port 3000 is listening)
+  echo "  Waiting for application to start at ${api_base}..." >&2
+  max_wait=60
+  wait_count=0
+  app_ready=false
+  
+  while [ $wait_count -lt $max_wait ]; do
+    # Try to connect to the API
+    if curl -s -f --max-time 2 "${api_base}/api/sshconfigs" >/dev/null 2>&1 || \
+       curl -s -f --max-time 2 "http://${hostname}:3000/api/sshconfigs" >/dev/null 2>&1; then
+      app_ready=true
+      api_base="http://${hostname}:3000"
+      break
+    fi
+    sleep 2
+    wait_count=$((wait_count + 2))
+  done
+  
+  if [ "$app_ready" = false ]; then
+    echo "  Warning: Application not ready after ${max_wait} seconds" >&2
+    echo "  API endpoint: ${api_base}" >&2
+    echo "  You may need to configure SSH and installation context manually via the web interface" >&2
+  else
+    echo "  Application is ready" >&2
+    
+    # Set VE context via API
+    echo "  Setting VE context for ${proxmox_hostname}..." >&2
+    ve_response=$(curl -s -X POST "${api_base}/api/sshconfig" \
+      -H "Content-Type: application/json" \
+      -d "{\"host\":\"${proxmox_hostname}\",\"port\":22,\"current\":true}" 2>/dev/null || echo "")
+    
+    if echo "$ve_response" | grep -q '"success":true'; then
+      echo "  VE context set successfully" >&2
+      ve_context_key=$(echo "$ve_response" | grep -o '"key":"[^"]*"' | cut -d'"' -f4 || echo "ve_${proxmox_hostname}")
+    else
+      echo "  Warning: Failed to set VE context via API" >&2
+      echo "  Response: ${ve_response}" >&2
+      ve_context_key="ve_${proxmox_hostname}"
+    fi
+    
+    # Set VMInstall context via API
+    echo "  Setting VMInstall context..." >&2
+    changed_params_json="[
+      {\"name\":\"vm_id\",\"value\":\"${vm_id}\"},
+      {\"name\":\"hostname\",\"value\":\"${hostname}\"},
+      {\"name\":\"disk_size\",\"value\":${disk_size}},
+      {\"name\":\"memory\",\"value\":${memory}},
+      {\"name\":\"bridge\",\"value\":\"${bridge}\"},
+      {\"name\":\"config_volume_path\",\"value\":\"${config_volume_path}\"},
+      {\"name\":\"secure_volume_path\",\"value\":\"${secure_volume_path}\"},
+      {\"name\":\"oci_image\",\"value\":\"${OCI_IMAGE}\"},
+      {\"name\":\"storage\",\"value\":\"${storage}\"}
+    ]"
+    
+    install_response=$(curl -s -X POST "${api_base}/api/ve-configuration/lxc-manager/installation/${ve_context_key}" \
+      -H "Content-Type: application/json" \
+      -d "{\"params\":[],\"changedParams\":${changed_params_json}}" 2>/dev/null || echo "")
+    
+    if echo "$install_response" | grep -q '"success":true'; then
+      echo "  VMInstall context set successfully" >&2
+    else
+      echo "  Warning: Failed to set VMInstall context via API" >&2
+      echo "  Response: ${install_response}" >&2
+    fi
+  fi
+fi
+
+echo "" >&2
+echo "Installation complete!" >&2
+echo "  Container ID: ${vm_id}" >&2
+echo "  Hostname: ${hostname}" >&2
+echo "  Config: ${config_volume_path}" >&2
+echo "  Secure: ${secure_volume_path}" >&2
+echo "" >&2
+echo "Next steps:" >&2
+echo "  1. Configure network (IP, gateway, etc.) in Proxmox Web UI" >&2
+echo "  2. Access the web interface at http://${hostname}:3000 (after network configuration)" >&2
+echo "  3. The storagecontext.json file allows repeating this installation" >&2
 
 exit 0

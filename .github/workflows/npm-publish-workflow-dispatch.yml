@@ -84,6 +84,8 @@ jobs:
 
       - name: Build and push Docker image from npm pack
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
         with:
           context: .
           file: docker/Dockerfile.npm-pack
@@ -97,6 +99,13 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_DATE=${{ github.run_started_at }}
             BUILD_REPOSITORY=${{ github.repository }}
+
+      - name: Container Registry Link
+        run: |
+          echo "::notice title=Docker Image::Docker image available at: https://github.com/${{ github.repository }}/pkgs/container/lxc-manager"
+          echo "Image tags:"
+          echo "  - ${{ env.REGISTRY }}/${{ github.repository_owner }}/lxc-manager:${{ steps.pack.outputs.version }}"
+          echo "  - ${{ env.REGISTRY }}/${{ github.repository_owner }}/lxc-manager:latest"
 
       - name: Create GitHub Release (for major/minor releases)
         if: steps.set-version.outputs.isRelease == 'true'

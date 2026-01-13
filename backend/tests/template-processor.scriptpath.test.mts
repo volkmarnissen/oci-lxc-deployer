@@ -19,24 +19,29 @@ describe("ProxmoxConfiguration script path resolution", () => {
   beforeAll(async () => {
     helper = new ProxmoxTestHelper();
     await helper.setup();
-    // IMPORTANT: StorageContext now only uses dynamic localPath. Ensure we write into local/applications.
+    
+    // Create application structure in localDir first (before any watchers start)
     appDir = path.join(helper.localDir, "applications", appName);
     scriptsDir = path.join(appDir, "scripts");
     appJsonPath = path.join(appDir, "application.json");
     templateDir = path.join(appDir, "templates");
     templatePath = path.join(templateDir, "install.json");
     scriptPath = path.join(scriptsDir, scriptName);
-    fs.mkdirSync(scriptsDir, { recursive: true });
-    fs.mkdirSync(templateDir, { recursive: true });
-    fs.writeFileSync(scriptPath, scriptContent);
-    fs.writeFileSync(
+    
+    // Create all directories at once to avoid race conditions with file watchers
+    await fs.promises.mkdir(scriptsDir, { recursive: true });
+    await fs.promises.mkdir(templateDir, { recursive: true });
+    
+    // Write all files after directories are created
+    await fs.promises.writeFile(scriptPath, scriptContent);
+    await fs.promises.writeFile(
       appJsonPath,
       JSON.stringify({
         name: appName,
         installation: ["install.json", "010-get-latest-os-template.json"],
       }),
     );
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       templatePath,
       JSON.stringify({
         execute_on: "ve",
