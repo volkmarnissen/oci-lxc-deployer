@@ -69,8 +69,8 @@ secure_volume_path=""
 storage="local"
 
 # Known UID/GID from Dockerfile (lxc user)
-LXC_UID=1000
-LXC_GID=1000
+LXC_UID=1001
+LXC_GID=1001
 
 # Parse CLI flags
 while [ "$#" -gt 0 ]; do
@@ -95,8 +95,8 @@ Options:
   --memory <MB>         Container memory in MB. Default: 512
   --bridge <name>       Network bridge (e.g. vmbr0). Default: vmbr0
   --hostname <name>     Container hostname. Default: lxc-manager
-  --config-volume <path> Host path for /config volume (default: /mnt/volumes/lxc-manager/\$hostname/config)
-  --secure-volume <path> Host path for /secure volume (default: /mnt/volumes/lxc-manager/\$hostname/secure)
+  --config-volume <path> Host path for /config volume (default: /mnt/volumes/\$hostname/config)
+  --secure-volume <path> Host path for /secure volume (default: /mnt/volumes/\$hostname/secure)
   --storage <name>      Proxmox storage for OCI image. Default: local
 
 Notes:
@@ -141,10 +141,10 @@ detect_volume_base_path() {
 # Set default volume paths if not provided
 volume_base=$(detect_volume_base_path)
 if [ -z "$config_volume_path" ]; then
-  config_volume_path="${volume_base}/lxc-manager/${hostname}/config"
+  config_volume_path="${volume_base}/${hostname}/config"
 fi
 if [ -z "$secure_volume_path" ]; then
-  secure_volume_path="${volume_base}/lxc-manager/${hostname}/secure"
+  secure_volume_path="${volume_base}/${hostname}/secure"
 fi
 
 # Get Proxmox hostname for VE context (use FQDN)
@@ -297,7 +297,7 @@ pct stop "${vm_id}" 2>/dev/null || true
 # Remove any automatically created idmap entries
 sed -i '/^lxc\.idmap/d' "$config_file" 2>/dev/null || true
 
-# Add 1:1 mapping for UID/GID 1000 (lxc user)
+# Add 1:1 mapping for UID/GID 1001 (lxc user)
 cat >> "$config_file" <<EOF
 lxc.idmap: u 0 100000 ${LXC_UID}
 lxc.idmap: g 0 100000 ${LXC_GID}

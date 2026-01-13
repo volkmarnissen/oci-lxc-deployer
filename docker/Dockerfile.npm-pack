@@ -23,7 +23,7 @@ COPY ${NPM_TARBALL} /tmp/app.tgz
 RUN set -eux; \
     npm install -g /tmp/app.tgz --omit=dev; \
     rm /tmp/app.tgz; \
-    addgroup -S -g 1000 lxc && adduser -S -u 1000 -G lxc lxc; \
+    addgroup -S -g 1001 lxc && adduser -S -u 1001 -G lxc lxc; \
     mkdir -p /home/lxc && chown -R lxc:lxc /home/lxc; \
     npm cache clean --force
 
