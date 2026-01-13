@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { DocumentationGenerator } from "@src/documentation-generator.mjs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import fs from "node:fs";
+import fs from "fs-extra";
 import path from "node:path";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import os from "node:os";
 
 describe("DocumentationGenerator", () => {
@@ -14,43 +14,37 @@ describe("DocumentationGenerator", () => {
   let htmlPath: string;
   let secretFilePath: string;
 
-  beforeAll(() => {
-    // Use project root paths (StorageContext uses hardcoded paths from import.meta.url)
-    const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-    jsonPath = path.join(projectRoot, "json");
-    localPath = path.join(projectRoot, "local", "json");
-    schemaPath = path.join(projectRoot, "schemas");
-    
-    // Create temporary directory for html output
+  beforeAll(async () => {
+    // Create temporary directory for test
     testDir = mkdtempSync(path.join(os.tmpdir(), "doc-gen-test-"));
+    
+    // Copy json directory to avoid modifying the original
+    const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+    const originalJsonPath = path.join(projectRoot, "json");
+    jsonPath = path.join(testDir, "json");
+    await fs.copy(originalJsonPath, jsonPath);
+    
+    // Copy schemas directory
+    const originalSchemaPath = path.join(projectRoot, "schemas");
+    schemaPath = path.join(testDir, "schemas");
+    await fs.copy(originalSchemaPath, schemaPath);
+    
+    localPath = path.join(testDir, "local", "json");
     htmlPath = path.join(testDir, "html");
     secretFilePath = path.join(testDir, "secret.txt");
 
-    // Create directory structure in project json directory
+    // Create directory structure in copied json directory
     const testAppPath = path.join(jsonPath, "applications", "test-app");
-    fs.mkdirSync(path.join(testAppPath, "templates"), { recursive: true });
-    fs.mkdirSync(path.join(testAppPath, "scripts"), { recursive: true });
+    await fs.ensureDir(path.join(testAppPath, "templates"));
+    await fs.ensureDir(path.join(testAppPath, "scripts"));
     
-    // Create StorageContext with project paths
+    // Create StorageContext with test paths
+    await fs.ensureDir(localPath);
     const storageContextPath = path.join(localPath, "storagecontext.json");
-    if (!fs.existsSync(path.dirname(storageContextPath))) {
-      fs.mkdirSync(path.dirname(storageContextPath), { recursive: true });
-    }
-    if (!fs.existsSync(storageContextPath)) {
-      writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
-    }
-    if (!fs.existsSync(secretFilePath)) {
-      writeFileSync(secretFilePath, "", "utf-8");
-    }
-    // Close existing instance if any
-    try {
-      PersistenceManager.getInstance().close();
-    } catch {
-      // Ignore if not initialized
-    }
-    PersistenceManager.initialize(localPath, storageContextPath, secretFilePath);
+    await fs.writeFile(storageContextPath, JSON.stringify({}), "utf-8");
+    await fs.writeFile(secretFilePath, "", "utf-8");
 
-    // Create test application.json
+    // Create test application.json FIRST, before initializing PersistenceManager
     const appJson = {
       name: "Test Application",
       description: "A test application for documentation generation",
@@ -60,7 +54,7 @@ describe("DocumentationGenerator", () => {
         "shared-template.json",
       ],
     };
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "applications", "test-app", "application.json"),
       JSON.stringify(appJson, null, 2),
       "utf-8",
@@ -97,7 +91,7 @@ describe("DocumentationGenerator", () => {
         },
       ],
     };
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "applications", "test-app", "templates", "set-parameters.json"),
       JSON.stringify(setParamsTemplate, null, 2),
       "utf-8",
@@ -127,7 +121,7 @@ describe("DocumentationGenerator", () => {
         },
       ],
     };
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "applications", "test-app", "templates", "test-template.json"),
       JSON.stringify(testTemplate, null, 2),
       "utf-8",
@@ -149,7 +143,7 @@ describe("DocumentationGenerator", () => {
 exec >&2
 echo "Test script executed"
 `;
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "applications", "test-app", "scripts", "test-script.sh"),
       testScript,
       "utf-8",
@@ -167,7 +161,7 @@ echo "Test script executed"
         },
       ],
     };
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "shared", "templates", "shared-template.json"),
       JSON.stringify(sharedTemplate, null, 2),
       "utf-8",
@@ -179,7 +173,7 @@ echo "Test script executed"
 exec >&2
 echo "Shared script"
 `;
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "shared", "scripts", "shared-script.sh"),
       sharedScript,
       "utf-8",
@@ -195,41 +189,54 @@ echo "Shared script"
         },
       ],
     };
-    writeFileSync(
+    await fs.writeFile(
       path.join(jsonPath, "applications", "test-app", "templates", "referencing-template.json"),
       JSON.stringify(referencingTemplate, null, 2),
       "utf-8",
     );
+
+    // Now initialize PersistenceManager AFTER all apps are created
+    // Close existing instance if any
+    try {
+      PersistenceManager.getInstance().close();
+    } catch {
+      // Ignore if not initialized
+    }
+    PersistenceManager.initialize(localPath, storageContextPath, secretFilePath, false, jsonPath, schemaPath);
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     try {
-      // Cleanup test application and html output
-      const testAppPath = path.join(jsonPath, "applications", "test-app");
-      if (fs.existsSync(testAppPath)) {
-        rmSync(testAppPath, { recursive: true, force: true });
+      // Cleanup entire test directory (includes copied json and all test data)
+      if (await fs.pathExists(testDir)) {
+        await fs.remove(testDir);
       }
-      const otherAppPath = path.join(jsonPath, "applications", "other-app");
-      if (fs.existsSync(otherAppPath)) {
-        rmSync(otherAppPath, { recursive: true, force: true });
-      }
-      if (fs.existsSync(testDir)) {
-        rmSync(testDir, { recursive: true, force: true });
-      }
-    } catch (e: any) {
+    } catch {
       // Ignore cleanup errors
     }
   });
 
   describe("Application Documentation Generation", () => {
+    beforeEach(async () => {
+      // Ensure PersistenceManager is initialized with test paths before each test
+      // Other tests might have reinitialized it
+      try {
+        PersistenceManager.getInstance().close();
+      } catch {
+        // Ignore if not initialized
+      }
+      const storageContextPath = path.join(localPath, "storagecontext.json");
+      PersistenceManager.initialize(localPath, storageContextPath, secretFilePath, false, jsonPath, schemaPath);
+    });
+
     it("should generate application.md with correct structure", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
 
       const appMdPath = path.join(htmlPath, "test-app.md");
-      expect(fs.existsSync(appMdPath)).toBe(true);
+      expect(await fs.pathExists(appMdPath)).toBe(true);
 
-      const content = fs.readFileSync(appMdPath, "utf-8");
+      const content = await fs.readFile(appMdPath, "utf-8");
 
       // Check title
       expect(content).toContain("# Test Application");
@@ -261,7 +268,7 @@ echo "Shared script"
       await generator.generateDocumentation("test-app");
 
       const appMdPath = path.join(htmlPath, "test-app.md");
-      const content = fs.readFileSync(appMdPath, "utf-8");
+      const content = await fs.readFile(appMdPath, "utf-8");
 
       // Check parameter table headers
       expect(content).toContain("| Parameter | Type | Required | Default | Description |");
@@ -276,14 +283,25 @@ echo "Shared script"
   });
 
   describe("Template Documentation Generation", () => {
+    beforeEach(async () => {
+      // Ensure PersistenceManager is initialized with test paths before each test
+      try {
+        PersistenceManager.getInstance().close();
+      } catch {
+        // Ignore if not initialized
+      }
+      const storageContextPath = path.join(localPath, "storagecontext.json");
+      PersistenceManager.initialize(localPath, storageContextPath, secretFilePath, false, jsonPath, schemaPath);
+    });
+
     it("should generate template.md with correct structure", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
 
       const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
-      expect(fs.existsSync(templateMdPath)).toBe(true);
+      expect(await fs.pathExists(templateMdPath)).toBe(true);
 
-      const content = fs.readFileSync(templateMdPath, "utf-8");
+      const content = await fs.readFile(templateMdPath, "utf-8");
 
       // Check title
       expect(content).toContain("# Test Template");
@@ -319,7 +337,7 @@ echo "Shared script"
       await generator.generateDocumentation("test-app");
 
       const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
-      const content = fs.readFileSync(templateMdPath, "utf-8");
+      const content = await fs.readFile(templateMdPath, "utf-8");
 
       // Check that capabilities from script header are extracted
       expect(content).toContain("Validates input parameters");
@@ -333,7 +351,7 @@ echo "Shared script"
       await generator.generateDocumentation("test-app");
 
       const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
-      const content = fs.readFileSync(templateMdPath, "utf-8");
+      const content = await fs.readFile(templateMdPath, "utf-8");
 
       // Check parameter table
       expect(content).toContain("| Parameter | Type | Required | Default | Description |");
@@ -346,7 +364,7 @@ echo "Shared script"
       await generator.generateDocumentation("test-app");
 
       const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
-      const content = fs.readFileSync(templateMdPath, "utf-8");
+      const content = await fs.readFile(templateMdPath, "utf-8");
 
       // Check outputs table
       expect(content).toContain("| Output ID | Default | Description |");
@@ -360,7 +378,7 @@ echo "Shared script"
       await generator.generateDocumentation("test-app");
 
       const setParamsMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "set-parameters.md");
-      const content = fs.readFileSync(setParamsMdPath, "utf-8");
+      const content = await fs.readFile(setParamsMdPath, "utf-8");
 
       // Check that it shows Properties section instead of Commands
       expect(content).toContain("## Properties");
@@ -373,15 +391,26 @@ echo "Shared script"
   });
 
   describe("Used By Applications List", () => {
+    beforeEach(async () => {
+      // Ensure PersistenceManager is initialized with test paths before each test
+      try {
+        PersistenceManager.getInstance().close();
+      } catch {
+        // Ignore if not initialized
+      }
+      const storageContextPath = path.join(localPath, "storagecontext.json");
+      PersistenceManager.initialize(localPath, storageContextPath, secretFilePath, false, jsonPath, schemaPath);
+    });
+
     it("should include applications that use the template (not skipped)", async () => {
       // Create another application that uses the shared template
-      fs.mkdirSync(path.join(jsonPath, "applications", "other-app", "templates"), { recursive: true });
+      await fs.ensureDir(path.join(jsonPath, "applications", "other-app", "templates"));
       const otherAppJson = {
         name: "Other Application",
         description: "Another test application",
         installation: ["set-parameters.json", "shared-template.json"],
       };
-      writeFileSync(
+      await fs.writeFile(
         path.join(jsonPath, "applications", "other-app", "application.json"),
         JSON.stringify(otherAppJson, null, 2),
         "utf-8",
@@ -398,21 +427,13 @@ echo "Shared script"
           },
         ],
       };
-      writeFileSync(
+      await fs.writeFile(
         path.join(jsonPath, "applications", "other-app", "templates", "set-parameters.json"),
         JSON.stringify(otherAppSetParams, null, 2),
         "utf-8",
       );
 
-      // Invalidate cache to ensure new application is found
-      const contextManager = PersistenceManager.getInstance().getContextManager();
-      // Invalidate via PersistenceManager
-      try {
-        const pm = PersistenceManager.getInstance();
-        pm.getPersistence().invalidateCache();
-      } catch {
-        // Ignore if PersistenceManager is not available
-      }
+      // Cache is disabled, no need to invalidate
 
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("other-app");
@@ -422,8 +443,8 @@ echo "Shared script"
       // Wait a bit for async operations
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (fs.existsSync(sharedTemplateMdPath)) {
-        const content = fs.readFileSync(sharedTemplateMdPath, "utf-8");
+      if (await fs.pathExists(sharedTemplateMdPath)) {
+        const content = await fs.readFile(sharedTemplateMdPath, "utf-8");
 
         // Check Used By Applications section
         if (content.includes("## Used By Applications")) {
@@ -436,9 +457,9 @@ echo "Shared script"
 
     it("should not include applications that skip the template", async () => {
       // Ensure test-app still exists (it might have been cleaned up)
-      if (!fs.existsSync(path.join(jsonPath, "applications", "test-app", "application.json"))) {
+      if (!(await fs.pathExists(path.join(jsonPath, "applications", "test-app", "application.json")))) {
         // Recreate test-app if it was cleaned up
-        fs.mkdirSync(path.join(jsonPath, "applications", "test-app", "templates"), { recursive: true });
+        await fs.ensureDir(path.join(jsonPath, "applications", "test-app", "templates"));
         const appJson = {
           name: "Test Application",
           description: "A test application for documentation generation",
@@ -448,7 +469,7 @@ echo "Shared script"
             "shared-template.json",
           ],
         };
-        writeFileSync(
+        await fs.writeFile(
           path.join(jsonPath, "applications", "test-app", "application.json"),
           JSON.stringify(appJson, null, 2),
           "utf-8",
@@ -464,8 +485,8 @@ echo "Shared script"
       const sharedTemplateMdPath = path.join(htmlPath, "json", "shared", "templates", "shared-template.md");
       
       // If the file exists, check that test-app is not in the list if it skips
-      if (fs.existsSync(sharedTemplateMdPath)) {
-        const content = fs.readFileSync(sharedTemplateMdPath, "utf-8");
+      if (await fs.pathExists(sharedTemplateMdPath)) {
+        const content = await fs.readFile(sharedTemplateMdPath, "utf-8");
         
         // If test-app skips shared-template, it should not appear in Used By Applications
         // This test verifies the skip logic works

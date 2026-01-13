@@ -21,7 +21,9 @@ export class VeConfigurationService {
   private veContextKey?: string;
   // Explicit initializer: call early (e.g., AppComponent.ngOnInit or APP_INITIALIZER)
   initVeContext(): Observable<ISsh[]> {
-    return this.getSshConfigs();
+    return this.getSshConfigs().pipe(
+      map((res: ISshConfigsResponse) => res.sshs)
+    );
   }
 
   private static _router: Router;
@@ -92,10 +94,9 @@ export class VeConfigurationService {
     return this.http.get<IUnresolvedParametersResponse>(url);
   }
 
-  getSshConfigs(): Observable<ISsh[]> {
+  getSshConfigs(): Observable<ISshConfigsResponse> {
     return this.get<ISshConfigsResponse>(ApiUri.SshConfigs).pipe(
-      tap((res) => this.setVeContextKeyFrom(res)),
-      map((res: ISshConfigsResponse) => res.sshs)
+      tap((res) => this.setVeContextKeyFrom(res))
     );
   }
 

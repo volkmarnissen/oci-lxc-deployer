@@ -16,19 +16,33 @@
     "e2e:headed": "playwright test --headed",
     "e2e:debug": "PWDEBUG=1 playwright test --headed",
     "lint:lang": "node scripts/check-language.js",
-    "prettier": "npm run prettier --prefix backend && npm run prettier --prefix frontend"
+    "prettier": "npm run prettier --prefix backend && npm run prettier --prefix frontend",
+    "sync-dependencies": "node scripts/sync-dependencies.mjs",
+    "sync-dependencies:lock": "node scripts/sync-dependencies.mjs --update-lock",
+    "prepack": "npm run sync-dependencies"
   },
   "bin": {
-    "lxc-manager-web": "bin/webapp"
+    "lxc-manager": "backend/dist/lxc-manager.mjs"
   },
   "files": [
     "backend/dist",
     "frontend/dist",
-    "backend/json",
-    "bin"
+    "json",
+    "schemas",
+    "examples"
   ],
   "lxcManager": {
     "frontendDir": "frontend/dist/webapp-angular/browser"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-errors": "^3.0.0",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "json-source-map": "^0.6.1",
+    "jsonschema": "^1.5.0",
+    "path": "^0.12.7",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2"

@@ -30,3 +30,4 @@ alpine/repo/
 test-results/
 **/secret.txt
 **/storagecontext.json
+docker/lxc-manager.tgz

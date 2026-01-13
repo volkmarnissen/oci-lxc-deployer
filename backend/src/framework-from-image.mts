@@ -1,4 +1,4 @@
-import { IApplicationDefaults } from "./types.mjs";
+import { IApplicationDefaults, IFramework } from "./types.mjs";
 import { IVEContext } from "./backend-types.mjs";
 import { IOciImageAnnotations } from "./types.mjs";
 import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
@@ -164,9 +164,36 @@ export class FrameworkFromImage {
    * 
    * @param image OCI image name (e.g., "mariadb", "ghcr.io/home-assistant/home-assistant")
    * @param annotations Extracted annotations from image
-   * @param baseApplicationId Base application ID to extend (default: "oci-image")
+   * @param baseApplicationId Base application ID to extend (default: "npm-nodejs")
    * @returns Pre-filled Framework object
    */
+  static buildFrameworkFromAnnotations(
+    image: string,
+    annotations: IOciImageAnnotations,
+    baseApplicationId: string = "npm-nodejs",
+  ): IFramework {
+    // Extract image name for framework name
+    const imageName = image.split("/").pop()?.split(":")[0] || image;
+    const frameworkName = imageName
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+    
+    const framework: IFramework = {
+      id: frameworkName.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+      name: frameworkName,
+      extends: baseApplicationId,
+      properties: [],
+      ...(annotations.description && { description: annotations.description }),
+      ...(annotations.url && { url: annotations.url }),
+      ...(annotations.documentation && { documentation: annotations.documentation }),
+      ...(annotations.source && { source: annotations.source }),
+      ...(annotations.vendor && { vendor: annotations.vendor }),
+    };
+    
+    return framework;
+  }
+
   /**
    * Checks if a string is a valid hostname.
    * Valid hostname rules:

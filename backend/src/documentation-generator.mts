@@ -111,7 +111,7 @@ export class DocumentationGenerator {
     const allApps = pm.getApplicationService().getAllAppNames();
 
     const appsToCheck = applicationName 
-      ? [[applicationName, allApps.get(applicationName)!].filter(([, appPath]) => appPath)]
+      ? (allApps.get(applicationName) ? [[applicationName, allApps.get(applicationName)!]] : [])
       : Array.from(allApps.entries());
 
     for (const [appName, appPath] of appsToCheck) {

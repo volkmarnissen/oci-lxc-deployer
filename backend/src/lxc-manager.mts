@@ -136,6 +136,24 @@ async function startWebApp(
   webApp.httpServer.listen(port, () => {
     console.log(`VEWebApp listening on port ${port}`);
   });
+
+  // Graceful shutdown handlers
+  const shutdown = (signal: string) => {
+    console.log(`\n${signal} received, shutting down gracefully...`);
+    webApp.httpServer.close(() => {
+      console.log("HTTP server closed");
+      process.exit(0);
+    });
+
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+      console.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 async function runExecCommand(

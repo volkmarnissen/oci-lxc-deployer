@@ -25,6 +25,7 @@ ProxmoxTestHelper.prototype.createStorageContext = function () {
     localPath,
     storageContextFilePath,
     secretFilePath,
+    false, // Disable cache for tests
   );
   return PersistenceManager.getInstance().getContextManager();
 };

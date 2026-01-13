@@ -210,7 +210,6 @@ export class ContextManager extends Context implements IContext {
   listSshConfigs(): ISsh[] {
     const result: ISsh[] = [];
     const pubCmd = Ssh.getPublicKeyCommand();
-    const install = Ssh.getInstallSshServerCommand();
     for (const key of this.keys().filter((k) => k.startsWith("ve_"))) {
       const anyCtx: any = this.get(key);
       if (anyCtx && typeof anyCtx.host === "string") {
@@ -218,7 +217,11 @@ export class ContextManager extends Context implements IContext {
         if (typeof anyCtx.port === "number") item.port = anyCtx.port;
         if (typeof anyCtx.current === "boolean") item.current = anyCtx.current;
         if (pubCmd) item.publicKeyCommand = pubCmd;
-        item.installSshServer = install;
+        // Only include installSshServer command if SSH port is not listening
+        const portListening = Ssh.checkSshPortListening(item.host, item.port);
+        if (!portListening) {
+          item.installSshServer = Ssh.getInstallSshServerCommand();
+        }
         const perm = Ssh.checkSshPermission(item.host, item.port);
         item.permissionOk = perm.permissionOk;
         if (perm.stderr) (item as any).stderr = perm.stderr;

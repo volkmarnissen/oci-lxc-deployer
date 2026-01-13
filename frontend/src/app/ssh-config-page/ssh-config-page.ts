@@ -16,7 +16,6 @@ type SshWithDiagnostics = ISsh & { stderr?: string };
   standalone: true,
   imports: [
     FormsModule,
-    MatExpansionModule,
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
@@ -33,12 +32,19 @@ export class SshConfigPage implements OnInit {
   configService = inject(VeConfigurationService);
   newHost = '';
   newPort = 22;
+  publicKeyCommand?: string;
+  installSshServer?: string;
 
   ngOnInit() {
     this.loading = true;
     this.configService.getSshConfigs().subscribe({
-      next: (ssh) => {
-        this.ssh = (ssh && ssh.length > 0 ? ssh : []) as SshWithDiagnostics[];
+      next: (res) => {
+        this.ssh = (res.sshs && res.sshs.length > 0 ? res.sshs : []) as SshWithDiagnostics[];
+        // publicKeyCommand: prefer from SSH configs, fallback to top-level response
+        const currentSsh = this.ssh.find(s => s.current) ?? this.ssh[0];
+        this.publicKeyCommand = currentSsh?.publicKeyCommand || res.publicKeyCommand;
+        // installSshServer comes from the current SSH config (if port is not listening)
+        this.installSshServer = currentSsh?.installSshServer;
         this.loading = false;
       },
       error: () => {
@@ -57,9 +63,22 @@ export class SshConfigPage implements OnInit {
         next: () => { /* persisted current */ },
         error: () => { /* ignore persist error; UI remains */ }
       });
-      // Refresh permission status
+      // Refresh permission status and reload configs to get updated installSshServer
       this.configService.checkSsh(sel.host, sel.port).subscribe({
-        next: (r) => { sel.permissionOk = !!r?.permissionOk; sel.stderr = r?.stderr; },
+        next: (r) => { 
+          sel.permissionOk = !!r?.permissionOk; 
+          sel.stderr = r?.stderr;
+          // Reload configs to get updated installSshServer based on port listening status
+          this.configService.getSshConfigs().subscribe({
+            next: (res) => {
+              this.ssh = (res.sshs || []) as SshWithDiagnostics[];
+              // publicKeyCommand: prefer from SSH configs, fallback to top-level response
+              const currentSsh = this.ssh.find(s => s.current) ?? this.ssh[0];
+              this.publicKeyCommand = currentSsh?.publicKeyCommand || res.publicKeyCommand;
+              this.installSshServer = currentSsh?.installSshServer;
+            }
+          });
+        },
         error: () => { sel.permissionOk = false; }
       });
     }
@@ -78,7 +97,8 @@ export class SshConfigPage implements OnInit {
       this.error = 'Host already exists. Please choose a different host name.';
       return;
     }
-    const makeCurrent = this.ssh.length === 0;
+    // Always mark new host as current
+    const makeCurrent = true;
     this.configService.setSshConfig({ host, port, current: makeCurrent }).subscribe({
       next: () => {
         this.newHost = '';
@@ -86,7 +106,15 @@ export class SshConfigPage implements OnInit {
         // Reload list to reflect new entry
         this.loading = true;
         this.configService.getSshConfigs().subscribe({
-          next: (ssh) => { this.ssh = (ssh || []) as SshWithDiagnostics[]; this.loading = false; },
+          next: (res) => { 
+            this.ssh = (res.sshs || []) as SshWithDiagnostics[]; 
+            // publicKeyCommand: prefer from SSH configs, fallback to top-level response
+            const currentSsh = this.ssh.find(s => s.current) ?? this.ssh[0];
+            this.publicKeyCommand = currentSsh?.publicKeyCommand || res.publicKeyCommand;
+            // installSshServer comes from the current SSH config (if port is not listening)
+            this.installSshServer = currentSsh?.installSshServer;
+            this.loading = false; 
+          },
           error: () => { this.error = 'Error loading SSH configuration.'; this.loading = false; }
         });
       },
@@ -118,13 +146,6 @@ export class SshConfigPage implements OnInit {
     }
   }
 
-  get installSshServer(): string | undefined {
-    return this.ssh.length > 0 ? this.ssh[0].installSshServer : undefined;
-  }
-
-  get publicKeyCommand(): string | undefined {
-    return this.ssh.length > 0 ? this.ssh[0].publicKeyCommand : undefined;
-  }
 
   get permissionOk(): boolean {
     const cur = this.ssh.find(s => s.current) ?? this.ssh[0];
@@ -141,13 +162,39 @@ export class SshConfigPage implements OnInit {
     }
   }
 
+  refreshCurrentPermission() {
+    const currentSsh = this.ssh.find(s => s.current) ?? this.ssh[0];
+    if (currentSsh?.host) {
+      this.loading = true;
+      this.configService.checkSsh(currentSsh.host, currentSsh.port).subscribe({
+        next: (r) => {
+          currentSsh.permissionOk = !!r?.permissionOk;
+          currentSsh.stderr = r?.stderr;
+          // Reload configs to get updated installSshServer based on port listening status
+          this.configService.getSshConfigs().subscribe({
+            next: (res) => {
+              this.ssh = (res.sshs || []) as SshWithDiagnostics[];
+              // publicKeyCommand: prefer from SSH configs, fallback to top-level response
+              const updatedCurrentSsh = this.ssh.find(s => s.current) ?? this.ssh[0];
+              this.publicKeyCommand = updatedCurrentSsh?.publicKeyCommand || res.publicKeyCommand;
+              this.installSshServer = updatedCurrentSsh?.installSshServer;
+              this.loading = false;
+            },
+            error: () => {
+              this.loading = false;
+            }
+          });
+        },
+        error: () => {
+          currentSsh.permissionOk = false;
+          this.loading = false;
+        }
+      });
+    }
+  }
+
   copy(text: string | undefined) {
     if (!text) return;
     navigator.clipboard.writeText(text).catch(() => { /* ignore clipboard errors */ });
-  }
-
-  getCurrentStderr(): string {
-    const cur = (this.ssh.find(s => s.current) ?? this.ssh[0]);
-    return (cur && typeof cur.stderr === 'string') ? cur.stderr as string : '';
   }
 }

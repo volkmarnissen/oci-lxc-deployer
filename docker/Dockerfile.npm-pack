@@ -1,0 +1,58 @@
+# Runtime image built from the npm pack tarball
+FROM node:20-alpine
+
+# Install tools needed for SSH key generation (ssh-keygen)
+RUN apk add --no-cache openssh-client
+
+# Build metadata
+ARG NPM_TARBALL="docker/lxc-manager.tgz"
+ARG BUILD_DATE
+ARG BUILD_DESCRIPTION="LXC Manager Docker Image"
+ARG BUILD_REF="main"
+ARG BUILD_REPOSITORY="modbus2mqtt/lxc-manager"
+ARG BUILD_VERSION
+ARG IMAGE_NAME="lxc-manager"
+
+ENV NODE_ENV=production
+
+# Copy the pre-built tarball into the image
+COPY ${NPM_TARBALL} /tmp/app.tgz
+
+# Install the application globally from the tarball and create a non-root user
+RUN set -eux; \
+    npm install -g /tmp/app.tgz --omit=dev; \
+    rm /tmp/app.tgz; \
+    addgroup -S lxc && adduser -S -G lxc lxc; \
+    mkdir -p /home/lxc && chown -R lxc:lxc /home/lxc; \
+    npm cache clean --force
+
+# Create data directories for volume mounting
+# These will be owned by the lxc user so the app can write there
+RUN mkdir -p /config /secure && \
+    chown -R lxc:lxc /config /secure
+
+# Set service user home for backend SSH key discovery / generation
+ENV LXC_MANAGER_USER_HOME=/home/lxc
+ENV HOME=/home/lxc
+
+USER lxc
+
+EXPOSE 3000
+ENTRYPOINT ["lxc-manager"]
+CMD ["--local", "/config", "--secretsFilePath", "/secure/secret.txt"]
+
+# Labels
+LABEL \
+    maintainer="Volkmar Nissen <volkmar.nissen@gmail.com>" \
+    org.opencontainers.image.title="${IMAGE_NAME}" \
+    org.opencontainers.image.description="${BUILD_DESCRIPTION}" \
+    org.opencontainers.image.vendor="Carcam 360" \
+    org.opencontainers.image.authors="Volkmar Nissen <volkmar.nissen@gmail.com>" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.url="https://github.com/${BUILD_REPOSITORY}" \
+    org.opencontainers.image.source="https://github.com/${BUILD_REPOSITORY}" \
+    org.opencontainers.image.documentation="https://github.com/${BUILD_REPOSITORY}/blob/main/README.md" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.revision="${BUILD_REF}" \
+    org.opencontainers.image.version="${BUILD_VERSION}"
+

@@ -150,7 +150,15 @@ describe("FrameworkLoader.createApplicationFromFramework", () => {
     expect(appData.extends).toBe("npm-nodejs");
     expect(Array.isArray(appData.installation)).toBe(true);
     // The first template should be derived from application-id
-    expect(appData.installation?.[0]).toBe("test-app-parameters.json");
+    // It may be a string or an object with {name, before}
+    const firstTemplate = appData.installation?.[0];
+    if (typeof firstTemplate === "string") {
+      expect(firstTemplate).toBe("test-app-parameters.json");
+    } else if (firstTemplate && typeof firstTemplate === "object") {
+      expect((firstTemplate as any).name).toBe("test-app-parameters.json");
+    } else {
+      throw new Error(`Expected first template to be string or object, got ${typeof firstTemplate}`);
+    }
 
     // Verify parameters template exists and is valid
     const setParamsPath = path.join(tempDir, "applications", "test-app", "templates", "test-app-parameters.json");

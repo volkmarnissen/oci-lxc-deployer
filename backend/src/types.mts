@@ -131,6 +131,8 @@ export interface IUnresolvedParametersResponse {
 export interface ISshConfigsResponse {
   sshs: ISsh[];
   key?: string | undefined;
+  publicKeyCommand?: string | undefined;
+  installSshServer?: string | undefined;
 }
 export interface ISshConfigKeyResponse {
   key: string;

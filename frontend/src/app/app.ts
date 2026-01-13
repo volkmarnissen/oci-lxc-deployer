@@ -55,8 +55,8 @@ export class App implements OnInit {
   
   loadSshConfigs(): void {
     this.cfg.getSshConfigs().subscribe({
-      next: (sshs) => {
-        this.sshConfigs = sshs || [];
+      next: (res) => {
+        this.sshConfigs = res.sshs || [];
         this.updateCurrentHost();
       },
       error: () => {

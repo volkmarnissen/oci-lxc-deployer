@@ -36,12 +36,12 @@
         </div>
         <div class="col host">
           <mat-form-field appearance="fill" class="field">
-            <input matInput [(ngModel)]="newHost" name="newHost" placeholder="Host" />
+            <input matInput [(ngModel)]="newHost" name="newHost" placeholder="Host" (keyup.enter)="addSsh()" />
           </mat-form-field>
         </div>
         <div class="col port">
           <mat-form-field appearance="fill" class="field">
-            <input matInput type="number" [(ngModel)]="newPort" name="newPort" placeholder="Port" />
+            <input matInput type="number" [(ngModel)]="newPort" name="newPort" placeholder="Port" (keyup.enter)="addSsh()" />
           </mat-form-field>
         </div>
         <div class="col actions">
@@ -49,29 +49,34 @@
         </div>
       </div>
 
-      @if (permissionOk) {
+      @if (ssh.length === 0) {
+        <div class="info-banner"><mat-icon class="info-icon">info</mat-icon> Please add a Proxmox host above to configure SSH access.</div>
+      }
+      @else if (permissionOk) {
         <div class="ok-banner"><mat-icon class="ok-icon">verified</mat-icon> SSH access is working. No further action required.</div>
       }
       @else {
-        <div class="warn-banner emphasized"><mat-icon class="warn-icon">warning</mat-icon> SSH access is not allowed yet. Please run the steps below.</div>
-        @if (ssh.length > 0) {
-          <div class="stderr-box">
-            <div class="stderr-title">SSH Error Details</div>
-            <pre class="stderr-content">{{ getCurrentStderr() }}</pre>
+        <div class="warn-banner emphasized">
+          <div class="warn-text">
+            <mat-icon class="warn-icon">warning</mat-icon>
+            <span>SSH access is not allowed yet. Please run the steps below.</span>
           </div>
-        }
-        <mat-accordion multi>
-        @if (publicKeyCommand) {
-          <mat-expansion-panel>
-            <mat-expansion-panel-header>
-              Add the service public key (run first)
-              @if (permissionOk) { <span class="panel-ok"><mat-icon class="ok-icon">check_circle</mat-icon></span> }
-            </mat-expansion-panel-header>
-            <div class="help">
-              Run this on the Proxmox host as <strong>root</strong>.
-              It appends the public key to <code>~/.ssh/authenticated_keys</code>, which is used by the SSH drop‑in.
-              It is safe to run this command multiple times.
-            </div>
+          <button mat-flat-button color="primary" type="button" (click)="refreshCurrentPermission()" class="refresh-btn">
+            <mat-icon>refresh</mat-icon>
+            <span>Check Again</span>
+          </button>
+        </div>
+        <div class="step-section">
+          <h3 class="step-title">
+            Add the service public key (run first)
+            @if (permissionOk) { <span class="panel-ok"><mat-icon class="ok-icon">check_circle</mat-icon></span> }
+          </h3>
+          <div class="help">
+            Run this on the Proxmox host as <strong>root</strong>.
+            It appends the public key to <code>~/.ssh/authenticated_keys</code>, which is used by the SSH drop‑in.
+            It is safe to run this command multiple times.
+          </div>
+          @if (publicKeyCommand) {
             <div class="command-row">
               <mat-form-field appearance="fill" class="full-width">
                 <textarea matInput [value]="publicKeyCommand" readonly rows="3"></textarea>
@@ -80,14 +85,21 @@
                 <mat-icon>content_copy</mat-icon>
               </button>
             </div>
-          </mat-expansion-panel>
-        }
+            <div class="help" style="margin-top: 12px;">
+              After running the command above, click <strong>"Check Again"</strong> to verify SSH access.
+            </div>
+          } @else {
+            <div class="help" style="color: #d32f2f;">
+              ⚠️ No service SSH key could be generated automatically. Please create an SSH key pair inside the lxc-manager container (for example with <code>ssh-keygen -t ed25519</code>) or provide a key via <code>LXC_MANAGER_PUBKEY_FILE</code>, then click <strong>Check Again</strong>.
+            </div>
+          }
+        </div>
         @if (installSshServer) {
-          <mat-expansion-panel>
-            <mat-expansion-panel-header>
+          <div class="step-section">
+            <h3 class="step-title">
               Install and harden SSH server (one‑time)
               @if (permissionOk) { <span class="panel-ok"><mat-icon class="ok-icon">check_circle</mat-icon></span> }
-            </mat-expansion-panel-header>
+            </h3>
             <div class="help">
               Run on the Proxmox host as <strong>root</strong>, after the public key is present.<br />
               This installs <code>openssh-server</code> (if needed), writes a drop‑in at <code>/etc/ssh/sshd_config.d/lxc-manager.conf</code>,
@@ -105,9 +117,8 @@
             <div class="help">
               Verify: <code>systemctl status ssh</code> and <code>tail -n1 ~/.ssh/authenticated_keys</code> on the Proxmox host.
             </div>
-          </mat-expansion-panel>
+          </div>
         }
-        </mat-accordion>
 
       }
 

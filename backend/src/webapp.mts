@@ -226,7 +226,15 @@ export class VEWebApp {
       try {
         const sshs: ISsh[] = storageContext.listSshConfigs();
         const key = storageContext.getCurrentVEContext()?.getKey();
-        this.returnResponse<ISshConfigsResponse>(res, { sshs, key });
+        // Always include publicKeyCommand, even if no SSH configs exist
+        const publicKeyCommand = Ssh.getPublicKeyCommand() || undefined;
+        // installSshServer is only included in individual SSH configs if port is not listening
+        // We don't include it in the top-level response since it depends on the specific host
+        this.returnResponse<ISshConfigsResponse>(res, { 
+          sshs, 
+          key,
+          publicKeyCommand
+        });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
       }
@@ -663,5 +671,15 @@ export class VEWebApp {
 
     const webAppVE = new WebAppVE(this.app);
     webAppVE.init();
+
+    // Catch-all route for Angular routing - must be after all API routes
+    // This ensures that routes like /ssh-config work correctly.
+    // Use a RegExp instead of "*" to avoid path-to-regexp errors on Express 5.
+    if (staticDir) {
+      this.app.get(/^(?!\/api\/).*/, (req, res) => {
+        // All non-API GET requests are served by Angular index.html
+        res.sendFile(path.join(staticDir, "index.html"));
+      });
+    }
   }
 }
