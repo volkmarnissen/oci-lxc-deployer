@@ -2,6 +2,136 @@
 
 This guide describes how to create applications for LXC Manager, focusing on different installation types and best practices.
 
+## Quick Start: Using the Framework (Easiest Method)
+
+The **framework-based approach** is the simplest way to create a new application from a Docker/OCI image. In 90% of cases, you only need:
+
+1. **Docker image name** (e.g., `docker.io/nodered/node-red:latest`)
+2. **Volumes** that need to be persisted (e.g., `/data`)
+3. **UID/GID** of the user inside the container (e.g., `1000:1000`)
+
+### Method 1: Web UI (Recommended)
+
+The **easiest way** to create a new application is using the Web UI:
+
+1. **Open the Framework UI** in LXC Manager web interface (usually under "Create Application" or "Frameworks")
+2. **Select the OCI Image Framework** (`framework-oci-volumes`)
+3. **Enter the Docker image name** (e.g., `docker.io/your-org/your-app:latest`)
+4. **Fill in parameters**:
+   - Many parameters are automatically extracted from the Dockerfile (e.g., ports, environment variables)
+   - Review and adjust as needed
+5. **Define volumes and UID/GID**:
+   - Volumes: Specify which directories need to be persistent (e.g., `data=/data`, `config=/config`)
+   - UID/GID: The user ID inside the container (default: `1000:1000`)
+   - **Tip**: If unsure, install the application once and inspect the container to see what directories are used and which user runs the process
+6. **Save the application**: The result is a complete application definition that can be installed like any other application
+
+**That's it!** The Web UI handles all the complexity of creating the JSON structure and ensures all required fields are filled.
+
+### Method 2: Manual JSON (Advanced)
+
+For advanced users or automation, you can create the application JSON manually:
+
+```json
+{
+  "name": "your-app",
+  "label": "Your App",
+  "description": "Your application description",
+  "extends": "framework-oci-volumes",
+  "installation": {
+    "parameters": [
+      {
+        "name": "oci_image",
+        "value": "docker.io/your-org/your-app:latest"
+      },
+      {
+        "name": "volumes",
+        "value": "data=/data\nconfig=/config"
+      },
+      {
+        "name": "uid",
+        "value": "1000"
+      },
+      {
+        "name": "gid",
+        "value": "1000"
+      }
+    ]
+  }
+}
+```
+
+**That's it!** This creates a fully functional LXC container with:
+- Automatic OCI image download and conversion
+- Proper UID/GID mapping (1:1 mapping for the specified user)
+- Persistent volumes mounted to the container
+- Network configuration (DHCP or static IP)
+- Automatic startup and service management
+
+### Why the OCI Image Framework is So Powerful
+
+The OCI Image Framework (`framework-oci-volumes`) is often the only framework you need because:
+
+1. **Universal compatibility**: Works with any Docker/OCI image from Docker Hub, GitHub Container Registry, or private registries
+2. **Automatic detection**: Extracts labels from the image
+3. **Simple configuration**: Only requires image name, volumes, and UID/GID
+4. **Production-ready**: Handles all the complexity of LXC container creation, networking, and storage
+
+**Other frameworks** (like `framework-npm-service`) are specialized for specific use cases (e.g., npm packages) but are rarely needed since most applications are already containerized.
+
+### When Do You Need More?
+
+The framework handles most common cases. You only need custom templates if your application requires:
+
+- **External devices**: Serial ports (`/dev/ttyUSB0`), audio devices, USB devices
+- **Special capabilities**: Privileged operations, custom cgroups
+- **Custom initialization**: Application-specific setup scripts
+- **Complex networking**: Multiple network interfaces, custom firewall rules
+
+For these cases, see the [Custom Templates](#custom-templates) section below.
+
+### Finding Docker Image Information
+
+**Using the Web UI:** The framework UI automatically extracts most information from the Docker image, including ports and environment variables.
+
+**Manual inspection (if needed):**
+
+**UID/GID:** Check the Dockerfile or run:
+```sh
+docker run --rm your-image id
+# Output: uid=1000(node) gid=1000(node) groups=1000(node)
+```
+
+**Volumes:** Check the Dockerfile for `VOLUME` directives or documentation:
+```dockerfile
+VOLUME ["/data", "/config"]
+```
+
+**Tip for finding volumes:** If you're unsure which directories need persistence:
+1. Install the application once (even without volumes)
+2. Use the application (create some data, change settings)
+3. Inspect the container: `pct enter <vmid>` and look for directories with user data
+4. Re-create the application definition with the correct volumes
+
+### Available Frameworks
+
+- **`framework-oci-volumes`**: **[Recommended]** Base framework for OCI images with volumes (covers 90%+ of use cases)
+  - Handles any Docker/OCI image
+  - Automatic image download and conversion
+  - Volume management and UID/GID mapping
+  - **Use this unless you have a specific reason not to**
+
+- **`framework-oci-simple`**: Minimal OCI framework without volumes (rarely needed)
+  - Use only for stateless applications
+
+- **`framework-npm-service`**: Node.js applications installed via npm (legacy)
+  - Only needed for npm packages that aren't containerized
+  - Most Node.js applications are better served by `framework-oci-volumes` with an existing Docker image
+
+**Recommendation**: Start with `framework-oci-volumes` for any new application. It's simple, powerful, and handles almost all use cases.
+
+See [Application Creation with Frameworks](#application-creation-with-frameworks) for more details.
+
 ## Table of Contents
 
 - [Directory Structure and Search Order](#directory-structure-and-search-order)
@@ -902,3 +1032,165 @@ backend/dist/lxc-manager.mjs updatedoc node-red
 - Explore other applications in `json/applications/` for more examples
 - Read the [Template Documentation](generated/json/shared/) for detailed information about shared templates
 
+---
+
+## Command Line Usage
+
+LXC Manager can be used via command line to execute tasks for applications.
+
+### Start Web Application
+
+Start the web application server (default behavior when no command is specified):
+
+```sh
+lxc-manager [options]
+```
+
+**Options:**
+- `--local <path>`: Path to the local data directory (default: `examples` in current working directory)
+- `--secretsFilePath <path>`: Path to the secrets file for encryption/decryption
+
+**Examples:**
+```sh
+lxc-manager
+lxc-manager --local ./my-local
+lxc-manager --local ./my-local --secretsFilePath ./secrets.txt
+```
+
+### Execute Tasks
+
+Execute a task for a specific application:
+
+```sh
+lxc-manager exec <application> <task> <parameters file> [options]
+```
+
+**Arguments:**
+- `<application>`: Name of the application to execute the task for
+- `<task>`: Task type to execute. Valid values:
+  - `installation`: Install the application
+  - `backup`: Backup the application
+  - `restore`: Restore the application
+  - `uninstall`: Uninstall the application
+  - `update`: Update the application
+  - `upgrade`: Upgrade the application
+  - `webui`: Open web UI for the application
+- `<parameters file>`: Path to the JSON file containing task parameters
+
+**Options:**
+- `--local <path>`: Path to the local data directory (default: `local` in current working directory)
+- `--secretsFilePath <path>`: Path to the secrets file for encryption/decryption
+- `--restartInfoFile <path>`: Path to the restart info JSON file (used for resuming interrupted tasks)
+
+**Examples:**
+```sh
+# Install Node-RED
+lxc-manager exec node-red installation ./params.json
+
+# Install with custom local directory
+lxc-manager exec node-red installation ./params.json --local ./my-local
+
+# Backup with secrets file
+lxc-manager exec node-red backup ./backup-params.json --secretsFilePath ./secrets.txt
+
+# Resume interrupted task
+lxc-manager exec node-red installation ./params.json --restartInfoFile ./restart-info.json
+```
+
+### Generate Documentation
+
+Generate documentation for applications and templates:
+
+```sh
+lxc-manager gendoc [options]
+```
+
+**Options:**
+- `--local <path>`: Path to the local data directory (default: `local` in current working directory)
+- `--secretsFilePath <path>`: Path to the secrets file for encryption/decryption
+
+**Examples:**
+```sh
+lxc-manager gendoc
+lxc-manager gendoc --local ./my-local
+```
+
+### Validate Templates
+
+Validate application templates against JSON schemas:
+
+```sh
+lxc-manager validate [options]
+```
+
+**Options:**
+- `--local <path>`: Path to the local data directory (default: `local` in current working directory)
+
+**Examples:**
+```sh
+lxc-manager validate
+lxc-manager validate --local ./my-local
+```
+
+### Help
+
+Display help information:
+
+```sh
+lxc-manager --help
+# or
+lxc-manager -h
+```
+
+### Parameters File Format
+
+The parameters file is a JSON file that contains the input values required for executing a task. It must be a JSON array where each element is an object with `name` and `value` properties.
+
+**Format:**
+```json
+[
+  {
+    "name": "parameter_name",
+    "value": "parameter_value"
+  },
+  {
+    "name": "another_parameter",
+    "value": 123
+  },
+  {
+    "name": "boolean_parameter",
+    "value": true
+  }
+]
+```
+
+**Properties:**
+- **`name`** (string, required): The name/ID of the parameter as defined in the application templates
+- **`value`** (string | number | boolean, required): The value for the parameter
+
+**Finding Required Parameters:**
+1. **Use the Web UI**: Shows all required and optional parameters with descriptions
+2. **Check application templates**: Look in `json/applications/<application-name>/`
+3. **Run without parameters file**: LXC Manager will output a template with all required parameter names
+
+**Example for installing Node-RED:**
+```json
+[
+  {
+    "name": "hostname",
+    "value": "node-red"
+  },
+  {
+    "name": "vm_id",
+    "value": 100
+  },
+  {
+    "name": "static_ip",
+    "value": "192.168.1.100/24"
+  },
+  {
+    "name": "gateway",
+    "value": "192.168.1.1"
+  }
+]
+```
