@@ -156,9 +156,34 @@ while IFS= read -r line <&3; do
     fi
   fi
   
-  # Check if mount already exists
-  if pct config "$VMID" | grep -a -q "mp[0-9]*: $SOURCE_PATH,mp=$CONTAINER_PATH"; then
-    echo "Mount $SOURCE_PATH -> $CONTAINER_PATH already exists, skipping." >&2
+  # Determine existing mp slot for the target container path (mp=...)
+  EXISTING_LINE=$(pct config "$VMID" | grep -E "^mp[0-9]+: .*mp=$CONTAINER_PATH" | head -n1)
+  EXISTING_MP=""
+  EXISTING_SRC=""
+  if [ -n "$EXISTING_LINE" ]; then
+    EXISTING_MP=$(echo "$EXISTING_LINE" | cut -d: -f1)
+    EXISTING_SRC=$(echo "$EXISTING_LINE" | sed -E 's/^mp[0-9]+: ([^,]+),.*/\1/')
+  fi
+
+  # If an mp entry exists for the target path
+  if [ -n "$EXISTING_MP" ]; then
+    if [ "$EXISTING_SRC" = "$SOURCE_PATH" ]; then
+      echo "Mount $SOURCE_PATH -> $CONTAINER_PATH already exists in $EXISTING_MP, skipping." >&2
+      continue
+    fi
+    # Source path differs: update existing mp entry to new source
+    if [ "$NEEDS_STOP" -eq 0 ] && container_running; then
+      pct stop "$VMID" >&2
+      NEEDS_STOP=1
+    fi
+    MOUNT_OPTIONS="$SOURCE_PATH,mp=$CONTAINER_PATH"
+    if ! pct set "$VMID" -$EXISTING_MP "$MOUNT_OPTIONS" >&2; then
+      echo "Error: Failed to update mount point $EXISTING_MP in container $VMID" >&2
+      rm -f "$TMPFILE"
+      exit 1
+    fi
+    echo "Updated $EXISTING_MP: $SOURCE_PATH -> $CONTAINER_PATH in container $VMID" >&2
+    VOLUME_COUNT=$((VOLUME_COUNT + 1))
     continue
   fi
   
