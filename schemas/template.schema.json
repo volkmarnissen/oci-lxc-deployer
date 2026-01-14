@@ -38,6 +38,7 @@
           "if": { "type": "string" },
           "type": { "enum": ["string", "number", "enum", "boolean"] },
           "description": { "type": "string" },
+          "multiline": { "type": "boolean", "default": false },
           "upload": { "type": "boolean", "default": false },
           "required": { "type": "boolean", "default": false },
           "secure": { "type": "boolean", "default": false },

@@ -128,6 +128,7 @@ describe("WebAppVE API", () => {
             name: "hostname",
             type: "string",
             required: true,
+            description: "Hostname of the VE",
           },
         ],
         commands: [
@@ -249,6 +250,7 @@ describe("WebAppVE API", () => {
             name: "hostname",
             type: "string",
             required: true,
+            description: "Hostname of the VE",
           },
         ],
         commands: [
@@ -368,6 +370,7 @@ describe("WebAppVE API", () => {
             name: "hostname",
             type: "string",
             required: true,
+            description: "Hostname of the VE",
           },
         ],
         commands: [

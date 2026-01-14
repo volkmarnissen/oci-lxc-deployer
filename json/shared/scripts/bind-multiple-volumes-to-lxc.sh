@@ -29,6 +29,8 @@ VOLUMES="{{ volumes}}"
 USERNAME="{{ username}}"
 UID_VALUE="{{ uid}}"
 GID_VALUE="{{ gid}}"
+MAPPED_UID="{{ mapped_uid}}"
+MAPPED_GID="{{ mapped_gid}}"
 
 # Check that required parameters are not empty
 if [ -z "$VMID" ] || [ -z "$HOSTNAME" ]; then
@@ -44,6 +46,14 @@ fi
 # Set default base_path if not provided
 if [ -z "$BASE_PATH" ] || [ "$BASE_PATH" = "" ]; then
   BASE_PATH="volumes"
+fi
+
+# Use mapped UID/GID if provided, otherwise fall back to uid/gid parameters
+if [ -n "$MAPPED_UID" ] && [ "$MAPPED_UID" != "" ]; then
+  UID_VALUE="$MAPPED_UID"
+fi
+if [ -n "$MAPPED_GID" ] && [ "$MAPPED_GID" != "" ]; then
+  GID_VALUE="$MAPPED_GID"
 fi
 
 # Construct the full host path: <host_mountpoint>/<base_path>/<hostname>
@@ -100,9 +110,18 @@ while IFS= read -r line <&3; do
   # Skip empty lines
   [ -z "$line" ] && continue
   
-  # Parse key=value format
+  # Parse format: key=value or key=value,permissions
   VOLUME_KEY=$(echo "$line" | cut -d'=' -f1)
-  VOLUME_VALUE=$(echo "$line" | cut -d'=' -f2-)
+  VOLUME_REST=$(echo "$line" | cut -d'=' -f2-)
+  
+  # Check if permissions are specified (comma-separated)
+  if echo "$VOLUME_REST" | grep -q ','; then
+    VOLUME_VALUE=$(echo "$VOLUME_REST" | cut -d',' -f1)
+    VOLUME_PERMS=$(echo "$VOLUME_REST" | cut -d',' -f2)
+  else
+    VOLUME_VALUE="$VOLUME_REST"
+    VOLUME_PERMS="0755"  # Default permissions
+  fi
   
   # Skip if key or value is empty
   [ -z "$VOLUME_KEY" ] && continue
@@ -118,29 +137,27 @@ while IFS= read -r line <&3; do
   fi
   
   # Set permissions on the source directory if uid/gid are provided
-  # With standard Proxmox mapping: Container UID N → Host UID (100000 + N)
-  # So we need to set ownership to (UID_VALUE + 100000):(GID_VALUE + 100000) on the host
+  # For unprivileged containers with 1:1 UID mapping (via setup-lxc-uid-mapping.py),
+  # the container UID maps directly to the host UID (no offset calculation needed).
+  # UID_VALUE should already contain the correct host UID from mapped_uid parameter.
   if [ -n "$UID_VALUE" ] && [ -n "$GID_VALUE" ] && [ "$UID_VALUE" != "" ] && [ "$GID_VALUE" != "" ]; then
-    # Calculate mapped UID/GID for standard Proxmox mapping
-    MAPPED_UID=$((UID_VALUE + 100000))
-    MAPPED_GID=$((GID_VALUE + 100000))
-    
-    # Set ownership recursively with mapped UID/GID
-    if chown -R "$MAPPED_UID:$MAPPED_GID" "$SOURCE_PATH" 2>/dev/null; then
-      echo "Set ownership of $SOURCE_PATH (recursively) to $MAPPED_UID:$MAPPED_GID (Container UID $UID_VALUE -> Host UID $MAPPED_UID)" >&2
+    # Set ownership recursively with the provided UID/GID
+    # For 1:1 mapping: Container UID N → Host UID N (direct mapping)
+    if chown -R "$UID_VALUE:$GID_VALUE" "$SOURCE_PATH" 2>/dev/null; then
+      echo "Set ownership of $SOURCE_PATH (recursively) to $UID_VALUE:$GID_VALUE" >&2
     else
-      echo "Warning: Failed to set ownership of $SOURCE_PATH to $MAPPED_UID:$MAPPED_GID" >&2
+      echo "Warning: Failed to set ownership of $SOURCE_PATH to $UID_VALUE:$GID_VALUE" >&2
     fi
-    # Set permissions recursively
-    if chmod -R 755 "$SOURCE_PATH" 2>/dev/null; then
-      echo "Set permissions of $SOURCE_PATH (recursively) to 755" >&2
+    # Set permissions recursively with configured value
+    if chmod -R "$VOLUME_PERMS" "$SOURCE_PATH" 2>/dev/null; then
+      echo "Set permissions of $SOURCE_PATH (recursively) to $VOLUME_PERMS" >&2
     else
-      echo "Warning: Failed to set permissions of $SOURCE_PATH" >&2
+      echo "Warning: Failed to set permissions of $SOURCE_PATH to $VOLUME_PERMS" >&2
     fi
   fi
   
   # Check if mount already exists
-  if pct config "$VMID" | grep -q "mp[0-9]*: $SOURCE_PATH,mp=$CONTAINER_PATH"; then
+  if pct config "$VMID" | grep -a -q "mp[0-9]*: $SOURCE_PATH,mp=$CONTAINER_PATH"; then
     echo "Mount $SOURCE_PATH -> $CONTAINER_PATH already exists, skipping." >&2
     continue
   fi

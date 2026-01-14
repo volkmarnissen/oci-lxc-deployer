@@ -7,7 +7,7 @@ RUN apk add --no-cache openssh-client
 # Build metadata
 ARG NPM_TARBALL="docker/lxc-manager.tgz"
 ARG BUILD_DATE
-ARG BUILD_DESCRIPTION="LXC Manager Docker Image"
+ARG BUILD_DESCRIPTION="Deploys and manages LXC containers on Proxmox from OCI images via a web UI and API, and lets you easily define custom container services"
 ARG BUILD_REF="main"
 ARG BUILD_REPOSITORY="modbus2mqtt/lxc-manager"
 ARG BUILD_VERSION

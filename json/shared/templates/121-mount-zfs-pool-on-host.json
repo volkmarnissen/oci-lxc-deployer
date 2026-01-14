@@ -27,6 +27,22 @@
       "default": "0",
       "advanced": true,
       "description": "Optional: GID to set for the directory. Default is 0 (root)."
+    },
+    {
+      "id": "mapped_uid",
+      "name": "Mapped UID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Optional: The actual UID to use on the host filesystem for unprivileged containers with 1:1 UID mapping. If not provided, defaults to uid parameter. Typically set by setup-lxc-uid-mapping.py (102) output.",
+      "advanced": true
+    },
+    {
+      "id": "mapped_gid",
+      "name": "Mapped GID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Optional: The actual GID to use on the host filesystem for unprivileged containers with 1:1 GID mapping. If not provided, defaults to gid parameter. Typically set by setup-lxc-uid-mapping.py (102) output.",
+      "advanced": true
     }
   ],
   "commands": [

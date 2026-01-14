@@ -47,7 +47,7 @@ describe("ProxmoxConfiguration script path resolution", () => {
         execute_on: "ve",
         name: "Install",
         commands: [{ script: scriptName }],
-        parameters: [{ id: "param", name: "param", type: "string" }],
+        parameters: [{ id: "param", name: "param", type: "string", description: "Test parameter" }],
       }),
     );
   });

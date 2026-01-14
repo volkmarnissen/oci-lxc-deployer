@@ -8,28 +8,32 @@ import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 describe("TemplateProcessor enum handling", () => {
   let testDir: string;
+  let localPath: string;
   let secretFilePath: string;
-  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
+  let storageContextPath: string;
+  let contextManager: ReturnType<ReturnType<typeof PersistenceManager.getInstance>["getContextManager"]>;
   let tp: any;
   const veContext = { host: "localhost", port: 22 } as any;
 
   beforeAll(() => {
     // Create a temporary directory for the test
     testDir = mkdtempSync(path.join(tmpdir(), "templateprocessor-enum-test-"));
+    localPath = path.join(testDir, "local");
     secretFilePath = path.join(testDir, "secret.txt");
+    storageContextPath = path.join(testDir, "storagecontext.json");
 
-    // Create a valid storagecontext.json file
-    const storageContextPath = path.join(testDir, "storagecontext.json");
+    // Create required directories
+    writeFileSync(secretFilePath, "", "utf-8");
     writeFileSync(storageContextPath, JSON.stringify({}), "utf-8");
 
-    // Ensure global PersistenceManager instance is set for TemplateProcessor defaults
     // Close existing instance if any
     try {
       PersistenceManager.getInstance().close();
     } catch {
       // Ignore if not initialized
     }
-    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
+    
+    PersistenceManager.initialize(localPath, storageContextPath, secretFilePath);
     const pm = PersistenceManager.getInstance();
     contextManager = pm.getContextManager();
     tp = contextManager.getTemplateProcessor();

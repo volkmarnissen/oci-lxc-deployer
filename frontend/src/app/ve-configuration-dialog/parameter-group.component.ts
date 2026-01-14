@@ -7,6 +7,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { marked } from 'marked';
 import { IParameter, IJsonError } from '../../shared/types';
 import { ErrorHandlerService } from '../shared/services/error-handler.service';
 
@@ -21,7 +24,8 @@ import { ErrorHandlerService } from '../shared/services/error-handler.service';
     MatTooltipModule,
     MatSlideToggleModule,
     MatIconModule,
-    MatButtonModule
+    MatButtonModule,
+    MatExpansionModule
   ],
   templateUrl: './parameter-group.component.html',
   styleUrl: './parameter-group.component.scss'
@@ -33,9 +37,41 @@ export class ParameterGroupComponent {
   @Input({ required: true }) showAdvanced!: boolean;
 
   private errorHandler = inject(ErrorHandlerService);
+  private sanitizer = inject(DomSanitizer);
+  expandedHelp: Record<string, boolean> = {};
 
   getTooltip(param: IParameter): string | undefined {
+    // Only show tooltip if help is not expandable
+    if (this.hasExpandableHelp(param)) {
+      return undefined;
+    }
     return param.description;
+  }
+
+  hasExpandableHelp(param: IParameter): boolean {
+    const desc = param.description || '';
+    // Check for markdown indicators: newlines, list markers, code blocks, etc.
+    return desc.length > 150 || 
+           desc.includes('\n') || 
+           desc.includes('- ') ||
+           desc.includes('* ') ||
+           desc.includes('```') ||
+           desc.includes('Example:') ||
+           desc.includes('Format:');
+  }
+
+  toggleHelp(paramId: string): void {
+    this.expandedHelp[paramId] = !this.expandedHelp[paramId];
+  }
+
+  isHelpExpanded(paramId: string): boolean {
+    return this.expandedHelp[paramId] || false;
+  }
+
+  getMarkdownHelp(param: IParameter): SafeHtml {
+    const markdown = param.description || '';
+    const html = marked.parse(markdown, { async: false }) as string;
+    return this.sanitizer.sanitize(1, html) || '';
   }
 
   getEnumOptionLabel(option: string | { name: string; value: string | number | boolean }): string {

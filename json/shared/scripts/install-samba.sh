@@ -294,9 +294,11 @@ create_all_shares() {
     # Skip empty lines
     [ -z "$line" ] && continue
     
-    # Parse key=value format
+    # Parse format: key=value or key=value,permissions (ignore permissions for Samba)
     local share_name=$(echo "$line" | cut -d'=' -f1)
-    local share_path=$(echo "$line" | cut -d'=' -f2-)
+    local share_rest=$(echo "$line" | cut -d'=' -f2-)
+    # Extract path (before comma if permissions are present)
+    local share_path=$(echo "$share_rest" | cut -d',' -f1)
     
     # Skip if share name or path is empty
     [ -z "$share_name" ] && continue

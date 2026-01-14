@@ -42,7 +42,7 @@ export type TaskType =
 // Generated from template.schema.json
 export interface IOutputObject {
   id: string;
-  value?: string | number | boolean | Array<string | { name: string; value: string | number | boolean } | { id: string; value: string | number | boolean }>;
+  value?: string | number | boolean | (string | { name: string; value: string | number | boolean } | { id: string; value: string | number | boolean })[];
 }
 
 export interface ICommand {
@@ -53,7 +53,7 @@ export interface ICommand {
   libraryPath?: string; // Internal: resolved full path to library file
   template?: string;
   properties?: IOutputObject | IOutputObject[];
-  outputs?: Array<{ id: string; default?: boolean } | string>; // Expected outputs from this command/script
+  outputs?: ({ id: string; default?: boolean } | string)[]; // Expected outputs from this command/script
   description?: string;
   /** @internal execute_on is set internally from template.execute_on, not part of the schema */
   execute_on?: "ve" | "lxc" | string;
@@ -81,6 +81,7 @@ export interface IParameter {
   name: string;
   type: ParameterType;
   description?: string;
+  multiline?: boolean;
   required?: boolean;
   secure?: boolean;
   advanced?: boolean;
@@ -222,7 +223,7 @@ export interface IPostFrameworkCreateApplicationBody {
   vendor?: string;
   icon?: string;
   iconContent?: string;
-  parameterValues: Array<{ id: string; value: string | number | boolean }>;
+  parameterValues: { id: string; value: string | number | boolean }[];
 }
 export interface IPostFrameworkCreateApplicationResponse {
   success: boolean;

@@ -147,6 +147,13 @@ export class CreateApplication implements OnInit, OnDestroy {
       next: (frameworks) => {
         this.frameworks = frameworks;
         this.loadingFrameworks.set(false);
+        
+        // Auto-select oci-image as default
+        const defaultFramework = frameworks.find(f => f.id === 'oci-image');
+        if (defaultFramework && !this.selectedFramework) {
+          this.selectedFramework = defaultFramework;
+          this.loadParameters(defaultFramework.id);
+        }
       },
       error: (err) => {
         this.errorHandler.handleError('Failed to load frameworks', err);

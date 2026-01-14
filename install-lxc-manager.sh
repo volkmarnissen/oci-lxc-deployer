@@ -6,10 +6,12 @@ set -eu
 # Downloads OCI image, creates container, mounts volumes, and writes storagecontext.json
 
 # Static GitHub source configuration
+OCI_OWNER="modbus2mqtt"
+#OWNER="volkmarnissen"
 OWNER="modbus2mqtt"
 REPO="lxc-manager"
 BRANCH="main"
-OCI_IMAGE="ghcr.io/${OWNER}/lxc-manager:latest"
+OCI_IMAGE="ghcr.io/${OCI_OWNER}/lxc-manager:latest"
 
 # Helper functions
 execute_script_from_github() {
@@ -19,7 +21,7 @@ execute_script_from_github() {
   fi
   path="$1"; output_id="$2"; shift 2
 
-  raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}"
+  raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/refs/heads/${BRANCH}/${path}"
   sed_args=""
   for kv in "$@"; do
     key="${kv%%=*}"
@@ -27,14 +29,22 @@ execute_script_from_github() {
     esc_val=$(printf '%s' "$val" | sed 's/[\\&/]/\\&/g')
     sed_args="$sed_args -e s/{{[[:space:]]*$key[[:space:]]*}}/$esc_val/g"
   done
+
+  # Determine interpreter based on file extension
+  case "$path" in
+    *.py) interpreter="python3" ;;
+    *.sh) interpreter="sh" ;;
+    *) interpreter="sh" ;;
+  esac
+
   script_content=$(curl -fsSL "$raw_url" | sed $sed_args)
 
   if [ "$output_id" = "-" ]; then
-    printf '%s' "$script_content" | sh
+    printf '%s' "$script_content" | $interpreter
     return $?
   fi
 
-  script_output=$(printf '%s' "$script_content" | sh)
+  script_output=$(printf '%s' "$script_content" | $interpreter)
   output_value=$(printf '%s\n' "$script_output" \
     | awk -v ID="$output_id" '
       BEGIN { FS="\"" }
@@ -215,60 +225,34 @@ fi
 
 # 1) Download OCI image
 echo "Step 1: Downloading OCI image..." >&2
-# Download and execute Python script with variable substitution
-raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/get-oci-image.py"
-script_content=$(curl -fsSL "$raw_url" | \
-  sed "s|{{ oci_image }}|${OCI_IMAGE}|g" | \
-  sed "s|{{ storage }}|${storage}|g" | \
-  sed "s|{{ registry_username }}||g" | \
-  sed "s|{{ registry_password }}||g" | \
-  sed "s|{{ platform }}|linux/amd64|g")
-
-script_output=$(printf '%s' "$script_content" | python3)
-template_path=$(printf '%s\n' "$script_output" | \
-  awk -v ID="template_path" '
-    BEGIN { FS="\"" }
-    /"id"[[:space:]]*:[[:space:]]*"/ {
-      for (i=1; i<=NF; i++) {
-        if ($i=="id" && $(i+2)==ID) {
-          for (j=i; j<=NF; j++) {
-            if ($j=="value") { print $(j+2); exit }
-          }
-        }
-      }
-    }')
-
-ostype=$(printf '%s\n' "$script_output" | \
-  awk -v ID="ostype" '
-    BEGIN { FS="\"" }
-    /"id"[[:space:]]*:[[:space:]]*"/ {
-      for (i=1; i<=NF; i++) {
-        if ($i=="id" && $(i+2)==ID) {
-          for (j=i; j<=NF; j++) {
-            if ($j=="value") { print $(j+2); exit }
-          }
-        }
-      }
-    }')
+template_path=$(execute_script_from_github \
+  "json/shared/scripts/get-oci-image.py" \
+  "template_path" \
+  "oci_image=${OCI_IMAGE}" \
+  "storage=${storage}" \
+  "registry_username=" \
+  "registry_password=" \
+  "platform=linux/amd64")
 
 if [ -z "$template_path" ]; then
   echo "Error: Failed to download OCI image" >&2
   exit 1
 fi
 
+ostype=$(execute_script_from_github \
+  "json/shared/scripts/get-oci-image.py" \
+  "ostype" \
+  "oci_image=${OCI_IMAGE}" \
+  "storage=${storage}" \
+  "registry_username=" \
+  "registry_password=" \
+  "platform=linux/amd64")
+
 echo "  OCI image ready: ${template_path}" >&2
 
-# 2) Configure subuid/subgid before container creation
-echo "Step 2: Configuring subuid/subgid..." >&2
-execute_script_from_github \
-  "json/shared/scripts/configure-subuid-subgid.sh" \
-  "-" \
-  "uid=${LXC_UID}" \
-  "gid=${LXC_GID}"
-echo "  subuid/subgid configured" >&2
 
-# 3) Create LXC container from OCI image
-echo "Step 3: Creating LXC container..." >&2
+# 2) Create LXC container from OCI image
+echo "Step 2: Creating LXC container..." >&2
 vm_id=$(execute_script_from_github \
   "json/shared/scripts/create-lxc-container.sh" \
   "vm_id" \
@@ -286,28 +270,27 @@ if [ -z "$vm_id" ]; then
 fi
 
 echo "  Container created: ${vm_id}" >&2
+# 3) Configure UID/GID mapping (subuid/subgid only, container config after creation)
+echo "Step 3: Configuring UID/GID mapping..." >&2
+# Run mapping script and capture mapped UID/GID for later steps (idempotent to call twice)
+mapped_uid=$(execute_script_from_github \
+  "json/shared/scripts/setup-lxc-uid-mapping.py" \
+  "mapped_uid" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}" \
+  "vm_id=${vm_id}" || echo "")
+mapped_gid=$(execute_script_from_github \
+  "json/shared/scripts/setup-lxc-uid-mapping.py" \
+  "mapped_gid" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}" \
+  "vm_id=${vm_id}" || echo "")
 
-# 3.5) Configure UID/GID mapping in container config
-echo "Step 3.5: Configuring UID/GID mapping..." >&2
-config_file="/etc/pve/lxc/${vm_id}.conf"
+# Fallback to defaults if mapper returned nothing
+if [ -z "$mapped_uid" ]; then mapped_uid="$LXC_UID"; fi
+if [ -z "$mapped_gid" ]; then mapped_gid="$LXC_GID"; fi
 
-# Stop container to modify config
-pct stop "${vm_id}" 2>/dev/null || true
-
-# Remove any automatically created idmap entries
-sed -i '/^lxc\.idmap/d' "$config_file" 2>/dev/null || true
-
-# Add 1:1 mapping for UID/GID 1001 (lxc user)
-cat >> "$config_file" <<EOF
-lxc.idmap: u 0 100000 ${LXC_UID}
-lxc.idmap: g 0 100000 ${LXC_GID}
-lxc.idmap: u ${LXC_UID} ${LXC_UID} 1
-lxc.idmap: g ${LXC_GID} ${LXC_GID} 1
-lxc.idmap: u $((LXC_UID + 1)) $((100000 + LXC_UID + 1)) $((65536 - LXC_UID - 1))
-lxc.idmap: g $((LXC_GID + 1)) $((100000 + LXC_GID + 1)) $((65536 - LXC_GID - 1))
-EOF
-
-echo "  UID/GID mapping configured: Container UID ${LXC_UID} <-> Host UID ${LXC_UID} (1:1)" >&2
+echo "  UID/GID ranges configured; mapped_uid=${mapped_uid}, mapped_gid=${mapped_gid}" >&2
 
 # 4) Mount ZFS pool if using ZFS storage
 echo "Step 4: Preparing storage..." >&2
@@ -324,7 +307,13 @@ if echo "$volume_base" | grep -q "^/"; then
         "host_mountpoint" \
         "storage_selection=zfs:${zfs_pool}" \
         "uid=${LXC_UID}" \
-        "gid=${LXC_GID}")
+        "gid=${LXC_GID}" \
+        "mapped_uid=${mapped_uid}" \
+        "mapped_gid=${mapped_gid}")
+      if [ -z "$host_mountpoint" ]; then
+        echo "Error: Failed to mount ZFS pool" >&2
+        exit 1
+      fi
       echo "  ZFS pool mounted at: ${host_mountpoint}" >&2
     else
       # Not ZFS, use volume_base directly
@@ -338,25 +327,31 @@ fi
 
 # 5) Bind volumes to container
 echo "Step 5: Binding volumes to container..." >&2
-# Download and execute bind-multiple-volumes script with volumes as environment variable
-raw_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/json/shared/scripts/bind-multiple-volumes-to-lxc.sh"
-
-# Set volumes as environment variable (multiline)
+# Log context for permissions/mapping
+echo "  Host: ${proxmox_hostname}" >&2
+echo "  Container ID: ${vm_id}, Container hostname: ${hostname}" >&2
+echo "  Using UID/GID: ${LXC_UID}/${LXC_GID} (mapped: ${mapped_uid}/${mapped_gid})" >&2
+# Set volumes as environment variable for the script
 export VOLUMES="config=config
 secure=secure"
 
-# Download script, replace all variables except volumes, and execute with VOLUMES env var
-# Note: Platzhalter im Script haben kein Leerzeichen nach {{ und vor }}
-curl -fsSL "$raw_url" | \
-  sed "s|{{ vm_id}}|${vm_id}|g" | \
-  sed "s|{{ hostname}}|${hostname}|g" | \
-  sed "s|{{ base_path}}|lxc-manager|g" | \
-  sed "s|{{ host_mountpoint}}|${host_mountpoint}|g" | \
-  sed "s|{{ username}}||g" | \
-  sed "s|{{ uid}}|${LXC_UID}|g" | \
-  sed "s|{{ gid}}|${LXC_GID}|g" | \
-  sed 's|VOLUMES="{{ volumes}}"|VOLUMES="$VOLUMES"|g' | \
-  sh
+# Use execute_script_from_github - VOLUMES is passed via environment
+if ! execute_script_from_github \
+  "json/shared/scripts/bind-multiple-volumes-to-lxc.sh" \
+  "-" \
+  "vm_id=${vm_id}" \
+  "hostname=${hostname}" \
+  "base_path=lxc-manager" \
+  "host_mountpoint=${host_mountpoint}" \
+  "username=" \
+  "uid=${LXC_UID}" \
+  "gid=${LXC_GID}" \
+  "mapped_uid=${mapped_uid}" \
+  "mapped_gid=${mapped_gid}" \
+  "volumes=\$VOLUMES"; then
+  echo "Error: Failed to bind volumes to container" >&2
+  exit 1
+fi
 
 echo "  Volumes bound successfully" >&2
 
@@ -577,9 +572,6 @@ echo "  Hostname: ${hostname}" >&2
 echo "  Config: ${config_volume_path}" >&2
 echo "  Secure: ${secure_volume_path}" >&2
 echo "" >&2
-echo "Next steps:" >&2
-echo "  1. Configure network (IP, gateway, etc.) in Proxmox Web UI" >&2
-echo "  2. Access the web interface at http://${hostname}:3000 (after network configuration)" >&2
-echo "  3. The storagecontext.json file allows repeating this installation" >&2
+echo "  Access the web interface at http://${hostname}:3000" >&2
 
 exit 0

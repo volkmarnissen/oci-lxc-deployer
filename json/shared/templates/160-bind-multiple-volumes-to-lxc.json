@@ -1,6 +1,6 @@
 {
   "name": "Bind Multiple Volumes to LXC",
-  "description": "Binds multiple host directories to an LXC container.\n\nFor each volume entry (key=value format, one per line), creates a bind mount from <host_mountpoint>/<base_path>/<hostname>/<key> to /<value> in the container.\n\nIf host_mountpoint is provided (from 'Mount Disk on Host' (120) or 'Mount ZFS Pool on Host' (121)), volumes are created at <host_mountpoint>/<base_path>/<hostname>/<key>.\nIf host_mountpoint is not provided, volumes are created at /mnt/<base_path>/<hostname>/<key>.\n\nThis template can be called independently of the LXC container's state (running or stopped) and is safe to call multiple times (idempotent).",
+  "description": "Bind multiple host directories to an LXC container (idempotent).",
   "execute_on": "ve",
   "skip_if_all_missing": ["volumes"],
   "skip_if_property_set": "skip_bind_multiple_volumes_to_lxc",
@@ -10,21 +10,21 @@
       "name": "ID of the LXC Container",
       "type": "string",
       "required": true,
-      "description": "ID of the LXC container to which the volumes will be bound."
+      "description": "LXC container ID to bind volumes to."
     },
     {
       "id": "hostname",
       "name": "Hostname",
       "type": "string",
       "required": true,
-      "description": "Hostname of the LXC container. Used to create container-specific volume directories."
+      "description": "Container hostname; used in volume directory paths."
     },
     {
       "id": "host_mountpoint",
       "name": "Host Mountpoint",
       "type": "string",
       "default": "",
-      "description": "Mountpoint on the Proxmox host from 'Mount Disk on Host' (120) or 'Mount ZFS Pool on Host' (121). Volume directories will be created at <host_mountpoint>/<base_path>/<hostname>/<volume-key>. If not provided (empty), volumes will be created under /mnt/<base_path>/<hostname>/<volume-key>.",
+      "description": "Host mountpoint for volumes (optional).",
       "advanced": true
     },
     {
@@ -33,21 +33,21 @@
       "type": "string",
       "default": "volumes",
       "advanced": true,
-      "description": "Base subdirectory name. Volume directories will be created at <host_mountpoint>/<base_path>/<hostname>/<volume-key>. Default is 'volumes'. If host_mountpoint is not set, /mnt/<base_path> will be used."
+      "description": "Base subdirectory under mountpoint; default 'volumes'."
     },
     {
       "id": "volumes",
       "name": "Volumes",
       "type": "string",
-      "required": true,
-      "description": "Volume mappings in key=value format, one per line. Each line creates a bind mount from <host_mountpoint>/<base_path>/<hostname>/<key> to /<value> in the container. Example:\nvolume1=/var/lib/myapp/data\nvolume2=/var/lib/myapp/logs"
+      "multiline": true,
+      "required": true
     },
     {
       "id": "username",
       "name": "Username",
       "type": "string",
       "default": "root",
-      "description": "Optional: Username for setting permissions on volume directories. If provided, will be used for chown instead of numeric UID/GID. Default is root. Should match the user created on the VE host (300-create-user-on-host.json).",
+      "description": "Username for directory ownership (optional).",
       "advanced": true
     },
     {
@@ -55,7 +55,7 @@
       "name": "UID",
       "type": "string",
       "default": "0",
-      "description": "UID for setting permissions on volume directories. Will be used consistently on VE host and LXC container. Default is 0 (root).",
+      "description": "UID for permissions; default 0.",
       "advanced": true
     },
     {
@@ -63,7 +63,23 @@
       "name": "GID",
       "type": "string",
       "default": "0",
-      "description": "GID for setting permissions on volume directories. Will be used consistently on VE host and LXC container. Default is 0 (root).",
+      "description": "GID for permissions; default 0.",
+      "advanced": true
+    },
+    {
+      "id": "mapped_uid",
+      "name": "Mapped UID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Host UID for unprivileged containers (optional).",
+      "advanced": true
+    },
+    {
+      "id": "mapped_gid",
+      "name": "Mapped GID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Host GID for unprivileged containers (optional).",
       "advanced": true
     }
   ],

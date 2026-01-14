@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from "fs";
+import { existsSync, readFileSync, mkdirSync, chmodSync } from "fs";
 import { homedir } from "os";
 import path from "path";
 import { ISsh } from "./types.mjs";
@@ -97,7 +97,7 @@ function generateSshKeyForLxcUser(): string | null {
       const key = readFileSync(publicKeyPath, "utf-8").trim();
       if (key.length > 0) return key;
     }
-  } catch (err: any) {
+  } catch {
     // If ed25519 fails, try RSA as fallback
     try {
       const rsaPrivateKeyPath = path.join(sshDir, "id_rsa");
@@ -230,47 +230,23 @@ export class Ssh {
     host: string,
     port?: number,
   ): boolean {
-    const sshPort = port || 22;
+    // Single lightweight check using ssh with short timeout
     try {
-      // Try multiple methods to check if port is open
-      // Method 1: nc with -z flag (GNU netcat)
-      try {
-        const res1 = spawnSync(
-          "nc",
-          ["-z", "-w", "2", host, String(sshPort)],
-          { encoding: "utf-8", timeout: 3000 }
-        );
-        if (res1.status === 0) return true;
-      } catch {}
-
-      // Method 2: timeout + nc (if timeout command exists)
-      try {
-        const res2 = spawnSync(
-          "timeout",
-          ["2", "nc", "-z", host, String(sshPort)],
-          { encoding: "utf-8", timeout: 3000 }
-        );
-        if (res2.status === 0) return true;
-      } catch {}
-
-      // Method 3: Use ssh connection test as fallback (if port is open but auth fails, port is listening)
-      // This is less reliable but better than nothing
       const sshTest = this.checkSshPermission(host, port);
-      // If we get any response (even permission denied), the port is likely listening
-      // We check if stderr contains connection-related errors vs auth errors
-      if (sshTest.stderr) {
-        const stderr = sshTest.stderr.toLowerCase();
-        // Connection refused means port is not listening
-        if (stderr.includes("connection refused") || stderr.includes("no route to host")) {
-          return false;
-        }
-        // Other errors (like permission denied) suggest port is listening
-        return true;
+      if (sshTest.permissionOk === true) return true;
+      const stderr = (sshTest.stderr || "").toLowerCase();
+      // Heuristics: explicit connection errors -> not listening
+      if (
+        stderr.includes("connection refused") ||
+        stderr.includes("no route to host") ||
+        stderr.includes("operation timed out") ||
+        stderr.includes("timed out")
+      ) {
+        return false;
       }
-      
-      return false;
-    } catch (err: any) {
-      // If all checks fail, assume port is not listening to be safe
+      // Otherwise, assume listening (e.g., permission denied)
+      return true;
+    } catch {
       return false;
     }
   }
@@ -285,7 +261,7 @@ export class Ssh {
         "-o",
         "BatchMode=yes",
         "-o",
-        "ConnectTimeout=2",
+        "ConnectTimeout=1",
         "-o",
         "StrictHostKeyChecking=no",
         "-o",

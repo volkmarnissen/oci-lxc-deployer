@@ -25,6 +25,7 @@ import { ITemplatePersistence, IApplicationPersistence } from "./persistence/int
 import { VeExecution } from "./ve-execution.mjs";
 import { TemplatePathResolver } from "./template-path-resolver.mjs";
 import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
+import { MarkdownReader } from "./markdown-reader.mjs";
 // ITemplateReference moved to backend-types.mts
 import { ITemplateReference } from "./backend-types.mjs";
 interface IProcessTemplateOpts {
@@ -625,8 +626,35 @@ export class TemplateProcessor extends EventEmitter {
     // Only add parameters if template is NOT skipped
     for (const param of tmplData.parameters ?? []) {
       if (!opts.parameters.some((p) => p.id === param.id)) {
+        // Resolve description from markdown if not in JSON
+        let description = param.description;
+        if (!description || description.trim() === '') {
+          // Try to load from markdown file
+          const mdPath = MarkdownReader.getMarkdownPath(tmplPath);
+          
+          // Try param.name first, then param.id
+          let mdSection = MarkdownReader.extractSection(mdPath, param.name || param.id);
+          if (!mdSection && param.name && param.name !== param.id) {
+            // Fallback: try param.id if param.name didn't work
+            mdSection = MarkdownReader.extractSection(mdPath, param.id);
+          }
+          
+          if (mdSection) {
+            description = mdSection;
+          } else {
+            // No description in JSON or markdown - this is an error
+            opts.errors.push(
+              new JsonError(
+                `Parameter '${param.id}' in template '${this.extractTemplateName(opts.template)}' has no description. ` +
+                `Add 'description' in JSON or create '${path.basename(tmplPath, '.json')}.md' with '## ${param.name || param.id}' section.`,
+              ),
+            );
+          }
+        }
+        
         const pparm: IParameterWithTemplate = {
           ...param,
+          description: description ?? "", // Use resolved description (ensure string)
           template: this.extractTemplateName(opts.template),
           templatename:
             tmplData.name || this.extractTemplateName(opts.template),

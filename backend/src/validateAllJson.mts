@@ -9,6 +9,7 @@ import { TaskType } from "./types.mjs";
 import { VEConfigurationError, VELoadApplicationError, IVEContext } from "./backend-types.mjs";
 import { TemplateProcessor } from "./templateprocessor.mjs";
 import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
+import { ExecutionMode } from "./ve-execution-constants.mjs";
 
 function findTemplateDirs(dir: string): string[] {
   let results: string[] = [];
@@ -412,8 +413,9 @@ export async function validateAllJson(localPathArg?: string): Promise<void> {
           // - Script existence checks
           // - Duplicate output/property ID checks
           // - Skip logic validation
+          // Pass ExecutionMode.TEST to skip actual SSH execution for enum templates
           const templateProcessor = new TemplateProcessor(configuredPathes, storageContext, pm.getPersistence());
-          await templateProcessor.loadApplication(appName, task, dummyVeContext);
+          await templateProcessor.loadApplication(appName, task, dummyVeContext, ExecutionMode.TEST);
           
           console.log(`✔ Validated application: ${relPath} (task: ${task})`);
         } catch (err: any) {

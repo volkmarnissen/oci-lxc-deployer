@@ -21,11 +21,21 @@
 STORAGE_SELECTION="{{ storage_selection}}"
 UID_VALUE="{{ uid}}"
 GID_VALUE="{{ gid}}"
+MAPPED_UID="{{ mapped_uid}}"
+MAPPED_GID="{{ mapped_gid}}"
 
 # Check that required parameters are not empty
 if [ -z "$STORAGE_SELECTION" ]; then
   echo "Error: Required parameter (storage_selection) must be set and not empty!" >&2
   exit 1
+fi
+
+# Use mapped UID/GID if provided, otherwise fall back to uid/gid parameters
+if [ -n "$MAPPED_UID" ] && [ "$MAPPED_UID" != "" ]; then
+  UID_VALUE="$MAPPED_UID"
+fi
+if [ -n "$MAPPED_GID" ] && [ "$MAPPED_GID" != "" ]; then
+  GID_VALUE="$MAPPED_GID"
 fi
 
 # Parse storage selection: must be zfs:...

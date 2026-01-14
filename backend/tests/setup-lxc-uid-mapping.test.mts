@@ -1,0 +1,182 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "fs-extra";
+import path from "path";
+import os from "os";
+import { spawnSync } from "child_process";
+
+describe("setup-lxc-uid-mapping.py", () => {
+  let tempDir: string;
+  let subuidPath: string;
+  let subgidPath: string;
+  let configDir: string;
+  let scriptPath: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "uid-mapping-test-"));
+    subuidPath = path.join(tempDir, "subuid");
+    subgidPath = path.join(tempDir, "subgid");
+    configDir = path.join(tempDir, "lxc");
+    scriptPath = path.join(__dirname, "../../json/shared/scripts/setup-lxc-uid-mapping.py");
+    await fs.ensureDir(configDir);
+  });
+
+  afterEach(async () => {
+    if (tempDir) {
+      await fs.remove(tempDir);
+    }
+  });
+
+  function runScript(uid: string, gid: string, vmId?: string): { stdout: string; stderr: string; exitCode: number } {
+    // Read script content and replace template variables (like execute_script_from_github does)
+    let scriptContent = fs.readFileSync(scriptPath, "utf-8");
+    scriptContent = scriptContent
+      .replace(/\{\{\s*uid\s*\}\}/g, uid)
+      .replace(/\{\{\s*gid\s*\}\}/g, gid)
+      .replace(/\{\{\s*vm_id\s*\}\}/g, vmId || "");
+
+    // Set environment variables for mock paths
+    const env = {
+      ...process.env,
+      MOCK_SUBUID_PATH: subuidPath,
+      MOCK_SUBGID_PATH: subgidPath,
+      MOCK_CONFIG_DIR: configDir,
+    };
+
+    // Execute the modified script via stdin
+    const result = spawnSync("python3", [], {
+      input: scriptContent,
+      env,
+      encoding: "utf-8",
+      timeout: 5000,
+    });
+
+    return {
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      exitCode: result.status || 0,
+    };
+  }
+
+  it("should configure single UID mapping correctly", () => {
+    const result = runScript("1000", "1000", "100");
+
+    expect(result.exitCode).toBe(0);
+
+    // Check /etc/subuid
+    const subuidContent = fs.readFileSync(subuidPath, "utf-8");
+    expect(subuidContent).toContain("root:100000:65536"); // Standard range
+    expect(subuidContent).toContain("root:6719136:1000"); // Specific range for UID 1000
+    expect(subuidContent).toContain("root:1000:1"); // 1:1 mapping
+    expect(subuidContent).toContain("root:6720137:64535"); // Rest range
+
+    // Check /etc/subgid
+    const subgidContent = fs.readFileSync(subgidPath, "utf-8");
+    expect(subgidContent).toContain("root:100000:65536");
+    expect(subgidContent).toContain("root:6719136:1000");
+    expect(subgidContent).toContain("root:1000:1");
+    expect(subgidContent).toContain("root:6720137:64535");
+
+    // Check container config
+    const configPath = path.join(configDir, "100.conf");
+    const configContent = fs.readFileSync(configPath, "utf-8");
+    expect(configContent).toContain("lxc.idmap: u 0 100000 1000");
+    expect(configContent).toContain("lxc.idmap: g 0 100000 1000");
+    expect(configContent).toContain("lxc.idmap: u 1000 1000 1");
+    expect(configContent).toContain("lxc.idmap: g 1000 1000 1");
+    expect(configContent).toContain("lxc.idmap: u 1001 6720137 64535");
+    expect(configContent).toContain("lxc.idmap: g 1001 6720137 64535");
+  });
+
+  it("should add second UID without duplicating existing entries", () => {
+    // First run: UID 1000
+    let result = runScript("1000", "1000", "100");
+    expect(result.exitCode).toBe(0);
+
+    // Second run: UID 1000,2000
+    result = runScript("1000,2000", "1000,2000", "100");
+    expect(result.exitCode).toBe(0);
+
+    // Check subuid - should have both UIDs but no duplicates
+    const subuidContent = fs.readFileSync(subuidPath, "utf-8");
+    const subuidLines = subuidContent.split("\n").filter(l => l.trim());
+    
+    // Count occurrences of standard range - should appear only once
+    const standardRangeCount = subuidLines.filter(l => l === "root:100000:65536").length;
+    expect(standardRangeCount).toBe(1);
+
+    // Should have new specific range for max UID (2000)
+    // Formula: 100000 + 65536 + ((2000/10) * 65536) = 100000 + 65536 + 13107200 = 13272736
+    expect(subuidContent).toContain("root:13272736:2000"); // Specific range for UID 2000
+    expect(subuidContent).toContain("root:1000:1");
+    expect(subuidContent).toContain("root:2000:1");
+    expect(subuidContent).toContain("root:13274737:63535"); // Rest range
+
+    // Check container config - should have mappings for both UIDs
+    const configPath = path.join(configDir, "100.conf");
+    const configContent = fs.readFileSync(configPath, "utf-8");
+    expect(configContent).toContain("lxc.idmap: u 0 100000 1000");
+    expect(configContent).toContain("lxc.idmap: u 1000 1000 1");
+    expect(configContent).toContain("lxc.idmap: u 2000 2000 1");
+    expect(configContent).toContain("lxc.idmap: u 2001 13274737 63535");
+
+    // No duplicate idmap entries
+    const idmapLines = configContent.split("\n").filter(l => l.includes("lxc.idmap:"));
+    const uniqueIdmapLines = new Set(idmapLines);
+    expect(idmapLines.length).toBe(uniqueIdmapLines.size);
+  });
+
+  it("should handle multiple comma-separated UIDs", () => {
+    const result = runScript("1000,1001,2000", "1000,1001,2000", "101");
+    expect(result.exitCode).toBe(0);
+
+    const configPath = path.join(configDir, "101.conf");
+    const configContent = fs.readFileSync(configPath, "utf-8");
+
+    // Check all 1:1 mappings are present
+    expect(configContent).toContain("lxc.idmap: u 1000 1000 1");
+    expect(configContent).toContain("lxc.idmap: u 1001 1001 1");
+    expect(configContent).toContain("lxc.idmap: u 2000 2000 1");
+    expect(configContent).toContain("lxc.idmap: g 1000 1000 1");
+    expect(configContent).toContain("lxc.idmap: g 1001 1001 1");
+    expect(configContent).toContain("lxc.idmap: g 2000 2000 1");
+  });
+
+  it("should work without vm_id (only update subuid/subgid)", () => {
+    const result = runScript("1000", "1000");
+    expect(result.exitCode).toBe(0);
+
+    // Files should exist
+    expect(fs.existsSync(subuidPath)).toBe(true);
+    expect(fs.existsSync(subgidPath)).toBe(true);
+
+    // No config file should be created
+    const configPath = path.join(configDir, "100.conf");
+    expect(fs.existsSync(configPath)).toBe(false);
+  });
+
+  it("should preserve existing non-idmap entries in container config", () => {
+    const configPath = path.join(configDir, "102.conf");
+    const existingConfig = `arch: amd64
+cores: 2
+hostname: test
+memory: 512
+net0: name=eth0,bridge=vmbr0
+ostype: alpine
+rootfs: local-lvm:vm-102-disk-0,size=8G
+`;
+    fs.writeFileSync(configPath, existingConfig);
+
+    const result = runScript("1000", "1000", "102");
+    expect(result.exitCode).toBe(0);
+
+    const configContent = fs.readFileSync(configPath, "utf-8");
+    
+    // Existing entries should be preserved
+    expect(configContent).toContain("arch: amd64");
+    expect(configContent).toContain("hostname: test");
+    expect(configContent).toContain("memory: 512");
+    
+    // New idmap entries should be added
+    expect(configContent).toContain("lxc.idmap: u 1000 1000 1");
+  });
+});

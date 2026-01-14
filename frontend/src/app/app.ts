@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { VeConfigurationService } from './ve-configuration.service';
+import { take } from 'rxjs/operators';
 import { CacheService } from './shared/services/cache.service';
 import { ISsh } from '../shared/types';
 
@@ -27,15 +28,15 @@ export class App implements OnInit {
   ngOnInit(): void {
     // Preload cache in background for faster UI loading
     this.cacheService.preloadAll();
-    
-    this.loadSshConfigs();
-    this.cfg.initVeContext().subscribe({
-      next: (sshs) => {
-        this.sshConfigs = sshs || [];
+
+    // Single call to fetch SSH configs (sets VE context key via service tap)
+    this.cfg.getSshConfigs().pipe(take(1)).subscribe({
+      next: (res) => {
+        const sshs = res.sshs || [];
+        this.sshConfigs = sshs;
         this.updateCurrentHost();
-        // Check if no SSH configs exist or no current SSH config is set
-        if (!sshs || sshs.length === 0 || !sshs.some(ssh => ssh.current === true)) {
-          // Only navigate if we're not already on the ssh-config page
+        // Navigate to ssh-config when none or no current selection exists
+        if (sshs.length === 0 || !sshs.some(ssh => ssh.current === true)) {
           const currentUrl = this.router.url;
           if (!currentUrl.startsWith('/ssh-config')) {
             this.router.navigate(['/ssh-config']);
@@ -43,8 +44,7 @@ export class App implements OnInit {
         }
       },
       error: (err) => {
-        console.warn('Failed to initialize VE context', err);
-        // On error, navigate to ssh-config page if not already there
+        console.warn('Failed to load SSH configs', err);
         const currentUrl = this.router.url;
         if (!currentUrl.startsWith('/ssh-config')) {
           this.router.navigate(['/ssh-config']);
@@ -80,13 +80,31 @@ export class App implements OnInit {
   onHostChange(host: string): void {
     const selected = this.sshConfigs.find(ssh => ssh.host === host);
     if (selected) {
+      // Non-blocking quick check of the target SSH host
+      this.cfg.checkSsh(selected.host, selected.port).pipe(take(1)).subscribe({
+        next: (res) => {
+          if (!res.permissionOk) {
+            console.warn('SSH host not reachable or permission denied', res);
+          }
+        },
+        error: (err) => {
+          console.warn('SSH check failed', err);
+        }
+      });
       this.cfg.setSshConfig({ host: selected.host, port: selected.port, current: true }).subscribe({
         next: () => {
           this.currentHost = host;
-          // Reload SSH configs to update current status
-          this.loadSshConfigs();
-          // Reload VE context
-          this.cfg.initVeContext().subscribe();
+          // Reload SSH configs to update current status (single call)
+          this.cfg.getSshConfigs().pipe(take(1)).subscribe({
+            next: (res) => {
+              this.sshConfigs = res.sshs || [];
+              this.updateCurrentHost();
+            },
+            error: () => {
+              this.sshConfigs = [];
+              this.currentHost = '';
+            }
+          });
         },
         error: (err) => {
           console.error('Failed to set current host', err);

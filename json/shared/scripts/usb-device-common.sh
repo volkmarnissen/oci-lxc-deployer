@@ -709,3 +709,40 @@ find_tty_device() {
   return 1
 }
 
+# 22. is_usb_device_mapped_in_running_containers(bus, device)
+# Checks if a USB device (bus:device) is already mapped to any running LXC container
+# by checking lxc.mount.entry entries containing /dev/bus/usb/{bus}/{device}
+# Returns: 0 (true) if device is mapped, 1 (false) otherwise
+is_usb_device_mapped_in_running_containers() {
+  local bus="$1"
+  local device="$2"
+  
+  # Format bus and device with leading zeros (e.g., 001, 003)
+  local bus_formatted=$(printf "%03d" "$bus" 2>/dev/null || echo "$bus")
+  local device_formatted=$(printf "%03d" "$device" 2>/dev/null || echo "$device")
+  local usb_bus_path="/dev/bus/usb/${bus_formatted}/${device_formatted}"
+  
+  # Get list of running container IDs
+  local running_containers=$(pct list 2>/dev/null | awk 'NR>1 && $2=="running" {print $1}' || echo "")
+  
+  if [ -z "$running_containers" ]; then
+    return 1  # No running containers
+  fi
+  
+  # Check each running container's config
+  for vmid in $running_containers; do
+    local config_file="/etc/pve/lxc/${vmid}.conf"
+    if [ ! -f "$config_file" ]; then
+      continue
+    fi
+    
+    # Check for lxc.mount.entry containing this USB bus path
+    if grep -q "^lxc.mount.entry.*${usb_bus_path}" "$config_file" 2>/dev/null; then
+      return 0  # Device is mapped
+    fi
+  done
+  
+  return 1  # Device is not mapped
+}
+
+

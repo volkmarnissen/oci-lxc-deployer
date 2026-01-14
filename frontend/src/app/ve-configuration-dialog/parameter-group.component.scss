@@ -1,13 +1,14 @@
 .param-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  width: 280px;
-  flex-shrink: 0;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
   padding: 0.75rem;
   border-radius: 8px;
   background: #fafbfc;
   box-shadow: 0 2px 8px 0 #0001;
+  box-sizing: border-box;
 }
 
 .group-title {
@@ -22,7 +23,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .param-field {
@@ -43,5 +44,93 @@
 .unsupported-param {
   color: #c00;
   font-style: italic;
+}
+
+.help-toggle {
+  margin-left: 0.5rem;
+  color: rgba(0, 0, 0, 0.54);
+  
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.help-toggle-suffix {
+  margin-left: 4px;
+}
+
+.expandable-help {
+  width: 100%;
+  min-width: 0;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #f0f4f8;
+  border-left: 3px solid #1976d2;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #333;
+  animation: slideDown 0.2s ease-out;
+  box-sizing: border-box;
+
+  :deep(p) {
+    margin: 0.5em 0;
+    
+    &:first-child {
+      margin-top: 0;
+    }
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  :deep(ul), :deep(ol) {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+
+  :deep(li) {
+    margin: 0.25rem 0;
+  }
+
+  :deep(code) {
+    background: #fff;
+    padding: 0.125rem 0.3rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    border: 1px solid #e0e0e0;
+  }
+
+  :deep(pre) {
+    background: #fff;
+    padding: 0.75rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+    
+    code {
+      background: transparent;
+      padding: 0;
+      border: none;
+    }
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
 }
 

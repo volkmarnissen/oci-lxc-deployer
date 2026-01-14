@@ -1,10 +1,11 @@
 #!/bin/sh
-# List all audio devices (USB and PCI) on the VE host
+# List all audio devices (USB and PCI) on the VE host that are not already mapped to running LXC containers
 #
 # This script lists all available audio devices by:
 # 1. Scanning /sys/class/sound for audio cards
 # 2. Extracting device information (name, card number)
-# 3. Formatting as JSON array for enumValues
+# 3. Checking which devices are already mapped to running containers (USB only)
+# 4. Formatting as JSON array for enumValues
 #
 # Output format: JSON array of objects with name and value fields
 # Example: [{"name":"USB Audio Device","value":"card0"}, ...]
@@ -44,6 +45,12 @@ for SOUND_CARD in /sys/class/sound/card*; do
   # Check if device is USB by trying to find USB device
   if find_usb_device_by_vendor_product "$VENDOR_ID" "$PRODUCT_ID" "$CARD_NAME" "sound/card*"; then
     DEVICE_TYPE="USB"
+    
+    # Skip if USB device is already mapped to a running container
+    if is_usb_device_mapped_in_running_containers "$USB_BUS" "$USB_DEVICE"; then
+      continue
+    fi
+    
     # Get lsusb description using library function
     DEVICE_INFO=$(get_lsusb_description "$USB_BUS" "$USB_DEVICE" || echo "")
   else

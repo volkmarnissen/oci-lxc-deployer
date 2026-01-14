@@ -181,8 +181,15 @@ if [ "$VM_TYPE" = "lxc" ]; then
   if command -v udevadm >/dev/null 2>&1; then
     SYSFS_PATH=$(find_usb_sysfs_path "$USB_BUS" "$USB_DEVICE")
     if [ -n "$SYSFS_PATH" ] && get_vendor_product_id "$SYSFS_PATH"; then
-      MAPPED_UID=$((CONTAINER_UID + 100000))
-      MAPPED_GID=$((CONTAINER_GID + 100000))
+      # Use mapped values from template if provided, otherwise calculate
+      MAPPED_UID="{{ mapped_uid }}"
+      MAPPED_GID="{{ mapped_gid }}"
+      if [ -z "$MAPPED_UID" ] || [ "$MAPPED_UID" = "" ]; then
+        MAPPED_UID=$((CONTAINER_UID + 100000))
+      fi
+      if [ -z "$MAPPED_GID" ] || [ "$MAPPED_GID" = "" ]; then
+        MAPPED_GID=$((CONTAINER_GID + 100000))
+      fi
       RULE_FILE="/etc/udev/rules.d/99-lxc-input-${VM_ID}-${VENDOR_ID}-${PRODUCT_ID}.rules"
       
       # Install replug handler script (must be done before setup_udev_rule_with_replug)
@@ -411,8 +418,14 @@ if ! update_lxc_config_for_input_devices "\$LXC_CONFIG_FILE" "\$INPUT_DEVICES" "
 fi
 
 # Set permissions for all devices
-MAPPED_UID=\$((CONTAINER_UID + 100000))
-MAPPED_GID=\$((CONTAINER_GID + 100000))
+MAPPED_UID="{{ mapped_uid }}"
+MAPPED_GID="{{ mapped_gid }}"
+if [ -z "\$MAPPED_UID" ] || [ "\$MAPPED_UID" = "" ]; then
+  MAPPED_UID=\$((CONTAINER_UID + 100000))
+fi
+if [ -z "\$MAPPED_GID" ] || [ "\$MAPPED_GID" = "" ]; then
+  MAPPED_GID=\$((CONTAINER_GID + 100000))
+fi
 for DEVICE in \$INPUT_DEVICES; do
   if ! chown "\$MAPPED_UID:\$MAPPED_GID" "\$DEVICE" 2>/dev/null; then
     echo "Warning: Failed to set ownership of \$DEVICE" >&2

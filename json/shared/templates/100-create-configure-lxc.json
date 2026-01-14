@@ -75,14 +75,15 @@
     }
   ],
   "commands": [
-    {
-      "name": "Configure subuid/subgid",
-      "script": "configure-subuid-subgid.sh"
-    },
+
     {
       "name": "Create LXC container",
       "script": "create-lxc-container.sh",
       "outputs": ["vm_id"]
+    },    
+    {
+      "name": "Setup UID/GID mapping",
+      "script": "setup-lxc-uid-mapping.py"
     },
     {
       "name": "Compute Static IPs",

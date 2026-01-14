@@ -217,14 +217,22 @@ export class ContextManager extends Context implements IContext {
         if (typeof anyCtx.port === "number") item.port = anyCtx.port;
         if (typeof anyCtx.current === "boolean") item.current = anyCtx.current;
         if (pubCmd) item.publicKeyCommand = pubCmd;
-        // Only include installSshServer command if SSH port is not listening
-        const portListening = Ssh.checkSshPortListening(item.host, item.port);
-        if (!portListening) {
-          item.installSshServer = Ssh.getInstallSshServerCommand();
+        // Nur für den aktuellen SSH-Context eine kurze Prüfung
+        if (item.current === true) {
+          const perm = Ssh.checkSshPermission(item.host, item.port);
+          item.permissionOk = perm.permissionOk;
+          if (perm.stderr) (item as any).stderr = perm.stderr;
+          const stderr = (perm.stderr || "").toLowerCase();
+          const portListening = perm.permissionOk || (
+            !stderr.includes("connection refused") &&
+            !stderr.includes("no route to host") &&
+            !stderr.includes("operation timed out") &&
+            !stderr.includes("timed out")
+          );
+          if (!portListening) {
+            item.installSshServer = Ssh.getInstallSshServerCommand();
+          }
         }
-        const perm = Ssh.checkSshPermission(item.host, item.port);
-        item.permissionOk = perm.permissionOk;
-        if (perm.stderr) (item as any).stderr = perm.stderr;
         result.push(item);
       }
     }
