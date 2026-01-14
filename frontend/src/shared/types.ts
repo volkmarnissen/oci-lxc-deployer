@@ -117,6 +117,7 @@ export enum ApiUri {
   VeRestartInstallation = "/api/ve/restart-installation/:vmInstallKey/:veContext",
   VeExecute = "/api/ve/execute/:veContext",
   Applications = "/api/applications",
+  Installations = "/api/installations",
   TemplateDetailsForApplication = "/api/template-details/:application/:task/:veContext",
   UnresolvedParameters = "/api/unresolved-parameters/:application/:task/:veContext",
   FrameworkNames = "/api/framework-names",
@@ -177,6 +178,24 @@ export interface IApplicationResponse {
   application: IApplicationWeb;
   parameters: IParameter[];
 }
+
+export interface IInstallationEntry {
+  application: IApplicationWeb;
+  vmInstallKey: string;
+  hostname: string;
+  task: TaskType;
+}
+
+export type IInstallationsResponse = IInstallationEntry[];
+
+export interface IInstallationEntry {
+  application: IApplicationWeb;
+  vmInstallKey: string;
+  hostname: string;
+  task: TaskType;
+}
+
+export type IInstallationsResponse = IInstallationEntry[];
 
 export type IVeExecuteMessagesResponse = ISingleExecuteMessagesResponse[];
 export interface IVeConfigurationResponse {

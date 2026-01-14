@@ -18,6 +18,8 @@ import {
   IPostFrameworkFromImageBody,
   IPostFrameworkFromImageResponse,
   IOciImageAnnotations,
+  IInstallationsResponse,
+  IInstallationEntry,
 } from "@src/types.mjs";
 import http from "http";
 import path from "path";
@@ -442,6 +444,40 @@ export class VEWebApp {
         const pm = PersistenceManager.getInstance();
         const applications = pm.getApplicationService().listApplicationsForFrontend();
         const payload: IApplicationsResponse = applications;
+        res.json(payload).status(200);
+      } catch (err: any) {
+        const serializedError = this.serializeError(err);
+        res.status(500).json({ 
+          error: err instanceof Error ? err.message : String(err),
+          serializedError: serializedError 
+        });
+      }
+    });
+    // GET /api/installations - list VM install contexts joined with application metadata
+    this.app.get(ApiUri.Installations, (req, res) => {
+      try {
+        const pm = PersistenceManager.getInstance();
+        const apps = pm.getApplicationService().listApplicationsForFrontend();
+        const appMap = new Map<string, any>();
+        for (const a of apps) appMap.set(a.id, a);
+
+        const entries: IInstallationEntry[] = [];
+        for (const key of this.storageContext.keys().filter((k) => k.startsWith("vminstall_"))) {
+          const ctx: any = this.storageContext.get(key);
+          if (!ctx || typeof ctx !== 'object') continue;
+          const app = appMap.get(ctx.application) || {
+            id: ctx.application,
+            name: ctx.application,
+            description: "",
+          };
+          entries.push({
+            application: app,
+            vmInstallKey: key,
+            hostname: String(ctx.hostname || ''),
+            task: String(ctx.task || 'installation') as any,
+          });
+        }
+        const payload: IInstallationsResponse = entries;
         res.json(payload).status(200);
       } catch (err: any) {
         const serializedError = this.serializeError(err);
