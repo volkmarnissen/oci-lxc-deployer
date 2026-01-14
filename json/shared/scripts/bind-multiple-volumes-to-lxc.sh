@@ -76,17 +76,21 @@ fi
 
 # Helper function: Is container running?
 container_running() {
-  pct status "$VMID" 2>/dev/null | grep -q 'status: running'
+  pct status "$VMID" 2>/dev/null | grep -aq 'status: running'
 }
 
-# Helper function: Find next free mpX
+# Build list of used mp indexes from current config
+USED_MPS=$(pct config "$VMID" | awk -F: '/^mp[0-9]+:/ { sub(/^mp/,"",$1); print $1 }' | tr '\n' ' ')
+# Track mp indexes assigned during this run to avoid reusing same slot
+ASSIGNED_MPS=""
+
+# Helper function: Find next free mpX considering current config and assignments
 find_next_mp() {
-  USED=$(pct config "$VMID" | grep '^mp' | cut -d: -f1 | sed 's/mp//')
   for i in $(seq 0 9); do
-    if ! echo "$USED" | grep -qw "$i"; then
-      echo "mp$i"
-      return 0
-    fi
+    case " $USED_MPS $ASSIGNED_MPS " in
+      *" $i "*) ;; # already used
+      *) echo "mp$i"; return 0 ;;
+    esac
   done
   echo ""
 }
@@ -104,6 +108,73 @@ NEEDS_STOP=0
 # Use a temporary file to avoid subshell issues
 TMPFILE=$(mktemp)
 echo "$VOLUMES" > "$TMPFILE"
+
+# Pre-clean: ensure only one mp entry per host source path (based on VOLUMES)
+# Build source list from VOLUMES (first field before '=')
+SOURCES=""
+while IFS= read -r sline; do
+  [ -z "$sline" ] && continue
+  skey=$(echo "$sline" | cut -d'=' -f1)
+  [ -z "$skey" ] && continue
+  spath="$HOST_PATH/$skey"
+  SOURCES="$SOURCES $spath"
+done < "$TMPFILE"
+
+for SRC in $SOURCES; do
+  MAP_SRC_LINES=$(pct config "$VMID" | grep -aE "^mp[0-9]+: $SRC," || true)
+  if [ -n "$MAP_SRC_LINES" ]; then
+    # Delete all mp entries for this source; we'll re-add cleanly below
+    if [ "$NEEDS_STOP" -eq 0 ] && container_running; then
+      pct stop "$VMID" >&2
+      NEEDS_STOP=1
+    fi
+    printf '%s\n' "$MAP_SRC_LINES" | while IFS= read -r mline; do
+      mpkey=$(echo "$mline" | cut -d: -f1)
+      if pct set "$VMID" -delete "$mpkey" >&2; then
+        echo "Deleted mount $mpkey for source $SRC" >&2
+      else
+        echo "Warning: Failed to delete mount $mpkey for source $SRC" >&2
+      fi
+    done
+  fi
+done
+
+# Pre-clean: ensure only one mp entry per target container path (based on VOLUMES)
+# Build target list from VOLUMES (second field after '=')
+TARGETS=""
+while IFS= read -r tline; do
+  [ -z "$tline" ] && continue
+  tval=$(echo "$tline" | cut -d'=' -f2- | cut -d',' -f1)
+  [ -z "$tval" ] && continue
+  # Normalize container path: ensure a single leading slash (avoid //config)
+  tval=$(printf '%s' "$tval" | sed -E 's#^/*#/#')
+  TARGETS="$TARGETS $tval"
+done < "$TMPFILE"
+
+for TARGET in $TARGETS; do
+  # Find all mp entries for this target
+  MAP_LINES=$(pct config "$VMID" | grep -aE "^mp[0-9]+: .*mp=$TARGET" || true)
+  # If multiple entries exist, keep the first and delete the rest
+  if [ -n "$MAP_LINES" ]; then
+    # Stop container once before deletions
+    if [ "$NEEDS_STOP" -eq 0 ] && container_running; then
+      pct stop "$VMID" >&2
+      NEEDS_STOP=1
+    fi
+    # Delete all mp entries for this target; we'll re-add cleanly below
+    printf '%s\n' "$MAP_LINES" | while IFS= read -r mline; do
+      mpkey=$(echo "$mline" | cut -d: -f1)
+      if pct set "$VMID" -delete "$mpkey" >&2; then
+        echo "Deleted mount $mpkey for target $TARGET" >&2
+      else
+        echo "Warning: Failed to delete mount $mpkey for target $TARGET" >&2
+      fi
+    done
+  fi
+done
+
+# Refresh USED_MPS after cleanup
+USED_MPS=$(pct config "$VMID" | awk -F: '/^mp[0-9]+:/ { sub(/^mp/,"",$1); print $1 }' | tr '\n' ' ')
 
 VOLUME_COUNT=0
 while IFS= read -r line <&3; do
@@ -157,7 +228,7 @@ while IFS= read -r line <&3; do
   fi
   
   # Determine existing mp slot for the target container path (mp=...)
-  EXISTING_LINE=$(pct config "$VMID" | grep -E "^mp[0-9]+: .*mp=$CONTAINER_PATH" | head -n1)
+  EXISTING_LINE=$(pct config "$VMID" | grep -aE "^mp[0-9]+: .*mp=$CONTAINER_PATH" | head -n1)
   EXISTING_MP=""
   EXISTING_SRC=""
   if [ -n "$EXISTING_LINE" ]; then
@@ -211,6 +282,9 @@ while IFS= read -r line <&3; do
   
   echo "Bound $SOURCE_PATH to $CONTAINER_PATH in container $VMID" >&2
   VOLUME_COUNT=$((VOLUME_COUNT + 1))
+  # Mark this mp as assigned to avoid reuse in subsequent mounts
+  MP_NUM="${MP#mp}"
+  ASSIGNED_MPS="$ASSIGNED_MPS $MP_NUM"
 done 3< "$TMPFILE"
 rm -f "$TMPFILE"
 
