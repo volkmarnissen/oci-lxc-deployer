@@ -19,13 +19,14 @@ Mock paths for testing:
   - MOCK_CONFIG_DIR: Override /etc/pve/lxc directory
 
 Output: JSON to stdout with mapped_uid and mapped_gid (errors to stderr)
-  [{"id": "mapped_uid", "value": "1000"}, {"id": "mapped_gid", "value": "1000"}]
+    [{"id": "mapped_uid", "value": "101000"}, {"id": "mapped_gid", "value": "101000"}]
 """
 
 import sys
 import os
 import json
 from pathlib import Path
+from typing import List, Tuple
 
 # Standard Proxmox UID/GID range
 STANDARD_START = 100000
@@ -114,6 +115,54 @@ def update_lxc_config(config_path, idmap_entries):
     with open(config_path, 'w') as f:
         f.writelines(lines)
 
+def parse_idmap_lines(lines: List[str], kind: str) -> List[Tuple[int, int, int]]:
+    """Parse lxc.idmap lines into (container_start, host_start, range) for given kind 'u' or 'g'"""
+    result: List[Tuple[int, int, int]] = []
+    for line in lines:
+        s = line.strip()
+        if not s.startswith('lxc.idmap'):
+            continue
+        # Expected formats:
+        # 'lxc.idmap = u 0 100000 65536' or 'lxc.idmap: u 0 100000 65536'
+        s = s.replace('=', ':')
+        parts = [p for p in s.split() if p]
+        # parts example: ['lxc.idmap:', 'u', '0', '100000', '65536']
+        if len(parts) >= 6 and parts[0].startswith('lxc.idmap'):
+            k = parts[1]
+            if k != kind:
+                continue
+            try:
+                c_start = int(parts[2])
+                h_start = int(parts[3])
+                rng = int(parts[4])
+                result.append((c_start, h_start, rng))
+            except ValueError:
+                continue
+        elif len(parts) >= 5 and parts[0].startswith('lxc.idmap'):
+            # Fallback if tokenization differs
+            try:
+                k = parts[1]
+                if k != kind:
+                    continue
+                c_start = int(parts[2])
+                h_start = int(parts[3])
+                rng = int(parts[4])
+                result.append((c_start, h_start, rng))
+            except Exception:
+                continue
+    return sorted(result, key=lambda t: t[0])
+
+def compute_host_id_for_container_id(container_id: int, idmap_segments: List[Tuple[int, int, int]], unprivileged: bool) -> int:
+    """Given a container UID/GID and idmap segments, compute the host ID. If no segments match,
+    assume default Proxmox mapping 100000 offset for unprivileged containers, else 1:1."""
+    for c_start, h_start, rng in idmap_segments:
+        if c_start <= container_id < c_start + rng:
+            return h_start + (container_id - c_start)
+    # Fallbacks
+    if unprivileged:
+        return STANDARD_START + container_id
+    return container_id
+
 def main():
     # Get parameters from template variables (will be replaced by sed during script download)
     uid_str = "{{ uid }}"
@@ -144,20 +193,54 @@ def main():
     update_file(subuid_path, subuid_entries, 'subuid')
     update_file(subgid_path, subgid_entries, 'subgid')
     
+    # Determine mapped host IDs (what we should chown on the host)
+    mapped_uid_val = None
+    mapped_gid_val = None
+
+    # Default: assume unprivileged unless config says otherwise
+    unprivileged = True
+    config_lines: List[str] = []
+    config_path = None
     if vm_id and vm_id.isdigit():
         config_path = Path(config_dir) / f"{vm_id}.conf"
-        update_lxc_config(config_path, idmap_entries)
-    
-    # Output mapped UID/GID as JSON for templates
-    # For 1:1 mapping, the container UID maps directly to host UID (not offset)
-    # This is the UID that should be used on the host filesystem
-    output = []
+        # Write idmap entries if provided
+        if idmap_entries:
+            update_lxc_config(config_path, idmap_entries)
+        # Reload config to compute mapping
+        try:
+            with open(config_path, 'r') as f:
+                config_lines = f.readlines()
+        except Exception:
+            config_lines = []
+    # Detect unprivileged flag
+    for line in config_lines:
+        s = line.strip()
+        if s.startswith('unprivileged'):
+            # Formats: 'unprivileged: 1' or 'unprivileged: true'
+            val = s.split(':', 1)[-1].strip().lower()
+            unprivileged = val in ('1', 'true', 'yes')
+            break
+
+    # Build idmap segments; if none present, assume default mapping for unprivileged
+    u_segments = parse_idmap_lines(config_lines, 'u') if config_lines else []
+    g_segments = parse_idmap_lines(config_lines, 'g') if config_lines else []
+    if not u_segments and unprivileged:
+        u_segments = [(0, STANDARD_START, 65536)]
+    if not g_segments and unprivileged:
+        g_segments = [(0, STANDARD_START, 65536)]
+
+    # Compute mapped host IDs for the first uid/gid
     if uid_list:
-        # Use the first UID from the list as the primary mapped UID
-        output.append({"id": "mapped_uid", "value": str(uid_list[0])})
+        mapped_uid_val = compute_host_id_for_container_id(uid_list[0], u_segments, unprivileged)
     if gid_list:
-        # Use the first GID from the list as the primary mapped GID
-        output.append({"id": "mapped_gid", "value": str(gid_list[0])})
+        mapped_gid_val = compute_host_id_for_container_id(gid_list[0], g_segments, unprivileged)
+
+    # Output mapped UID/GID as JSON for templates (host IDs to use for chown)
+    output = []
+    if mapped_uid_val is not None:
+        output.append({"id": "mapped_uid", "value": str(mapped_uid_val)})
+    if mapped_gid_val is not None:
+        output.append({"id": "mapped_gid", "value": str(mapped_gid_val)})
     
     if output:
         print(json.dumps(output))

@@ -264,9 +264,17 @@ if [ "$SKIP_RUN" = "false" ]; then
     docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
   fi
   
-  # Check if directories exist
-  CONFIG_PATH="$PROJECT_ROOT/$CONFIG_DIR"
-  SECURE_PATH="$PROJECT_ROOT/$SECURE_DIR"
+  # Resolve directories: support absolute paths, else relative to project root
+  if [[ "$CONFIG_DIR" = /* ]]; then
+    CONFIG_PATH="$CONFIG_DIR"
+  else
+    CONFIG_PATH="$PROJECT_ROOT/$CONFIG_DIR"
+  fi
+  if [[ "$SECURE_DIR" = /* ]]; then
+    SECURE_PATH="$SECURE_DIR"
+  else
+    SECURE_PATH="$PROJECT_ROOT/$SECURE_DIR"
+  fi
   
   if [ ! -d "$CONFIG_PATH" ]; then
     echo "WARNING: Config directory not found: $CONFIG_PATH" >&2
@@ -315,6 +323,9 @@ if [ "$SKIP_RUN" = "false" ]; then
     echo "Starting container (press Ctrl+C to stop)..."
     echo ""
     echo "Access web UI: http://localhost:$PORT"
+    echo ""
+    echo "SSH keys will be written to: $SECURE_PATH/.ssh"
+    echo "Storage context is at:      $CONFIG_PATH/storagecontext.json"
     echo ""
     
     # Trap Ctrl+C to cleanup

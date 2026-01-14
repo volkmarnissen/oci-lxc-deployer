@@ -32,6 +32,13 @@ RUN set -eux; \
 RUN mkdir -p /config /secure && \
     chown -R lxc:lxc /config /secure
 
+# Ensure SSH keys persist in /secure and are accessible via /home/lxc/.ssh
+RUN mkdir -p /secure/.ssh && \
+  chmod 700 /secure/.ssh && \
+  chown -R lxc:lxc /secure && \
+  ln -sfn /secure/.ssh /home/lxc/.ssh && \
+  chown -h lxc:lxc /home/lxc/.ssh
+
 # Set service user home for backend SSH key discovery / generation
 ENV LXC_MANAGER_USER_HOME=/home/lxc
 ENV HOME=/home/lxc
@@ -40,6 +47,23 @@ ENV HOME=/home/lxc
 RUN cat > /usr/local/bin/entrypoint-wrapper.sh <<'EOF'
 #!/bin/sh
 # Wrapper to ensure lxc-manager runs as lxc user, even when started as root
+# Also ensure the SSH key symlink exists so keys persist in /secure/.ssh
+ensure_ssh_setup() {
+  # Create target dir if missing (volume mount may be empty)
+  if [ ! -d /secure/.ssh ]; then
+    mkdir -p /secure/.ssh 2>/dev/null || true
+    chmod 700 /secure/.ssh 2>/dev/null || true
+    chown -R lxc:lxc /secure 2>/dev/null || true
+  fi
+  # Ensure symlink points to target
+  if [ ! -L /home/lxc/.ssh ]; then
+    rm -rf /home/lxc/.ssh 2>/dev/null || true
+    ln -s /secure/.ssh /home/lxc/.ssh 2>/dev/null || true
+    chown -h lxc:lxc /home/lxc/.ssh 2>/dev/null || true
+  fi
+}
+
+ensure_ssh_setup
 if [ "$(id -u)" = "0" ]; then
   # Running as root, switch to lxc user
   exec su -s /bin/sh lxc -c "cd /home/lxc && exec $*"

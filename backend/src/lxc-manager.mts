@@ -131,6 +131,16 @@ async function startWebApp(
 ) {
   PersistenceManager.initialize(localPath, storageContextPath, secretFilePath);
   const pm = PersistenceManager.getInstance();
+  // Ensure SSH public key exists early so installer can import it
+  try {
+    const { Ssh } = await import("./ssh.mjs");
+    const pub = (Ssh as any).getPublicKey?.();
+    if (pub && typeof pub === "string" && pub.length > 0) {
+      console.log("SSH public key ready for import");
+    } else {
+      console.log("SSH public key not available yet; will be generated on demand");
+    }
+  } catch {}
   const webApp = new VEWebApp(pm.getContextManager());
   const port = process.env.PORT || 3000;
   webApp.httpServer.listen(port, () => {

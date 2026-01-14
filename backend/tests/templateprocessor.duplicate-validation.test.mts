@@ -4,14 +4,14 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templateprocessor.mjs";
-import { VELoadApplicationError, VEConfigurationError } from "@src/backend-types.mjs";
-import { JsonError } from "@src/jsonvalidator.mjs";
+import { VEConfigurationError } from "@src/backend-types.mjs";
 import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ContextManager } from "@src/context-manager.mjs";
 
 describe("TemplateProcessor duplicate validation", () => {
   let testDir: string;
   let secretFilePath: string;
-  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
+  let contextManager: ContextManager;
   let tp: TemplateProcessor;
   const veContext = { host: "validation-dummy", current: false, getStorageContext: () => PersistenceManager.getInstance().getContextManager() as any, getKey: () => "ve_validation-dummy" } as any;
 
@@ -58,7 +58,7 @@ describe("TemplateProcessor duplicate validation", () => {
   afterAll(() => {
     try {
       rmSync(testDir, { recursive: true, force: true });
-    } catch (e) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -76,7 +76,7 @@ describe("TemplateProcessor duplicate validation", () => {
         "template-a.json",
         "template-b.json",
         "template-a.json"  // Duplicate
-      ]
+      ] 
     };
     writeFileSync(
       path.join(testAppDir, "application.json"),

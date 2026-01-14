@@ -9,7 +9,8 @@ import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 describe("TemplateProcessor skip_if_property_set", () => {
   let testDir: string;
   let secretFilePath: string;
-  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
+  let jsonDir: string;
+  let contextManager: ReturnType<ReturnType<typeof PersistenceManager.getInstance>["getContextManager"]>;
   let tp: TemplateProcessor;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -18,13 +19,8 @@ describe("TemplateProcessor skip_if_property_set", () => {
     testDir = mkdtempSync(path.join(tmpdir(), "templateprocessor-skip-if-property-set-test-"));
     secretFilePath = path.join(testDir, "secret.txt");
 
-    // StorageContext uses rootDirname which is "../../" relative to backend/src
-    // So jsonPath will be <repo-root>/json, not in testDir
-    // We need to create the application in the actual json directory
-    const __filename = new URL(import.meta.url).pathname;
-    const backendDir = path.dirname(__filename);
-    const repoRoot = path.join(backendDir, "../..");
-    const jsonDir = path.join(repoRoot, "json");
+    // Use an isolated temp jsonDir for this suite
+    jsonDir = path.join(testDir, "json");
     const applicationsDir = path.join(jsonDir, "applications");
     const testAppDir = path.join(applicationsDir, "test-skip-property-set-app");
     const templatesDir = path.join(testAppDir, "templates");
@@ -116,7 +112,19 @@ describe("TemplateProcessor skip_if_property_set", () => {
     } catch {
       // Ignore if not initialized
     }
-    PersistenceManager.initialize(testDir, storageContextPath, secretFilePath);
+    // Initialize PersistenceManager with isolated jsonDir and real schemas
+    const __filename = new URL(import.meta.url).pathname;
+    const backendDir = path.dirname(__filename);
+    const repoRoot = path.join(backendDir, "../..");
+    const schemaPath = path.join(repoRoot, "schemas");
+    PersistenceManager.initialize(
+      testDir,
+      storageContextPath,
+      secretFilePath,
+      false, // disable cache for tests
+      jsonDir,
+      schemaPath,
+    );
     const pm = PersistenceManager.getInstance();
     contextManager = pm.getContextManager();
     tp = contextManager.getTemplateProcessor();
@@ -126,13 +134,6 @@ describe("TemplateProcessor skip_if_property_set", () => {
     try {
       if (testDir && require("fs").existsSync(testDir)) {
         rmSync(testDir, { recursive: true, force: true });
-      }
-      const __filename = new URL(import.meta.url).pathname;
-      const backendDir = path.dirname(__filename);
-      const repoRoot = path.join(backendDir, "../..");
-      const testAppDir = path.join(repoRoot, "json", "applications", "test-skip-property-set-app");
-      if (require("fs").existsSync(testAppDir)) {
-        rmSync(testAppDir, { recursive: true, force: true });
       }
     } catch {
       // Ignore cleanup errors
@@ -175,10 +176,6 @@ describe("TemplateProcessor skip_if_property_set", () => {
 
   it("should NOT skip template when skip_if_property_set variable is NOT set", async () => {
     // Create a separate application for this test to avoid side effects
-    const __filename = new URL(import.meta.url).pathname;
-    const backendDir = path.dirname(__filename);
-    const repoRoot = path.join(backendDir, "../..");
-    const jsonDir = path.join(repoRoot, "json");
     const applicationsDir = path.join(jsonDir, "applications");
     const testAppDir2 = path.join(applicationsDir, "test-skip-property-set-app-2");
     const templatesDir2 = path.join(testAppDir2, "templates");

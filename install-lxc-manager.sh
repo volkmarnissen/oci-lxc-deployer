@@ -333,7 +333,7 @@ echo "  Container ID: ${vm_id}, Container hostname: ${hostname}" >&2
 echo "  Using UID/GID: ${LXC_UID}/${LXC_GID} (mapped: ${mapped_uid}/${mapped_gid})" >&2
 # Set volumes as environment variable for the script
 export VOLUMES="config=config
-secure=secure"
+secure=secure,0700"
 
 # Use execute_script_from_github - VOLUMES is passed via environment
 if ! execute_script_from_github \
@@ -341,7 +341,7 @@ if ! execute_script_from_github \
   "-" \
   "vm_id=${vm_id}" \
   "hostname=${hostname}" \
-  "base_path=lxc-manager" \
+  "base_path=volumes" \
   "host_mountpoint=${host_mountpoint}" \
   "username=" \
   "uid=${LXC_UID}" \
@@ -357,9 +357,42 @@ echo "  Volumes bound successfully" >&2
 
 # Update volume paths to match what was created
 if [ -n "$host_mountpoint" ]; then
-  config_volume_path="${host_mountpoint}/lxc-manager/${hostname}/config"
-  secure_volume_path="${host_mountpoint}/lxc-manager/${hostname}/secure"
+  config_volume_path="${host_mountpoint}/volumes/${hostname}/config"
+  secure_volume_path="${host_mountpoint}/volumes/${hostname}/secure"
 fi
+
+# Write storagecontext.json before starting the container so the app can read it on startup
+echo "Step 5.1: Writing storagecontext.json to /config..." >&2
+storagecontext_file="${config_volume_path}/storagecontext.json"
+# Prepare changed params for VMInstall context
+changed_params_json="[
+  {\"name\":\"vm_id\",\"value\":\"${vm_id}\"},
+  {\"name\":\"hostname\",\"value\":\"${hostname}\"},
+  {\"name\":\"disk_size\",\"value\":${disk_size}},
+  {\"name\":\"memory\",\"value\":${memory}},
+  {\"name\":\"bridge\",\"value\":\"${bridge}\"},
+  {\"name\":\"config_volume_path\",\"value\":\"${config_volume_path}\"},
+  {\"name\":\"secure_volume_path\",\"value\":\"${secure_volume_path}\"},
+  {\"name\":\"oci_image\",\"value\":\"${OCI_IMAGE}\"},
+  {\"name\":\"storage\",\"value\":\"${storage}\"}
+]"
+mkdir -p "$(dirname "${storagecontext_file}")" 2>/dev/null || true
+cat > "${storagecontext_file}" <<JSON
+{
+  "ve_${proxmox_hostname}": {
+    "host": "${proxmox_hostname}",
+    "port": 22,
+    "current": true
+  },
+  "vminstall_${hostname}_lxc-manager": {
+    "hostname": "${hostname}",
+    "application": "lxc-manager",
+    "task": "installation",
+    "changedParams": ${changed_params_json}
+  }
+}
+JSON
+echo "  storagecontext.json written at: ${storagecontext_file}" >&2
 
 # 6) Ensure container is running
 echo "Step 6: Ensuring container is running..." >&2
@@ -384,6 +417,17 @@ if ! pct status "${vm_id}" | grep -q "running"; then
 else
   echo "  Container is running" >&2
 fi
+
+  # Ensure SSH keys persist in /secure: symlink /home/lxc/.ssh -> /secure/.ssh
+  lxc-attach -n "${vm_id}" -- sh -c "\
+    mkdir -p /secure/.ssh && \
+    chown -R lxc:lxc /secure && \
+    chmod 700 /secure && \
+    chmod 700 /secure/.ssh && \
+    rm -rf /home/lxc/.ssh && \
+    ln -sfn /secure/.ssh /home/lxc/.ssh && \
+    chown -h lxc:lxc /home/lxc/.ssh\
+  " >/dev/null 2>&1 || true
 
 # 7) Get SSH public key from container and add to root authorized_keys
 echo "Step 7: Setting up SSH access..." >&2
@@ -417,19 +461,7 @@ while [ $attempt -lt $max_attempts ]; do
     fi
   done
   
-  # If key not found, try to generate it manually
-  if [ $attempt -eq 3 ]; then
-    echo "  Key not found, attempting to generate SSH key..." >&2
-    # Ensure .ssh directory exists and generate key
-    lxc-attach -n "${vm_id}" -- sh -c "
-      mkdir -p /home/lxc/.ssh
-      chmod 700 /home/lxc/.ssh
-      chown lxc:lxc /home/lxc/.ssh
-      if [ ! -f /home/lxc/.ssh/id_ed25519.pub ]; then
-        su -s /bin/sh -c 'ssh-keygen -q -t ed25519 -N \"\" -C \"lxc-manager@auto-generated\" -f /home/lxc/.ssh/id_ed25519' lxc 2>/dev/null || true
-      fi
-    " >/dev/null 2>&1 || true
-  fi
+  # Do not generate keys here; the application will generate them at startup
   
   if [ $attempt -lt $max_attempts ]; then
     sleep 3
@@ -475,95 +507,16 @@ if [ -n "$container_pubkey" ]; then
     chmod 600 "${actual_auth_keys}" 2>/dev/null || true
   fi
   
-  # Restart SSH server to ensure changes take effect
-  echo "  Restarting SSH server..." >&2
-  systemctl restart ssh >/dev/null 2>&1 || systemctl restart sshd >/dev/null 2>&1 || \
-  service ssh restart >/dev/null 2>&1 || service sshd restart >/dev/null 2>&1 || {
-    echo "  Warning: Failed to restart SSH server" >&2
-  }
+  # SSH key installed; no SSH service restart required
+  echo "  SSH key installed and permissions hardened (no SSH restart)" >&2
 else
   echo "  Warning: Could not retrieve SSH public key from container after ${max_attempts} attempts" >&2
   echo "  The key will be generated when the application starts" >&2
   echo "  You can add it later using the SSH config page in the web interface" >&2
 fi
 
-# 8) Wait for application to start and configure via API
-echo "Step 8: Configuring via API..." >&2
-
-# Check if curl is available
-if ! command -v curl >/dev/null 2>&1; then
-  echo "  Warning: curl not found, skipping API configuration" >&2
-  echo "  You will need to configure SSH and installation context manually via the web interface" >&2
-else
-  # Determine API base URL - use container hostname
-  api_base="http://${hostname}:3000"
-  
-  # Wait for application to be ready (check if port 3000 is listening)
-  echo "  Waiting for application to start at ${api_base}..." >&2
-  max_wait=60
-  wait_count=0
-  app_ready=false
-  
-  while [ $wait_count -lt $max_wait ]; do
-    # Try to connect to the API
-    if curl -s -f --max-time 2 "${api_base}/api/sshconfigs" >/dev/null 2>&1 || \
-       curl -s -f --max-time 2 "http://${hostname}:3000/api/sshconfigs" >/dev/null 2>&1; then
-      app_ready=true
-      api_base="http://${hostname}:3000"
-      break
-    fi
-    sleep 2
-    wait_count=$((wait_count + 2))
-  done
-  
-  if [ "$app_ready" = false ]; then
-    echo "  Warning: Application not ready after ${max_wait} seconds" >&2
-    echo "  API endpoint: ${api_base}" >&2
-    echo "  You may need to configure SSH and installation context manually via the web interface" >&2
-  else
-    echo "  Application is ready" >&2
-    
-    # Set VE context via API
-    echo "  Setting VE context for ${proxmox_hostname}..." >&2
-    ve_response=$(curl -s -X POST "${api_base}/api/sshconfig" \
-      -H "Content-Type: application/json" \
-      -d "{\"host\":\"${proxmox_hostname}\",\"port\":22,\"current\":true}" 2>/dev/null || echo "")
-    
-    if echo "$ve_response" | grep -q '"success":true'; then
-      echo "  VE context set successfully" >&2
-      ve_context_key=$(echo "$ve_response" | grep -o '"key":"[^"]*"' | cut -d'"' -f4 || echo "ve_${proxmox_hostname}")
-    else
-      echo "  Warning: Failed to set VE context via API" >&2
-      echo "  Response: ${ve_response}" >&2
-      ve_context_key="ve_${proxmox_hostname}"
-    fi
-    
-    # Set VMInstall context via API
-    echo "  Setting VMInstall context..." >&2
-    changed_params_json="[
-      {\"name\":\"vm_id\",\"value\":\"${vm_id}\"},
-      {\"name\":\"hostname\",\"value\":\"${hostname}\"},
-      {\"name\":\"disk_size\",\"value\":${disk_size}},
-      {\"name\":\"memory\",\"value\":${memory}},
-      {\"name\":\"bridge\",\"value\":\"${bridge}\"},
-      {\"name\":\"config_volume_path\",\"value\":\"${config_volume_path}\"},
-      {\"name\":\"secure_volume_path\",\"value\":\"${secure_volume_path}\"},
-      {\"name\":\"oci_image\",\"value\":\"${OCI_IMAGE}\"},
-      {\"name\":\"storage\",\"value\":\"${storage}\"}
-    ]"
-    
-    install_response=$(curl -s -X POST "${api_base}/api/ve-configuration/lxc-manager/installation/${ve_context_key}" \
-      -H "Content-Type: application/json" \
-      -d "{\"params\":[],\"changedParams\":${changed_params_json}}" 2>/dev/null || echo "")
-    
-    if echo "$install_response" | grep -q '"success":true'; then
-      echo "  VMInstall context set successfully" >&2
-    else
-      echo "  Warning: Failed to set VMInstall context via API" >&2
-      echo "  Response: ${install_response}" >&2
-    fi
-  fi
-fi
+# 8) Application startup note (no API configuration; app reads storagecontext.json)
+echo "Step 8: Application startup context ready (no API calls)" >&2
 
 echo "" >&2
 echo "Installation complete!" >&2
