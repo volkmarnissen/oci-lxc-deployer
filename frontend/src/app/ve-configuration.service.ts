@@ -72,6 +72,12 @@ export class VeConfigurationService {
       catchError(VeConfigurationService.handleError)
     )
   }
+  
+  // Post without global error handling - caller must handle errors
+  postWithoutGlobalErrorHandler<T, U>(url:string, body:U):Observable<T> {
+    return this.http.post<T>(this.veContextKey? url.replace(":veContext", this.veContextKey) : url, body);
+  }
+  
   get<T>(url:string):Observable<T> {
     return this.http.get<T>(this.veContextKey? url.replace(":veContext", this.veContextKey) : url).pipe(
       catchError(VeConfigurationService.handleError)
@@ -184,6 +190,7 @@ export class VeConfigurationService {
   }
 
   getFrameworkFromImage(body: IPostFrameworkFromImageBody): Observable<IPostFrameworkFromImageResponse> {
-    return this.post<IPostFrameworkFromImageResponse, IPostFrameworkFromImageBody>(ApiUri.FrameworkFromImage, body);
+    // Use postWithoutGlobalErrorHandler to allow caller to handle errors (e.g., for debounced input validation)
+    return this.postWithoutGlobalErrorHandler<IPostFrameworkFromImageResponse, IPostFrameworkFromImageBody>(ApiUri.FrameworkFromImage, body);
   }
 }

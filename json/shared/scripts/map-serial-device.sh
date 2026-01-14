@@ -312,6 +312,12 @@ validate_and_parse_parameters() {
 
 # Function to find and validate USB devices
 find_and_validate_devices() {
+  # Check if device is already mapped to another running container
+  if is_usb_device_mapped_in_running_containers "$USB_BUS" "$USB_DEVICE"; then
+    echo "Warning: USB device ${USB_BUS}:${USB_DEVICE} is already mapped to a running container." >&2
+    echo "Warning: Mapping the same device to multiple containers may cause conflicts." >&2
+  fi
+  
   # Get USB bus path using library function
   USB_BUS_PATH=$(get_usb_bus_path "$USB_BUS" "$USB_DEVICE")
   if [ -z "$USB_BUS_PATH" ] || [ ! -e "$USB_BUS_PATH" ]; then

@@ -6,6 +6,7 @@ This script:
 1. Configures /etc/subuid and /etc/subgid with required ranges
 2. Updates LXC container config with lxc.idmap entries (if vm_id provided)
 3. Supports multiple UIDs/GIDs (comma-separated)
+4. Outputs mapped host UIDs/GIDs as JSON for use in templates
 
 Parameters:
   - uid: User ID(s) for 1:1 mapping (e.g., "1000" or "1000,1001")
@@ -17,11 +18,13 @@ Mock paths for testing:
   - MOCK_SUBGID_PATH: Override /etc/subgid path
   - MOCK_CONFIG_DIR: Override /etc/pve/lxc directory
 
-Output: JSON to stdout (errors to stderr)
+Output: JSON to stdout with mapped_uid and mapped_gid (errors to stderr)
+  [{"id": "mapped_uid", "value": "1000"}, {"id": "mapped_gid", "value": "1000"}]
 """
 
 import sys
 import os
+import json
 from pathlib import Path
 
 # Standard Proxmox UID/GID range
@@ -144,6 +147,20 @@ def main():
     if vm_id and vm_id.isdigit():
         config_path = Path(config_dir) / f"{vm_id}.conf"
         update_lxc_config(config_path, idmap_entries)
+    
+    # Output mapped UID/GID as JSON for templates
+    # For 1:1 mapping, the container UID maps directly to host UID (not offset)
+    # This is the UID that should be used on the host filesystem
+    output = []
+    if uid_list:
+        # Use the first UID from the list as the primary mapped UID
+        output.append({"id": "mapped_uid", "value": str(uid_list[0])})
+    if gid_list:
+        # Use the first GID from the list as the primary mapped GID
+        output.append({"id": "mapped_gid", "value": str(gid_list[0])})
+    
+    if output:
+        print(json.dumps(output))
 
 if __name__ == '__main__':
     try:

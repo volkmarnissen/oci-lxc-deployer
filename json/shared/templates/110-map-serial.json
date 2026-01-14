@@ -24,7 +24,7 @@
       "type": "string",
       "default": "0",
       "advanced": true,
-      "description": "Optional: UID of the user in the container who should have access to the serial device. Default is 0 (root). If provided, permissions will be set on the host device (mapped UID = container UID + 100000)."
+      "description": "Optional: UID of the user in the container who should have access to the serial device. Default is 0 (root)."
     },
     {
       "id": "gid",
@@ -32,7 +32,23 @@
       "type": "string",
       "default": "0",
       "advanced": true,
-      "description": "Optional: GID of the group in the container who should have access to the serial device. Default is 0 (root). If provided, permissions will be set on the host device (mapped GID = container GID + 100000)."
+      "description": "Optional: GID of the group in the container who should have access to the serial device. Default is 0 (root)."
+    },
+    {
+      "id": "mapped_uid",
+      "name": "Mapped UID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Optional: The actual UID to use on the host device for unprivileged containers with 1:1 UID mapping. If not provided, defaults to uid parameter. Typically set by setup-lxc-uid-mapping.py (102) output.",
+      "advanced": true
+    },
+    {
+      "id": "mapped_gid",
+      "name": "Mapped GID (Host)",
+      "type": "string",
+      "default": "",
+      "description": "Optional: The actual GID to use on the host device for unprivileged containers with 1:1 GID mapping. If not provided, defaults to gid parameter. Typically set by setup-lxc-uid-mapping.py (102) output.",
+      "advanced": true
     },
     {
       "id": "container_device_path",

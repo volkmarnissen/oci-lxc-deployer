@@ -29,7 +29,7 @@
       "id": "volumes",
       "name": "Volumes",
       "type": "string",
-      "description": "Volume mappings from 'Bind Multiple Volumes to LXC' (160) in key=value format, one per line. Each volume will be automatically shared via Samba with share name <key> at container path /<value>. Example:\ndata=/timemachine\nlogs=/var/log/myapp\n\nIf not provided, no automatic shares will be created.",
+      "description": "Volume mappings from 'Bind Multiple Volumes to LXC' (160) in key=value format, one per line. Optional permissions after comma will be ignored. Each volume will be automatically shared via Samba with share name <key> at container path /<value>. Format: key=path or key=path,permissions. Example:\ndata=/timemachine,0700\nlogs=/var/log/myapp,0755\n\nIf not provided, no automatic shares will be created.",
       "advanced": true
     },
     {

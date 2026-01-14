@@ -6,6 +6,7 @@
     {
       "name": "List USB Serial Ports",
       "script": "list-host-usb-serial-ports.sh",
+      "library": "usb-device-common.sh",
       "outputs": ["enumValues"]
     }
   ]

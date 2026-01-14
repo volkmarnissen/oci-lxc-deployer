@@ -1,10 +1,11 @@
 #!/bin/sh
-# List all USB serial ports on the VE host
+# List all USB serial ports on the VE host that are not already mapped to running LXC containers
 #
 # This script lists all USB serial devices by:
 # 1. Using lsusb to enumerate USB devices
 # 2. Filtering for devices with serial/tty capabilities
-# 3. Formatting as JSON array for enumValues
+# 3. Checking which devices are already mapped to running containers (using library function)
+# 4. Formatting as JSON array for enumValues
 #
 # Output format: JSON array of objects with name and value fields
 # Example: [{"name":"FTDI Serial Converter","value":"1:2"}, ...]
@@ -12,6 +13,9 @@
 #
 # Requires:
 #   - lsusb: USB utilities (must be installed)
+#   - pct: Proxmox Container Toolkit (for checking running containers)
+#
+# Library: usb-device-common.sh (automatically prepended)
 #
 # Output: JSON to stdout (errors to stderr)
 
@@ -104,6 +108,11 @@ for TTY_SYSFS_PATH in /sys/bus/usb/devices/*/*/tty/*; do
   # Convert to integer (remove any leading zeros)
   USB_BUS=$((USB_BUS + 0))
   USB_DEVICE=$((USB_DEVICE + 0))
+  
+  # Skip if device is already mapped to a running container (using library function)
+  if is_usb_device_mapped_in_running_containers "$USB_BUS" "$USB_DEVICE"; then
+    continue
+  fi
   
   # Get vendor and product ID from USB interface path first (more accurate for devices behind hubs)
   # If not available, fall back to device path

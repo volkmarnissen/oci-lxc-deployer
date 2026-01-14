@@ -1,10 +1,11 @@
 #!/bin/sh
-# List all USB input devices (keyboard/mouse) on the VE host
+# List all USB input devices (keyboard/mouse) on the VE host that are not already mapped to running LXC containers
 #
 # This script lists all USB input devices by:
 # 1. Scanning /sys/class/input for input devices
 # 2. Matching devices to USB bus:device identifiers
-# 3. Formatting as JSON array for enumValues
+# 3. Checking which devices are already mapped to running containers
+# 4. Formatting as JSON array for enumValues
 #
 # Output format: JSON array of objects with name and value fields
 # Example: [{"name":"USB Keyboard","value":"1:2"}, ...]
@@ -38,6 +39,11 @@ for INPUT_DEVICE in /sys/class/input/event*; do
   
   # Find USB device by vendor/product ID using library function
   if ! find_usb_device_by_vendor_product "$VENDOR_ID" "$PRODUCT_ID" "$DEVICE_NAME" "input/input*/event*"; then
+    continue
+  fi
+  
+  # Skip if device is already mapped to a running container
+  if is_usb_device_mapped_in_running_containers "$USB_BUS" "$USB_DEVICE"; then
     continue
   fi
   
