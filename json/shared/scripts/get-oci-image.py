@@ -13,7 +13,7 @@ Parameters (via template variables):
   platform (optional): Target platform (e.g., linux/amd64, linux/arm64). Default: linux/amd64
 
 Output (JSON to stdout):
-  [{"id": "template_path", "value": "storage:vztmpl/image_tag.tar"}, {"id": "ostype", "value": "alpine"}]
+    [{"id": "template_path", "value": "storage:vztmpl/image_tag.tar"}, {"id": "ostype", "value": "alpine"}, {"id": "application_id", "value": "lxc-manager"}, {"id": "oci_image", "value": "ghcr.io/modbus2mqtt/lxc-manager:latest"}]
 
 All logs and progress go to stderr.
 
@@ -300,6 +300,7 @@ def main() -> None:
     registry_username = "{{ registry_username }}"
     registry_password = "{{ registry_password }}"
     platform = "{{ platform }}"
+    application_id = "{{ application_id }}"
     
     # Check if template variables were not substituted
     # VariableResolver returns "NOT_DEFINED" when a variable is not found
@@ -342,6 +343,15 @@ def main() -> None:
     else:
         image = image_with_tag
         tag = "latest"
+
+    # Normalize application_id (optional) - derive from image name if not provided
+    if (
+        not application_id
+        or application_id == "NOT_DEFINED"
+        or application_id.strip() == "{{ application_id }}"
+        or not application_id.strip()
+    ):
+        application_id = image.split('/')[-1]
     
     # Check if image already exists in storage (before download)
     try:
@@ -366,7 +376,9 @@ def main() -> None:
                     
                     output = [
                         {"id": "template_path", "value": template_path},
-                        {"id": "ostype", "value": ostype}
+                        {"id": "ostype", "value": ostype},
+                        {"id": "application_id", "value": application_id},
+                        {"id": "oci_image", "value": oci_image}
                     ]
                     print(json.dumps(output))
                     sys.exit(0)
@@ -406,7 +418,9 @@ def main() -> None:
                         log(f"OCI image already exists (with extracted version): {template_path} (version: {actual_tag})")
                         output = [
                             {"id": "template_path", "value": template_path},
-                            {"id": "ostype", "value": ostype}
+                            {"id": "ostype", "value": ostype},
+                            {"id": "application_id", "value": application_id},
+                            {"id": "oci_image", "value": oci_image}
                         ]
                         print(json.dumps(output))
                         sys.exit(0)
@@ -433,7 +447,9 @@ def main() -> None:
     # Output JSON
     output = [
         {"id": "template_path", "value": template_path},
-        {"id": "ostype", "value": ostype}
+        {"id": "ostype", "value": ostype},
+        {"id": "application_id", "value": application_id},
+        {"id": "oci_image", "value": oci_image}
     ]
     print(json.dumps(output))
     sys.exit(0)

@@ -55,27 +55,58 @@ execute_script_from_github() {
   fi
 
   script_output=$(printf '%s' "$script_content" | $interpreter)
-  output_value=$(printf '%s\n' "$script_output" \
-    | awk -v ID="$output_id" '
-      BEGIN { FS="\"" }
-      /"id"[[:space:]]*:[[:space:]]*"/ {
-        for (i=1; i<=NF; i++) {
-          if ($i=="id" && $(i+2)==ID) {
-            for (j=i; j<=NF; j++) {
-              if ($j=="value") { print $(j+2); exit }
+
+  get_value_by_id() {
+    printf '%s\n' "$script_output" \
+      | awk -v ID="$1" '
+        BEGIN { FS="\"" }
+        /"id"[[:space:]]*:[[:space:]]*"/ {
+          for (i=1; i<=NF; i++) {
+            if ($i=="id" && $(i+2)==ID) {
+              for (j=i; j<=NF; j++) {
+                if ($j=="value") { print $(j+2); exit }
+              }
             }
           }
-        }
-      }')
-  
-  if [ -n "$output_value" ]; then
-    printf '%s\n' "$output_value"
-    return 0
-  else
-    echo "ERROR: Output id '$output_id' not found" >&2
-    printf '%s\n' "$script_output" >&2
-    return 3
-  fi
+        }'
+  }
+
+  case "$output_id" in
+    *","*)
+      # Multiple output IDs, comma-separated
+      output_ids=$(printf '%s' "$output_id" | tr -d ' ')
+      IFS=','
+      set -- $output_ids
+      IFS=' '
+      results=""
+      missing=""
+      for id in "$@"; do
+        value=$(get_value_by_id "$id")
+        if [ -z "$value" ]; then
+          missing="${missing}${missing:+,}${id}"
+          value=""
+        fi
+        results="${results}${results:+,}${value}"
+      done
+      if [ -n "$missing" ]; then
+        echo "Warning: Output id(s) '$missing' not found" >&2
+        printf '%s\n' "$script_output" >&2
+      fi
+      printf '%s\n' "$results"
+      return 0
+      ;;
+    *)
+      output_value=$(get_value_by_id "$output_id")
+      if [ -n "$output_value" ]; then
+        printf '%s\n' "$output_value"
+        return 0
+      else
+        echo "ERROR: Output id '$output_id' not found" >&2
+        printf '%s\n' "$script_output" >&2
+        return 3
+      fi
+      ;;
+  esac
 }
 
 # Defaults
@@ -249,14 +280,25 @@ if [ -z "$template_path" ]; then
   exit 1
 fi
 
-ostype=$(execute_script_from_github \
+oci_outputs=$(execute_script_from_github \
   "json/shared/scripts/get-oci-image.py" \
-  "ostype" \
+  "ostype,application_id,oci_image" \
   "oci_image=${OCI_IMAGE}" \
   "storage=${storage}" \
   "registry_username=" \
   "registry_password=" \
   "platform=linux/amd64")
+
+IFS=',' read -r ostype application_id resolved_oci_image <<EOF
+$oci_outputs
+EOF
+
+if [ -z "$application_id" ]; then
+  application_id="lxc-manager"
+fi
+if [ -z "$resolved_oci_image" ]; then
+  resolved_oci_image="${OCI_IMAGE}"
+fi
 
 echo "  OCI image ready: ${template_path}" >&2
 
@@ -381,7 +423,8 @@ changed_params_json="[
   {\"name\":\"bridge\",\"value\":\"${bridge}\"},
   {\"name\":\"config_volume_path\",\"value\":\"${config_volume_path}\"},
   {\"name\":\"secure_volume_path\",\"value\":\"${secure_volume_path}\"},
-  {\"name\":\"oci_image\",\"value\":\"${OCI_IMAGE}\"},
+  {\"name\":\"application_id\",\"value\":\"${application_id}\"},
+  {\"name\":\"oci_image\",\"value\":\"${resolved_oci_image}\"},
   {\"name\":\"storage\",\"value\":\"${storage}\"}
 ]"
 mkdir -p "$(dirname "${storagecontext_file}")" 2>/dev/null || true
@@ -394,7 +437,7 @@ cat > "${storagecontext_file}" <<JSON
   },
   "vminstall_${hostname}_lxc-manager": {
     "hostname": "${hostname}",
-    "application": "lxc-manager",
+    "application": "${application_id}",
     "task": "installation",
     "changedParams": ${changed_params_json}
   }
