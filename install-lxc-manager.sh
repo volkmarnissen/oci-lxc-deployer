@@ -12,7 +12,6 @@ OWNER="${OWNER:-modbus2mqtt}"
 REPO="lxc-manager"
 BRANCH="main"
 OCI_IMAGE="ghcr.io/${OCI_OWNER}/lxc-manager:latest"
-
 # Helper functions
 execute_script_from_github() {
   if [ "$#" -lt 2 ]; then
@@ -208,6 +207,7 @@ echo "  Proxmox Host: ${proxmox_hostname}" >&2
 echo "  Volume base: ${volume_base}" >&2
 echo "  Config volume: ${config_volume_path}" >&2
 echo "  Secure volume: ${secure_volume_path}" >&2
+echo "  OWNER=${OWNER}, REPO=${REPO}, BRANCH=${BRANCH}, OCI_IMAGE=${OCI_IMAGE}" >&2 
 
 # Check and install SSH server if needed (on Proxmox VE host)
 # This matches the installation command from the SSH config page
