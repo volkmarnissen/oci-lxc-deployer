@@ -7,7 +7,7 @@
     {
       "address": "localhost",
       "localRoot": "${workspaceFolder}",
-      "name": "LXC manager to Remote",
+      "name": "OCI LXC Deployer to Remote",
       "port": 9229,
       "remoteRoot": "${workspaceFolder}",
       "request": "attach",
@@ -16,7 +16,7 @@
     },
     {
       "name": "Launch Web Server",
-      "program": "${workspaceFolder}/dist/lxc-manager.mjs",
+      "program": "${workspaceFolder}/dist/oci-lxc-deployer.mjs",
       "preLaunchTask": "npm: build",
       "request": "launch",
       "sourceMaps": true,
@@ -25,9 +25,9 @@
         "--local",
         "${workspaceFolder}/examples",
         "--storageContextFilePath",
-        "~/lxc-manager/examples/storagecontext.json",
+        "~/oci-lxc-deployer/examples/storagecontext.json",
         "--secretsFilePath",
-        "~/lxc-manager/examples/secret.txt"
+        "~/oci-lxc-deployer/examples/secret.txt"
       ],
 
       "trace": true,

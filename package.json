@@ -1,7 +1,7 @@
 {
-  "name": "lxc-manager",
+  "name": "oci-lxc-deployer",
   "version": "0.1.17",
-  "description": "Packaged web UI and backend for LXC Manager",
+  "description": "Packaged web UI and backend for OCI LXC Deployer",
   "type": "module",
   "draft": true,
   "author": {
@@ -24,7 +24,7 @@
     "prepack": "npm run sync-dependencies"
   },
   "bin": {
-    "lxc-manager": "backend/dist/lxc-manager.mjs"
+    "oci-lxc-deployer": "backend/dist/oci-lxc-deployer.mjs"
   },
   "files": [
     "backend/dist",
@@ -35,7 +35,7 @@
     "scripts/git-hooks",
     "scripts/install-git-hooks.sh"
   ],
-  "lxcManager": {
+  "ociLxcDeployer": {
     "frontendDir": "frontend/dist/webapp-angular/browser"
   },
   "dependencies": {

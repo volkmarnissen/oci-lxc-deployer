@@ -44,24 +44,24 @@ interface IProcessTemplateOpts {
   webuiTemplates: string[];
   veContext?: IVEContext;
   executionMode?: ExecutionMode;  // Execution mode for VeExecution
-  processedTemplates?: Map<string, IProcessedTemplate>;  // NEU: Sammelt Template-Informationen
-  templateReferences?: Map<string, Set<string>>;  // NEU: Template-Referenzen (template -> referenzierte Templates)
+  processedTemplates?: Map<string, IProcessedTemplate>;  // NEW: Collects template information
+  templateReferences?: Map<string, Set<string>>;  // NEW: Template references (template -> referenced templates)
 }
 export interface IParameterWithTemplate extends IParameter {
   template: string;
 }
 export interface IProcessedTemplate {
-  name: string;              // Template-Name (ohne .json)
-  path: string;              // Vollständiger Pfad zur Template-Datei
+  name: string;              // Template name (without .json)
+  path: string;              // Full path to the template file
   isShared: boolean;         // true = shared template, false = app-specific
-  skipped: boolean;          // true = alle Commands geskippt
-  conditional: boolean;       // true = skip_if_all_missing oder optional
-  referencedBy?: string[];    // Templates, die diesen Template referenzieren
-  references?: string[];      // Templates, die von diesem Template referenziert werden
-  templateData?: ITemplate;   // NEU: Vollständige Template-Daten (validiert)
-  capabilities?: string[];    // NEU: Extrahierte Capabilities aus Script-Headern
-  resolvedScriptPaths?: Map<string, string>;  // NEU: script name -> full path
-  usedByApplications?: string[];  // NEU: Applications, die diesen Template verwenden
+  skipped: boolean;          // true = all commands skipped
+  conditional: boolean;       // true = skip_if_all_missing or skip_if_property_set
+  referencedBy?: string[];    // Templates that reference this template
+  references?: string[];      // Templates referenced by this template
+  templateData?: ITemplate;   // NEW: Full template data (validated)
+  capabilities?: string[];    // NEW: Extracted capabilities from script headers
+  resolvedScriptPaths?: Map<string, string>;  // NEW: script name -> full path
+  usedByApplications?: string[];  // NEW: Applications that use this template
 }
 
 export interface ITemplateProcessorLoadResult {
@@ -69,8 +69,8 @@ export interface ITemplateProcessorLoadResult {
   parameters: IParameterWithTemplate[];
   resolvedParams: IResolvedParam[];
   webuiTemplates: string[];
-  application?: IApplication;  // Vollständige Application-Daten (inkl. Parent)
-  processedTemplates?: IProcessedTemplate[];  // Liste aller verarbeiteten Templates
+  application?: IApplication;  // Full application data (incl. parent)
+  processedTemplates?: IProcessedTemplate[];  // List of all processed templates
 }
 export class TemplateProcessor extends EventEmitter {
   resolvedParams: IResolvedParam[] = [];
@@ -209,17 +209,24 @@ export class TemplateProcessor extends EventEmitter {
     // Save resolvedParams for getUnresolvedParameters
     this.resolvedParams = resolvedParams;
     if (errors.length > 0) {
-      if (errors.length === 1 && errors[0]) {
-        // Only one error: throw it directly (as string or error object)
-        throw errors[0];
-      } else {
-        const err = new VEConfigurationError(
-          "Template processing error",
-          applicationName,
-          errors,
-        );
-        throw err;
-      }
+      const appBase = {
+        name: applicationName,
+        description: application?.description || "",
+        icon: application?.icon,
+        errors: errors.map((d: any) => d?.passed_message || d?.message || String(d)),
+      };
+      const primaryMessage =
+        errors.length === 1
+          ? String(
+              (errors[0] as any)?.passed_message ??
+                (errors[0] as any)?.message ??
+                "Template processing error",
+            )
+          : "Template processing error";
+
+      const err = new VEConfigurationError(primaryMessage, applicationName, errors);
+      (err as any).application = appBase;
+      throw err;
     }
     return {
       parameters: outParameters,
@@ -240,13 +247,13 @@ export class TemplateProcessor extends EventEmitter {
   #shouldSkipTemplate(
     tmplData: ITemplate,
     resolvedParams: IResolvedParam[],
-  ): boolean {
+  ): { shouldSkip: boolean; reason?: "property_set" | "all_missing" } {
     // Check skip_if_property_set logic first (highest priority)
     if (tmplData.skip_if_property_set) {
       const resolved = resolvedParams.find((p) => p.id === tmplData.skip_if_property_set);
       if (resolved) {
         // Parameter is set, skip the template
-        return true;
+        return { shouldSkip: true, reason: "property_set" };
       }
     }
     
@@ -269,7 +276,7 @@ export class TemplateProcessor extends EventEmitter {
       
       // If not all skip parameters are missing, don't skip
       if (!allSkipParamsMissing) {
-        return false;
+        return { shouldSkip: false };
       }
       
       // Now check if there are any other required parameters that are unresolved
@@ -286,18 +293,160 @@ export class TemplateProcessor extends EventEmitter {
             const resolved = resolvedParams.find((p) => p.id === param.id);
             if (!resolved) {
               // Required parameter is missing, don't skip (will cause error)
-              return false;
+              return { shouldSkip: false };
             }
           }
         }
       }
       
       // All skip parameters are missing AND no other required parameters are unresolved
-      return true;
+      return { shouldSkip: true, reason: "all_missing" };
     }
     
     // No skip conditions met
-    return false;
+    return { shouldSkip: false };
+  }
+
+  async #validateAndAddParameters(
+    opts: IProcessTemplateOpts,
+    tmplData: ITemplate,
+    tmplPath: string,
+  ): Promise<void> {
+    // Custom validation: 'if' must refer to another parameter name, not its own
+    if (tmplData.parameters) {
+      const paramNames = tmplData.parameters.map((p) => p.id);
+      for (const param of tmplData.parameters) {
+        if (
+          param.if &&
+          (param.if === param.id || !paramNames.includes(param.if))
+        ) {
+          opts.errors?.push(
+            new JsonError(
+              `Parameter '${param.name}': 'if' must refer to another parameter name in the same template (not itself).`,
+            ),
+          );
+        }
+      }
+    }
+
+    // Add all parameters (no duplicates)
+    for (const param of tmplData.parameters ?? []) {
+      if (!opts.parameters.some((p) => p.id === param.id)) {
+        // Resolve description from markdown if not in JSON
+        let description = param.description;
+        if (!description || description.trim() === "") {
+          // Try to load from markdown file
+          const mdPath = MarkdownReader.getMarkdownPath(tmplPath);
+
+          // Try param.name first, then param.id
+          let mdSection = MarkdownReader.extractSection(
+            mdPath,
+            param.name || param.id,
+          );
+          if (!mdSection && param.name && param.name !== param.id) {
+            // Fallback: try param.id if param.name didn't work
+            mdSection = MarkdownReader.extractSection(mdPath, param.id);
+          }
+
+          if (mdSection) {
+            description = mdSection;
+          } else {
+            // No description in JSON or markdown - this is an error
+            opts.errors?.push(
+              new JsonError(
+                `Parameter '${param.id}' in template '${this.extractTemplateName(opts.template)}' has no description. ` +
+                  `Add 'description' in JSON or create '${path.basename(tmplPath, ".json")}.md' with '## ${param.name || param.id}' section.`,
+              ),
+            );
+          }
+        }
+
+        const pparm: IParameterWithTemplate = {
+          ...param,
+          description: description ?? "", // Use resolved description (ensure string)
+          template: this.extractTemplateName(opts.template),
+          templatename: tmplData.name || this.extractTemplateName(opts.template),
+        };
+
+        if (param.type === "enum" && (param as any).enumValuesTemplate) {
+          // Load enum values from another template (mocked execution):
+          const enumTmplName = (param as any).enumValuesTemplate;
+          opts.webuiTemplates?.push(enumTmplName);
+
+          // Prefer reusing the same processing logic by invoking #processTemplate
+          // on the referenced enum template; capture its commands and parse payload.
+          const tmpCommands: ICommand[] = [];
+          const tmpParams: IParameterWithTemplate[] = [];
+          const tmpErrors: IJsonError[] = [];
+          const tmpResolved: IResolvedParam[] = [];
+          const tmpWebui: string[] = [];
+          await this.#processTemplate({
+            ...opts,
+            template: enumTmplName,
+            templatename: enumTmplName,
+            commands: tmpCommands,
+            parameters: tmpParams,
+            errors: tmpErrors,
+            resolvedParams: tmpResolved,
+            webuiTemplates: tmpWebui,
+            parentTemplate: this.extractTemplateName(opts.template),
+          });
+
+          // Try executing via VeExecution to respect execution semantics; collect errors
+          // Skip execution if veContext is not provided (parameter extraction only)
+          if (opts.veContext) {
+            try {
+              const ve = new VeExecution(
+                tmpCommands,
+                [],
+                opts.veContext,
+                undefined,
+                undefined, // sshCommand deprecated - use executionMode instead
+                opts.executionMode ?? determineExecutionMode(),
+              );
+              const rc = await ve.run(null);
+              if (rc && Array.isArray(rc.outputs) && rc.outputs.length > 0) {
+                // If outputs is an array of {name, value}, use it as enum values
+                pparm.enumValues = rc.outputs;
+                // If only one enum value is available and no default is set, use it as default
+                if (rc.outputs.length === 1 && pparm.default === undefined) {
+                  const singleValue = rc.outputs[0];
+                  // Handle both string values and {name, value} objects
+                  if (typeof singleValue === "string") {
+                    pparm.default = singleValue;
+                  } else if (
+                    typeof singleValue === "object" &&
+                    singleValue !== null &&
+                    "value" in singleValue
+                  ) {
+                    pparm.default = (singleValue as any).value;
+                  }
+                }
+              }
+            } catch (e: any) {
+              const err =
+                e instanceof JsonError
+                  ? e
+                  : new JsonError(String(e?.message ?? e));
+              opts.errors?.push(err);
+              this.emit("message", {
+                stderr: err.message,
+                result: null,
+                exitCode: -1,
+                command: String(enumTmplName),
+                execute_on: undefined,
+                index: 0,
+              });
+            }
+          } else {
+            // During validation, we skip enum value execution but still validate that the template exists
+            // The enum template will be validated separately as part of the application validation
+          }
+        }
+
+        opts.parameters.push(pparm);
+      }
+    }
   }
 
   private extractTemplateName(template: ITemplateReference | string): string {
@@ -380,10 +529,9 @@ export class TemplateProcessor extends EventEmitter {
     // Check if template should be skipped due to missing parameters
     // This check happens BEFORE marking outputs, so outputs from previous templates are available
     // but we don't set outputs for skipped templates
-    const shouldSkip = this.#shouldSkipTemplate(
-      tmplData,
-      opts.resolvedParams,
-    );
+    const skipDecision = this.#shouldSkipTemplate(tmplData, opts.resolvedParams);
+    const shouldSkip = skipDecision.shouldSkip;
+    const skipReason = skipDecision.reason;
     
     // Determine if template is conditional (skip_if_all_missing or skip_if_property_set)
     const isConditional = !!(tmplData.skip_if_all_missing && tmplData.skip_if_all_missing.length > 0) ||
@@ -409,18 +557,26 @@ export class TemplateProcessor extends EventEmitter {
       // Replace all commands with "skipped" commands that always exit with 0
       // Only set execute_on if template has it (properties-only templates don't need it)
       for (const cmd of tmplData.commands ?? []) {
+        const description =
+          skipReason === "property_set"
+            ? `Skipped: property '${tmplData.skip_if_property_set}' is set`
+            : "Skipped: all required parameters missing";
         const skippedCommand: ICommand = {
           name: `${cmd.name || tmplData.name || "unnamed-template"} (skipped)`,
           command: "exit 0",
-          description: `Skipped: all required parameters missing`,
+          description,
           ...(tmplData.execute_on && { execute_on: tmplData.execute_on }),
         };
         opts.commands.push(skippedCommand);
       }
       // IMPORTANT: Do NOT set outputs when template is skipped
       // This ensures that subsequent templates correctly detect missing parameters
-      // IMPORTANT: Do NOT add parameters when template is skipped
-      // This ensures that parameters from skipped templates don't appear in unresolved parameters
+      // IMPORTANT: We intentionally DO add parameters when the skip reason is "all_missing".
+      // Rationale: The UI needs to see these parameters even when inputs start empty,
+      // while commands/outputs remain skipped.
+      if (skipReason === "all_missing") {
+        await this.#validateAndAddParameters(opts, tmplData, tmplPath);
+      }
       return; // Exit early, don't process this template further
     }
     
@@ -604,134 +760,7 @@ export class TemplateProcessor extends EventEmitter {
       }
     }
 
-    // Custom validation: 'if' must refer to another parameter name, not its own
-    // Only validate and add parameters if template is NOT skipped
-    if (tmplData.parameters) {
-      const paramNames = tmplData.parameters.map((p) => p.id);
-      for (const param of tmplData.parameters) {
-        if (
-          param.if &&
-          (param.if === param.id || !paramNames.includes(param.if))
-        ) {
-          opts.errors.push(
-            new JsonError(
-              `Parameter '${param.name}': 'if' must refer to another parameter name in the same template (not itself).`,
-            ),
-          );
-        }
-      }
-    }
-    
-    // Add all parameters (no duplicates)
-    // Only add parameters if template is NOT skipped
-    for (const param of tmplData.parameters ?? []) {
-      if (!opts.parameters.some((p) => p.id === param.id)) {
-        // Resolve description from markdown if not in JSON
-        let description = param.description;
-        if (!description || description.trim() === '') {
-          // Try to load from markdown file
-          const mdPath = MarkdownReader.getMarkdownPath(tmplPath);
-          
-          // Try param.name first, then param.id
-          let mdSection = MarkdownReader.extractSection(mdPath, param.name || param.id);
-          if (!mdSection && param.name && param.name !== param.id) {
-            // Fallback: try param.id if param.name didn't work
-            mdSection = MarkdownReader.extractSection(mdPath, param.id);
-          }
-          
-          if (mdSection) {
-            description = mdSection;
-          } else {
-            // No description in JSON or markdown - this is an error
-            opts.errors.push(
-              new JsonError(
-                `Parameter '${param.id}' in template '${this.extractTemplateName(opts.template)}' has no description. ` +
-                `Add 'description' in JSON or create '${path.basename(tmplPath, '.json')}.md' with '## ${param.name || param.id}' section.`,
-              ),
-            );
-          }
-        }
-        
-        const pparm: IParameterWithTemplate = {
-          ...param,
-          description: description ?? "", // Use resolved description (ensure string)
-          template: this.extractTemplateName(opts.template),
-          templatename:
-            tmplData.name || this.extractTemplateName(opts.template),
-        };
-        if (param.type === "enum" && (param as any).enumValuesTemplate) {
-          // Load enum values from another template (mocked execution):
-          const enumTmplName = (param as any).enumValuesTemplate;
-          opts.webuiTemplates?.push(enumTmplName);
-          // Prefer reusing the same processing logic by invoking #processTemplate
-          // on the referenced enum template; capture its commands and parse payload.
-          const tmpCommands: ICommand[] = [];
-          const tmpParams: IParameterWithTemplate[] = [];
-          const tmpErrors: IJsonError[] = [];
-          const tmpResolved: IResolvedParam[] = [];
-          const tmpWebui: string[] = [];
-          await this.#processTemplate({
-            ...opts,
-            template: enumTmplName,
-            templatename: enumTmplName,
-            commands: tmpCommands,
-            parameters: tmpParams,
-            errors: tmpErrors,
-            resolvedParams: tmpResolved,
-            webuiTemplates: tmpWebui,
-            parentTemplate: this.extractTemplateName(opts.template),
-          });
-          // Try executing via VeExecution to respect execution semantics; collect errors
-          // Skip execution if veContext is not provided (parameter extraction only)
-          if (opts.veContext) {
-            try {
-              const ve = new VeExecution(
-                tmpCommands,
-                [],
-                opts.veContext,
-                undefined,
-                undefined, // sshCommand deprecated - use executionMode instead
-                opts.executionMode ?? determineExecutionMode(),
-              );
-                const rc = await ve.run(null);
-                if (rc && Array.isArray(rc.outputs) && rc.outputs.length > 0) {
-                  // If outputs is an array of {name, value}, use it as enum values
-                  pparm.enumValues = rc.outputs;
-                  // If only one enum value is available and no default is set, use it as default
-                  if (rc.outputs.length === 1 && pparm.default === undefined) {
-                    const singleValue = rc.outputs[0];
-                    // Handle both string values and {name, value} objects
-                    if (typeof singleValue === "string") {
-                      pparm.default = singleValue;
-                    } else if (typeof singleValue === "object" && singleValue !== null && "value" in singleValue) {
-                      pparm.default = singleValue.value;
-                    }
-                  }
-                }
-              } catch (e: any) {
-              const err =
-                e instanceof JsonError
-                  ? e
-                  : new JsonError(String(e?.message ?? e));
-              opts.errors?.push(err);
-              this.emit("message", {
-                stderr: err.message,
-                result: null,
-                exitCode: -1,
-                command: String(enumTmplName),
-                execute_on: undefined,
-                index: 0,
-              });
-            }
-          } else {
-            // During validation, we skip enum value execution but still validate that the template exists
-            // The enum template will be validated separately as part of the application validation
-          }
-        }
-
-        opts.parameters.push(pparm);
-      }
-    }
+    await this.#validateAndAddParameters(opts, tmplData, tmplPath);
 
     // Add commands or process nested templates
 

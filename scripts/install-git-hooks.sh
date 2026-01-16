@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install Git hooks for the lxc-manager project
+# Install Git hooks for the oci-lxc-deployer project
 # This script copies the pre-push hook from scripts/git-hooks to .git/hooks
 
 set -e

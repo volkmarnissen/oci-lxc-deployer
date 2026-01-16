@@ -9,7 +9,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'npm run build && lxc-manager --local ./backend/local',
+    command: 'npm run build && oci-lxc-deployer --local ./backend/local',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 60_000,

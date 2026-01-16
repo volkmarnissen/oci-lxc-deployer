@@ -1,6 +1,6 @@
-# LXC Manager – Configuration: Applications, Templates & Scripts
+# OCI LXC Deployer – Configuration: Applications, Templates & Scripts
 
-This document describes the structure and functionality of configuration in LXC Manager. It is intended for users and developers who want to provide or customize their own applications, templates, or scripts.
+This document describes the structure and functionality of configuration in OCI LXC Deployer. It is intended for users and developers who want to provide or customize their own applications, templates, or scripts.
 
 ---
 
@@ -165,7 +165,7 @@ This ensures that scripts are executed in the correct environment, depending on 
 
 ## 8. Additional Notes
 
-- Changes to configuration files are applied on the next start of LXC Manager.
+- Changes to configuration files are applied on the next start of OCI LXC Deployer.
 - Invalid configurations are rejected when loading (schema validation).
 - For complex applications, multiple scripts and parameters can be defined.
 

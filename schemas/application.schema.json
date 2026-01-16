@@ -12,10 +12,8 @@
     "source": { "type": "string" },
     "vendor": { "type": "string" },
     "installation": { "$ref": "templatelist" },
-    "backup": { "$ref": "templatelist" },
-    "restore": { "$ref": "templatelist" },
-    "uninstall": { "$ref": "templatelist" },
-    "update": { "$ref": "templatelist" }
+    "copy-upgrade": { "$ref": "templatelist" },
+    "copy-rollback": { "$ref": "templatelist" }
   },
   "required": ["name", "installation"],
   "additionalProperties": false

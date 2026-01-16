@@ -1,0 +1,26 @@
+<div class="installed-list">
+  @if (loading) {
+    <div>Lade installierte Container ...</div>
+  }
+  @if (error) {
+    <div class="error">{{ error }}</div>
+  }
+  <div class="card-grid">
+    @for (it of installations; track it) {
+      <div class="installed-card">
+        <div class="card-header">
+          <div class="header-info">
+            <h2>CT {{ it.vm_id }}</h2>
+            <p class="sub">
+              @if (it.hostname) { Host: <b>{{ it.hostname }}</b> • }
+              OCI: <b>{{ it.oci_image }}</b>
+            </p>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button type="button" (click)="goToMonitor()">Monitor</button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

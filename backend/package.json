@@ -1,19 +1,19 @@
 {
-  "name": "lxcmanager",
+  "name": "oci-lxc-deployer",
   "version": "1.0.0",
-  "description": "LXC Manager for Proxmox VE. Creates and manages LXC containers via Proxmox API.",
+  "description": "OCI LXC Deployer for Proxmox VE. Creates and manages LXC containers via Proxmox API.",
   "type": "module",
   "module": "nodenext",
   "main": "dist/index.js",
   "bin": {
-    "lxc-manager": "dist/lxc-manager.mjs"
+    "oci-lxc-deployer": "dist/oci-lxc-deployer.mjs"
   },
   "scripts": {
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.config.integration.mts",
     "test:all": "vitest run --config vitest.config.all.mts",
     "build": "tsc --project tsconfig.production.json && tsc-alias -p tsconfig.production.json",
-    "postbuild": "chmod +x ./dist/lxc-manager.mjs",
+    "postbuild": "chmod +x ./dist/oci-lxc-deployer.mjs",
     "prettier": "prettier --write ."
   },
   "keywords": [],

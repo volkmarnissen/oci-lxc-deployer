@@ -1,6 +1,6 @@
-# LXC Manager Applications - OCI Images
+# OCI LXC Deployer Applications - OCI Images
 
-This document lists all applications in LXC Manager and their available OCI images from Docker Hub or GitHub Container Registry (ghcr.io).
+This document lists all applications in OCI LXC Deployer and their available OCI images from Docker Hub or GitHub Container Registry (ghcr.io).
 
 ## Applications OCI Images Table
 

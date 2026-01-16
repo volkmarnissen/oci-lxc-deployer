@@ -15,7 +15,7 @@
       "id": "envs",
       "name": "Environment Variables",
       "type": "string",
-      "required": true,
+      "advanced": true,
       "description": "Environment variables in key=value format, one per line. Each line sets an environment variable in the container configuration. Example:\nMYAPP_HOST=localhost\nMYAPP_PORT=8080\nDATABASE_URL=postgresql://localhost:5432/mydb"
     }
   ],

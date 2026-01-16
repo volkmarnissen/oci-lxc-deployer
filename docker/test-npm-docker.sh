@@ -10,8 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd -P)"
 
 # Default values
-IMAGE_TAG="lxc-manager-test"
-CONTAINER_NAME="lxc-manager-test"
+IMAGE_TAG="oci-lxc-deployer-test"
+CONTAINER_NAME="oci-lxc-deployer-test"
 SKIP_BUILD=false
 SKIP_PACK=false
 SKIP_RUN=false
@@ -88,10 +88,10 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 [options]"
       echo ""
       echo "Options:"
-      echo "  --tag <image>         Docker image tag (default: lxc-manager-test)"
-      echo "  --container-name <n>  Container name (default: lxc-manager-test)"
+      echo "  --tag <image>         Docker image tag (default: oci-lxc-deployer-test)"
+      echo "  --container-name <n>  Container name (default: oci-lxc-deployer-test)"
       echo "  --no-build           Skip npm build steps (use existing dist/)"
-      echo "  --no-pack            Skip npm pack (use existing docker/lxc-manager.tgz)"
+      echo "  --no-pack            Skip npm pack (use existing docker/oci-lxc-deployer.tgz)"
       echo "  --no-run             Skip starting container after build"
       echo "  --detach, -d          Run container in detached mode"
       echo "  --port <p>, -p <p>   Host port to map to container port 3000 (default: 3000)"
@@ -114,9 +114,9 @@ cd "$PROJECT_ROOT"
 BUILD_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "dev")
 BUILD_REF=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-BUILD_REPOSITORY="${BUILD_REPOSITORY:-modbus2mqtt/lxc-manager}"
+BUILD_REPOSITORY="${BUILD_REPOSITORY:-modbus2mqtt/oci-lxc-deployer}"
 
-echo "=== LXC Manager npm pack + Docker Build Test ==="
+echo "=== OCI LXC Deployer npm pack + Docker Build Test ==="
 echo "  Image tag: $IMAGE_TAG"
 echo "  Version: $BUILD_VERSION"
 echo "  Git ref: ${BUILD_REF:0:8}"
@@ -157,9 +157,9 @@ if [ "$SKIP_PACK" = "false" ]; then
   echo "=== Step 2: Creating npm pack tarball ==="
   
   # Remove old tarball if exists
-  if [ -f "docker/lxc-manager.tgz" ]; then
+  if [ -f "docker/oci-lxc-deployer.tgz" ]; then
     echo "Removing old tarball..."
-    rm -f docker/lxc-manager.tgz
+    rm -f docker/oci-lxc-deployer.tgz
   fi
   
   echo "Running npm pack..."
@@ -171,19 +171,19 @@ if [ "$SKIP_PACK" = "false" ]; then
     exit 1
   fi
   
-  echo "Moving tarball to docker/lxc-manager.tgz..."
-  mv "$TARBALL" docker/lxc-manager.tgz
+  echo "Moving tarball to docker/oci-lxc-deployer.tgz..."
+  mv "$TARBALL" docker/oci-lxc-deployer.tgz
   
-  TARBALL_SIZE=$(du -h docker/lxc-manager.tgz | cut -f1)
-  echo "✓ Tarball created: docker/lxc-manager.tgz ($TARBALL_SIZE)"
+  TARBALL_SIZE=$(du -h docker/oci-lxc-deployer.tgz | cut -f1)
+  echo "✓ Tarball created: docker/oci-lxc-deployer.tgz ($TARBALL_SIZE)"
   echo ""
 else
-  echo "=== Step 2: Skipping npm pack (using existing docker/lxc-manager.tgz) ==="
-  if [ ! -f "docker/lxc-manager.tgz" ]; then
-    echo "ERROR: docker/lxc-manager.tgz not found. Run without --no-pack first." >&2
+  echo "=== Step 2: Skipping npm pack (using existing docker/oci-lxc-deployer.tgz) ==="
+  if [ ! -f "docker/oci-lxc-deployer.tgz" ]; then
+    echo "ERROR: docker/oci-lxc-deployer.tgz not found. Run without --no-pack first." >&2
     exit 1
   fi
-  echo "✓ Using existing tarball: docker/lxc-manager.tgz"
+  echo "✓ Using existing tarball: docker/oci-lxc-deployer.tgz"
   echo ""
 fi
 
@@ -197,17 +197,17 @@ if ! docker buildx version >/dev/null 2>&1; then
 else
   USE_BUILDX=true
   # Ensure buildx builder exists
-  if ! docker buildx ls | grep -q "lxc-manager-builder"; then
+  if ! docker buildx ls | grep -q "oci-lxc-deployer-builder"; then
     echo "Creating buildx builder..."
-    docker buildx create --name lxc-manager-builder --use >/dev/null 2>&1 || true
+    docker buildx create --name oci-lxc-deployer-builder --use >/dev/null 2>&1 || true
   else
-    docker buildx use lxc-manager-builder >/dev/null 2>&1 || true
+    docker buildx use oci-lxc-deployer-builder >/dev/null 2>&1 || true
   fi
 fi
 
 echo "Building Docker image..."
 echo "  Dockerfile: docker/Dockerfile.npm-pack"
-echo "  Tarball: docker/lxc-manager.tgz"
+echo "  Tarball: docker/oci-lxc-deployer.tgz"
 echo ""
 
 if [ "$USE_BUILDX" = "true" ]; then
@@ -215,7 +215,7 @@ if [ "$USE_BUILDX" = "true" ]; then
     --file docker/Dockerfile.npm-pack \
     --tag "$IMAGE_TAG:latest" \
     --tag "$IMAGE_TAG:$BUILD_VERSION" \
-    --build-arg NPM_TARBALL=docker/lxc-manager.tgz \
+    --build-arg NPM_TARBALL=docker/oci-lxc-deployer.tgz \
     --build-arg BUILD_VERSION="$BUILD_VERSION" \
     --build-arg BUILD_REF="$BUILD_REF" \
     --build-arg BUILD_DATE="$BUILD_DATE" \
@@ -227,7 +227,7 @@ else
     --file docker/Dockerfile.npm-pack \
     --tag "$IMAGE_TAG:latest" \
     --tag "$IMAGE_TAG:$BUILD_VERSION" \
-    --build-arg NPM_TARBALL=docker/lxc-manager.tgz \
+    --build-arg NPM_TARBALL=docker/oci-lxc-deployer.tgz \
     --build-arg BUILD_VERSION="$BUILD_VERSION" \
     --build-arg BUILD_REF="$BUILD_REF" \
     --build-arg BUILD_DATE="$BUILD_DATE" \

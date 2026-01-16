@@ -1,6 +1,6 @@
 # Application Development Guide
 
-This guide describes how to create applications for LXC Manager, focusing on different installation types and best practices.
+This guide describes how to create applications for OCI LXC Deployer, focusing on different installation types and best practices.
 
 ## Quick Start: Using the Framework (Easiest Method)
 
@@ -13,7 +13,7 @@ The **framework-based approach** is the simplest way to create a new application
 
 ### Use the Web UI to create a new application:
 
-1. **Open the Framework UI** in LXC Manager web interface (usually under "Create Application" or "Frameworks")
+1. **Open the Framework UI** in OCI LXC Deployer web interface (usually under "Create Application" or "Frameworks")
 2. **Select the OCI Image Framework** (`framework-oci-volumes`)
 3. **Enter the Docker image name** (e.g., `docker.io/your-org/your-app:latest`)
 4. **Fill in parameters**:
@@ -128,11 +128,11 @@ See [Application Creation with Frameworks](#application-creation-with-frameworks
 
 ## Directory Structure and Search Order
 
-Understanding the directory structure and search order is crucial for developing applications. LXC Manager uses a hierarchical search system that allows you to override shared templates and scripts with application-specific or local versions.
+Understanding the directory structure and search order is crucial for developing applications. OCI LXC Deployer uses a hierarchical search system that allows you to override shared templates and scripts with application-specific or local versions.
 
 ### Directory Structure
 
-LXC Manager uses two main directory hierarchies:
+OCI LXC Deployer uses two main directory hierarchies:
 
 #### 1. Main Repository (`json/`)
 
@@ -199,7 +199,7 @@ examples/                     # or local/json/
 
 ### Search Order
 
-LXC Manager searches for files in a specific order, allowing you to override shared resources with application-specific or local versions.
+OCI LXC Deployer searches for files in a specific order, allowing you to override shared resources with application-specific or local versions.
 
 #### Applications
 
@@ -291,12 +291,12 @@ You can override these using the `--local` option:
 
 ```bash
 # Use custom local directory
-lxc-manager --local ./my-custom-local
+oci-lxc-deployer --local ./my-custom-local
 ```
 
 ## Core Concepts
 
-Before diving into application development, it's important to understand the three core building blocks of LXC Manager: Applications, Templates, and Scripts.
+Before diving into application development, it's important to understand the three core building blocks of OCI LXC Deployer: Applications, Templates, and Scripts.
 
 ### Applications
 
@@ -459,7 +459,7 @@ This separation allows:
 
 ## Installation Types
 
-LXC Manager supports several installation types for applications:
+OCI LXC Deployer supports several installation types for applications:
 
 1. **npm + service**: Node.js applications installed via npm with an OpenRC/systemd service
 2. **python3 + service**: Python applications with an OpenRC/systemd service
@@ -648,10 +648,10 @@ The `volumes` parameter defines mount points for persistent data storage. **This
 
 Format: `key=value` pairs separated by spaces, where:
 - `key`: The mount point name (used as a variable like `$DATA_DIR`)
-- `value`: The directory name on the host (under `/var/lib/lxc-manager/data/`)
+- `value`: The directory name on the host (under `/var/lib/oci-lxc-deployer/data/`)
 
 Example: `data=modbus2mqtt` creates:
-- Host path: `/var/lib/lxc-manager/data/modbus2mqtt/`
+- Host path: `/var/lib/oci-lxc-deployer/data/modbus2mqtt/`
 - Container mount: Available as `$DATA_DIR` in scripts
 
 **Why volumes are important:**
@@ -737,9 +737,9 @@ The installation templates are executed in this order:
 During development, you can use a local directory instead of the main `json/` directory:
 
 1. Create your application in a local directory (e.g., `local/json/applications/your-app/`)
-2. Use the `--local` option when running LXC Manager:
+2. Use the `--local` option when running OCI LXC Deployer:
    ```bash
-   lxc-manager --local ./local
+   oci-lxc-deployer --local ./local
    ```
 
 The local directory structure should mirror the main `json/` directory:
@@ -765,7 +765,7 @@ Before committing your application, validate it:
 cd backend
 npm run build
 cd ..
-backend/dist/lxc-manager.mjs validate
+backend/dist/oci-lxc-deployer.mjs validate
 ```
 
 This will:
@@ -958,7 +958,7 @@ You can create custom templates for application-specific tasks:
 3. **Use meaningful parameter names**: Make it clear what each parameter does
 4. **Provide sensible defaults**: Users should be able to install with minimal configuration
 5. **Mark advanced parameters**: Use `"advanced": true` for parameters most users won't need
-6. **Validate before committing**: Always run `lxc-manager validate` before committing
+6. **Validate before committing**: Always run `oci-lxc-deployer validate` before committing
 7. **Document your application**: Add clear descriptions to help users understand parameters
 8. **Test with local path**: Use `--local` during development to test changes safely
 9. **Consider security within the container**: Applications running as root inside the container are responsible for their own security. The container itself has no elevated permissions on the host system
@@ -971,7 +971,7 @@ To generate documentation for all applications and templates:
 cd backend
 npm run build
 cd ..
-backend/dist/lxc-manager.mjs updatedoc
+backend/dist/oci-lxc-deployer.mjs updatedoc
 ```
 
 This will generate documentation in `docs/generated/`:
@@ -981,7 +981,7 @@ This will generate documentation in `docs/generated/`:
 To generate documentation for a specific application:
 
 ```bash
-backend/dist/lxc-manager.mjs updatedoc node-red
+backend/dist/oci-lxc-deployer.mjs updatedoc node-red
 ```
 
 ## Next Steps
@@ -995,14 +995,14 @@ backend/dist/lxc-manager.mjs updatedoc node-red
 
 ## Command Line Usage
 
-LXC Manager can be used via command line to execute tasks for applications.
+OCI LXC Deployer can be used via command line to execute tasks for applications.
 
 ### Start Web Application
 
 Start the web application server (default behavior when no command is specified):
 
 ```sh
-lxc-manager [options]
+oci-lxc-deployer [options]
 ```
 
 **Options:**
@@ -1011,9 +1011,9 @@ lxc-manager [options]
 
 **Examples:**
 ```sh
-lxc-manager
-lxc-manager --local ./my-local
-lxc-manager --local ./my-local --secretsFilePath ./secrets.txt
+oci-lxc-deployer
+oci-lxc-deployer --local ./my-local
+oci-lxc-deployer --local ./my-local --secretsFilePath ./secrets.txt
 ```
 
 ### Execute Tasks
@@ -1021,7 +1021,7 @@ lxc-manager --local ./my-local --secretsFilePath ./secrets.txt
 Execute a task for a specific application:
 
 ```sh
-lxc-manager exec <application> <task> <parameters file> [options]
+oci-lxc-deployer exec <application> <task> <parameters file> [options]
 ```
 
 **Arguments:**
@@ -1044,16 +1044,16 @@ lxc-manager exec <application> <task> <parameters file> [options]
 **Examples:**
 ```sh
 # Install Node-RED
-lxc-manager exec node-red installation ./params.json
+oci-lxc-deployer exec node-red installation ./params.json
 
 # Install with custom local directory
-lxc-manager exec node-red installation ./params.json --local ./my-local
+oci-lxc-deployer exec node-red installation ./params.json --local ./my-local
 
 # Backup with secrets file
-lxc-manager exec node-red backup ./backup-params.json --secretsFilePath ./secrets.txt
+oci-lxc-deployer exec node-red backup ./backup-params.json --secretsFilePath ./secrets.txt
 
 # Resume interrupted task
-lxc-manager exec node-red installation ./params.json --restartInfoFile ./restart-info.json
+oci-lxc-deployer exec node-red installation ./params.json --restartInfoFile ./restart-info.json
 ```
 
 ### Generate Documentation
@@ -1061,7 +1061,7 @@ lxc-manager exec node-red installation ./params.json --restartInfoFile ./restart
 Generate documentation for applications and templates:
 
 ```sh
-lxc-manager gendoc [options]
+oci-lxc-deployer gendoc [options]
 ```
 
 **Options:**
@@ -1070,8 +1070,8 @@ lxc-manager gendoc [options]
 
 **Examples:**
 ```sh
-lxc-manager gendoc
-lxc-manager gendoc --local ./my-local
+oci-lxc-deployer gendoc
+oci-lxc-deployer gendoc --local ./my-local
 ```
 
 ### Validate Templates
@@ -1079,7 +1079,7 @@ lxc-manager gendoc --local ./my-local
 Validate application templates against JSON schemas:
 
 ```sh
-lxc-manager validate [options]
+oci-lxc-deployer validate [options]
 ```
 
 **Options:**
@@ -1087,8 +1087,8 @@ lxc-manager validate [options]
 
 **Examples:**
 ```sh
-lxc-manager validate
-lxc-manager validate --local ./my-local
+oci-lxc-deployer validate
+oci-lxc-deployer validate --local ./my-local
 ```
 
 ### Help
@@ -1096,9 +1096,9 @@ lxc-manager validate --local ./my-local
 Display help information:
 
 ```sh
-lxc-manager --help
+oci-lxc-deployer --help
 # or
-lxc-manager -h
+oci-lxc-deployer -h
 ```
 
 ### Parameters File Format
@@ -1130,7 +1130,7 @@ The parameters file is a JSON file that contains the input values required for e
 **Finding Required Parameters:**
 1. **Use the Web UI**: Shows all required and optional parameters with descriptions
 2. **Check application templates**: Look in `json/applications/<application-name>/`
-3. **Run without parameters file**: LXC Manager will output a template with all required parameter names
+3. **Run without parameters file**: OCI LXC Deployer will output a template with all required parameter names
 
 **Example for installing Node-RED:**
 ```json

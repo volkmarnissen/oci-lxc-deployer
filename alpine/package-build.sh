@@ -88,8 +88,8 @@ PACKAGER_PUBKEY="/home/builder/.abuild/builder-6904805d.rsa.pub"
 EOF
 chmod 600 /home/builder/.abuild/abuild.conf || true
 chown builder:dialout /home/builder/.abuild/abuild.conf || true
-# Ensure desired repo channel directory exists (use channel "lxc-manager")
-mkdir -p /work/alpine/lxc-manager
+# Ensure desired repo channel directory exists (use channel "oci-lxc-deployer")
+mkdir -p /work/alpine/oci-lxc-deployer
 chown -R builder:dialout /work/alpine
 # Prepare source
 echo "Preparing source code..." >&2
@@ -97,14 +97,14 @@ rm -rf /work/src/node_modules || true
 # has been set in generate-ap.sh sed -i 's/pkgver=.*/pkgver='"${PKG_VERSION}"'/g' /work/APKBUILD || true
 
 # Build APK as builder user via a temporary script to avoid quoting issues
-echo "Building APK version $PKG_VERSION into /work/alpine/lxc-manager/<arch>"
+echo "Building APK version $PKG_VERSION into /work/alpine/oci-lxc-deployer/<arch>"
 cat >/tmp/build-as-builder.sh <<'BUILDER'
 #!/bin/sh
 set -e
 cd /work
 ls
 export REPODEST=/work/alpine
-export repo=lxc-manager
+export repo=oci-lxc-deployer
 export ABUILD_VERBOSE=1
 export ABUILD_TRACE=1
 mkdir -p /var/cache/apk

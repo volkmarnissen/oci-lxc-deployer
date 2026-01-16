@@ -13,7 +13,7 @@ function generateSshKeyForLxcUser(): string | null {
   const envServiceHome = process.env.LXC_MANAGER_USER_HOME;
   const serviceHomes = envServiceHome 
     ? [envServiceHome] 
-    : ["/var/lib/lxc-manager", "/home/lxc-manager", "/home/lxc"];
+    : ["/var/lib/oci-lxc-deployer", "/home/oci-lxc-deployer", "/home/lxc"];
   
   // Try to find an existing home directory or use the first one
   let serviceHome: string | null = null;
@@ -82,7 +82,7 @@ function generateSshKeyForLxcUser(): string | null {
         "-t", "ed25519",
         "-f", privateKeyPath,
         "-N", "", // No passphrase
-        "-C", "lxc-manager@auto-generated"
+        "-C", "oci-lxc-deployer@auto-generated"
       ],
       { encoding: "utf-8", timeout: 10000 }
     );
@@ -110,7 +110,7 @@ function generateSshKeyForLxcUser(): string | null {
           "-b", "4096",
           "-f", rsaPrivateKeyPath,
           "-N", "", // No passphrase
-          "-C", "lxc-manager@auto-generated"
+          "-C", "oci-lxc-deployer@auto-generated"
         ],
         { encoding: "utf-8", timeout: 10000 }
       );
@@ -148,7 +148,7 @@ function readServicePublicKey(): string | null {
   // 3) Fallbacks (only if not found in current user's home)
   const envServiceHome = process.env.LXC_MANAGER_USER_HOME;
   if (envServiceHome) homes.push(envServiceHome);
-  homes.push("/var/lib/lxc-manager", "/home/lxc-manager", "/home/lxc");
+  homes.push("/var/lib/oci-lxc-deployer", "/home/oci-lxc-deployer", "/home/lxc");
 
   const filenames = ["id_ed25519.pub", "id_rsa.pub", "id_ecdsa.pub"];
 
@@ -179,7 +179,7 @@ function resolveServiceHome(): string | null {
   const envServiceHome = process.env.LXC_MANAGER_USER_HOME;
   const candidates = envServiceHome
     ? [envServiceHome]
-    : ["/var/lib/lxc-manager", "/home/lxc-manager", "/home/lxc"];
+    : ["/var/lib/oci-lxc-deployer", "/home/oci-lxc-deployer", "/home/lxc"];
 
   for (const h of candidates) {
     try {
@@ -315,8 +315,8 @@ export class Ssh {
       "if command -v apt-get >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; fi; " +
       // Prepare dirs and drop-in config
       "mkdir -p /root/.ssh /var/run/sshd /etc/ssh/sshd_config.d; " +
-      // Write lxc-manager drop-in configuration
-      "cat > /etc/ssh/sshd_config.d/lxc-manager.conf <<'EOF'\n" +
+      // Write oci-lxc-deployer drop-in configuration
+      "cat > /etc/ssh/sshd_config.d/oci-lxc-deployer.conf <<'EOF'\n" +
       "PermitRootLogin prohibit-password\n" +
       "PubkeyAuthentication yes\n" +
       "PasswordAuthentication no\n" +

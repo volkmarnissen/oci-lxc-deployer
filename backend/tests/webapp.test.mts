@@ -9,7 +9,7 @@ import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { ApiUri } from "@src/types.mjs";
 
 function createTempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lxc-manager-test-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oci-lxc-deployer-test-"));
   // Prepare json/schema dirs to avoid errors where needed
   fs.mkdirSync(path.join(dir, "json"), { recursive: true });
   fs.mkdirSync(path.join(dir, "schemas"), { recursive: true });

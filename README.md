@@ -1,8 +1,8 @@
 <div align="center">
 
-<img alt="LXC Manager Logo" src="docs/assets/lxc-manager-logo.svg" height="120" />
+<img alt="OCI LXC Deployer Logo" src="docs/assets/oci-lxc-deployer-logo.svg" height="120" />
 
-# LXC Manager
+# OCI LXC Deployer
 
 Install and manage common LXC applications on Proxmox (e.g., Home Assistant, Node-RED), with support for custom templates and extended application configurations.
 </div>
@@ -11,10 +11,10 @@ Install and manage common LXC applications on Proxmox (e.g., Home Assistant, Nod
 Run this on your Proxmox host:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/install-lxc-manager.sh | sh
+curl -fsSL https://raw.githubusercontent.com/volkmarnissen/oci-lxc-deployer/main/install-oci-lxc-deployer.sh | sh
 ```
 
-This installs lxc-manager with DHCP networking. For static IP configuration, see options below.
+This installs oci-lxc-deployer with DHCP networking. For static IP configuration, see options below.
 
 ## Installation Options
 
@@ -23,7 +23,7 @@ This installs lxc-manager with DHCP networking. For static IP configuration, see
 - `--disk-size <GB>`: Rootfs size (default: `1`)
 - `--memory <MB>`: Memory (default: `512`)
 - `--bridge <name>`: Network bridge (default: `vmbr0`)
-- `--hostname <name>`: Hostname (default: `lxc-manager`)
+- `--hostname <name>`: Hostname (default: `oci-lxc-deployer`)
 - `--config-volume <path>`: Host path for /config volume (default: auto-detected)
 - `--secure-volume <path>`: Host path for /secure volume (default: auto-detected)
 - `--storage <name>`: Proxmox storage for OCI image (default: `local`)
@@ -32,7 +32,7 @@ This installs lxc-manager with DHCP networking. For static IP configuration, see
 
 **IPv4:**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/install-lxc-manager.sh \
+curl -fsSL https://raw.githubusercontent.com/volkmarnissen/oci-lxc-deployer/main/install-oci-lxc-deployer.sh \
   | sh -s -- --static-ip 192.168.4.100/24 --static-gw 192.168.4.1
 ```
 - `--static-ip <ip/prefix>`: IPv4 address in CIDR (e.g., `192.168.4.100/24`)
@@ -41,7 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/inst
 
 **IPv6:**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/install-lxc-manager.sh \
+curl -fsSL https://raw.githubusercontent.com/volkmarnissen/oci-lxc-deployer/main/install-oci-lxc-deployer.sh \
   | sh -s -- --static-ip6 fd00::50/64 --static-gw6 fd00::1
 ```
 - `--static-ip6 <ip/prefix>`: IPv6 address in CIDR (e.g., `fd00::50/64`)
@@ -50,14 +50,14 @@ curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/inst
 
 **Dual Stack (IPv4 + IPv6):**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/volkmarnissen/lxc-manager/main/install-lxc-manager.sh \
+curl -fsSL https://raw.githubusercontent.com/volkmarnissen/oci-lxc-deployer/main/install-oci-lxc-deployer.sh \
   | sh -s -- \
     --static-ip 192.168.4.100/24 --static-gw 192.168.4.1 \
     --static-ip6 fd00::50/64 --static-gw6 fd00::1
 ```
 
 ## Access the Web UI
-- Open `http://lxc-manager:3000` from your network (or replace `lxc-manager` with the container's IP/hostname you configured).
+- Open `http://oci-lxc-deployer:3000` from your network (or replace `oci-lxc-deployer` with the container's IP/hostname you configured).
 - If Proxmox VE is behind a firewall, ensure port `3000/tcp` is reachable from the browser.
 
 ## Command Line Usage
@@ -74,7 +74,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for installation details and [docs/applic
 - Parameterized tasks via JSON; validated against schemas in `backend/schemas/`.
 
 
-## Why LXC Manager?
+## Why OCI LXC Deployer?
 - Simple Web UI to install common apps (e.g., Home Assistant, Node-RED)
 - Reusable JSON templates for repeatable provisioning
 - Extend with your own templates and app configurations

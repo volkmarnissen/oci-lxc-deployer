@@ -51,7 +51,7 @@
     {
       "name": "Get OCI Image",
       "script": "get-oci-image.py",
-      "outputs": ["template_path", "ostype"]
+      "outputs": ["template_path", "ostype", "application_id", "oci_image", "oci_image_tag"]
     }
   ]
 }

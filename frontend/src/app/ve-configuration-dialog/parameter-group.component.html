@@ -8,7 +8,7 @@
 						@case ('boolean') {
 						<div class="param-field param-toggle">
 						<mat-slide-toggle [formControlName]="param.id" [matTooltip]="getTooltip(param)" matTooltipPosition="above">
-						{{ param.description || param.name }}
+						{{ param.name }}
 						</mat-slide-toggle>
 						@if (hasExpandableHelp(param)) {
 							<button type="button" mat-icon-button class="help-toggle" (click)="toggleHelp(param.id)" [matTooltip]="'Show/hide help'" matTooltipPosition="above">

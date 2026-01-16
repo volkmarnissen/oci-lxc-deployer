@@ -1,1 +1,1 @@
-lxc-manager
+oci-lxc-deployer

@@ -6,13 +6,12 @@ set -eu
 # Downloads OCI image, creates container, mounts volumes, and writes storagecontext.json
 
 # Static GitHub source configuration
-OCI_OWNER="modbus2mqtt"
-#OWNER="volkmarnissen"
-OWNER="modbus2mqtt"
+OCI_OWNER="${OCI_OWNER:-modbus2mqtt}"
+OWNER="${OWNER:-modbus2mqtt}"
+#OWNER="modbus2mqtt"
 REPO="lxc-manager"
 BRANCH="main"
 OCI_IMAGE="ghcr.io/${OCI_OWNER}/lxc-manager:latest"
-
 # Helper functions
 execute_script_from_github() {
   if [ "$#" -lt 2 ]; then
@@ -39,33 +38,74 @@ execute_script_from_github() {
 
   script_content=$(curl -fsSL "$raw_url" | sed $sed_args)
 
+  # Some Python scripts depend on shared helpers but are still executed via stdin.
+  # Prepend the helper library explicitly when needed.
+  case "$path" in
+    json/shared/scripts/setup-lxc-uid-mapping.py|json/shared/scripts/setup-lxc-gid-mapping.py)
+      lib_url="https://raw.githubusercontent.com/${OWNER}/${REPO}/refs/heads/${BRANCH}/json/shared/scripts/setup_lxc_idmap_common.py"
+      lib_content=$(curl -fsSL "$lib_url")
+      script_content=$(printf '%s\n\n%s' "$lib_content" "$script_content")
+      ;;
+  esac
+
   if [ "$output_id" = "-" ]; then
     printf '%s' "$script_content" | $interpreter
     return $?
   fi
 
   script_output=$(printf '%s' "$script_content" | $interpreter)
-  output_value=$(printf '%s\n' "$script_output" \
-    | awk -v ID="$output_id" '
-      BEGIN { FS="\"" }
-      /"id"[[:space:]]*:[[:space:]]*"/ {
-        for (i=1; i<=NF; i++) {
-          if ($i=="id" && $(i+2)==ID) {
-            for (j=i; j<=NF; j++) {
-              if ($j=="value") { print $(j+2); exit }
+
+  get_value_by_id() {
+    printf '%s\n' "$script_output" \
+      | awk -v ID="$1" '
+        BEGIN { FS="\"" }
+        /"id"[[:space:]]*:[[:space:]]*"/ {
+          for (i=1; i<=NF; i++) {
+            if ($i=="id" && $(i+2)==ID) {
+              for (j=i; j<=NF; j++) {
+                if ($j=="value") { print $(j+2); exit }
+              }
             }
           }
-        }
-      }')
-  
-  if [ -n "$output_value" ]; then
-    printf '%s\n' "$output_value"
-    return 0
-  else
-    echo "ERROR: Output id '$output_id' not found" >&2
-    printf '%s\n' "$script_output" >&2
-    return 3
-  fi
+        }'
+  }
+
+  case "$output_id" in
+    *","*)
+      # Multiple output IDs, comma-separated
+      output_ids=$(printf '%s' "$output_id" | tr -d ' ')
+      IFS=','
+      set -- $output_ids
+      IFS=' '
+      results=""
+      missing=""
+      for id in "$@"; do
+        value=$(get_value_by_id "$id")
+        if [ -z "$value" ]; then
+          missing="${missing}${missing:+,}${id}"
+          value=""
+        fi
+        results="${results}${results:+,}${value}"
+      done
+      if [ -n "$missing" ]; then
+        echo "Warning: Output id(s) '$missing' not found" >&2
+        printf '%s\n' "$script_output" >&2
+      fi
+      printf '%s\n' "$results"
+      return 0
+      ;;
+    *)
+      output_value=$(get_value_by_id "$output_id")
+      if [ -n "$output_value" ]; then
+        printf '%s\n' "$output_value"
+        return 0
+      else
+        echo "ERROR: Output id '$output_id' not found" >&2
+        printf '%s\n' "$script_output" >&2
+        return 3
+      fi
+      ;;
+  esac
 }
 
 # Defaults
@@ -167,6 +207,7 @@ echo "  Proxmox Host: ${proxmox_hostname}" >&2
 echo "  Volume base: ${volume_base}" >&2
 echo "  Config volume: ${config_volume_path}" >&2
 echo "  Secure volume: ${secure_volume_path}" >&2
+echo "  OWNER=${OWNER}, REPO=${REPO}, BRANCH=${BRANCH}, OCI_IMAGE=${OCI_IMAGE}" >&2 
 
 # Check and install SSH server if needed (on Proxmox VE host)
 # This matches the installation command from the SSH config page
@@ -239,14 +280,28 @@ if [ -z "$template_path" ]; then
   exit 1
 fi
 
-ostype=$(execute_script_from_github \
+oci_outputs=$(execute_script_from_github \
   "json/shared/scripts/get-oci-image.py" \
-  "ostype" \
+  "ostype,application_id,application_name,oci_image,oci_image_tag" \
   "oci_image=${OCI_IMAGE}" \
   "storage=${storage}" \
   "registry_username=" \
   "registry_password=" \
   "platform=linux/amd64")
+
+IFS=',' read -r ostype application_id application_name resolved_oci_image oci_image_tag <<EOF
+$oci_outputs
+EOF
+
+if [ -z "$application_id" ]; then
+  application_id="lxc-manager"
+fi
+if [ -z "$resolved_oci_image" ]; then
+  resolved_oci_image="${OCI_IMAGE}"
+fi
+if [ -z "$oci_image_tag" ]; then
+  oci_image_tag=""
+fi
 
 echo "  OCI image ready: ${template_path}" >&2
 
@@ -262,6 +317,10 @@ vm_id=$(execute_script_from_github \
   "memory=${memory}" \
   "bridge=${bridge}" \
   "hostname=${hostname}" \
+  "application_id=${application_id}" \
+  "application_name=${application_name}" \
+  "oci_image=${resolved_oci_image}" \
+  "oci_image_tag=${oci_image_tag}" \
   "ostype=${ostype}")
 
 if [ -z "$vm_id" ]; then
@@ -277,12 +336,10 @@ mapped_uid=$(execute_script_from_github \
   "json/shared/scripts/setup-lxc-uid-mapping.py" \
   "mapped_uid" \
   "uid=${LXC_UID}" \
-  "gid=${LXC_GID}" \
   "vm_id=${vm_id}" || echo "")
 mapped_gid=$(execute_script_from_github \
-  "json/shared/scripts/setup-lxc-uid-mapping.py" \
+  "json/shared/scripts/setup-lxc-gid-mapping.py" \
   "mapped_gid" \
-  "uid=${LXC_UID}" \
   "gid=${LXC_GID}" \
   "vm_id=${vm_id}" || echo "")
 
@@ -373,7 +430,9 @@ changed_params_json="[
   {\"name\":\"bridge\",\"value\":\"${bridge}\"},
   {\"name\":\"config_volume_path\",\"value\":\"${config_volume_path}\"},
   {\"name\":\"secure_volume_path\",\"value\":\"${secure_volume_path}\"},
-  {\"name\":\"oci_image\",\"value\":\"${OCI_IMAGE}\"},
+  {\"name\":\"application_id\",\"value\":\"${application_id}\"},
+  {\"name\":\"oci_image\",\"value\":\"${resolved_oci_image}\"},
+  {\"name\":\"oci_image_tag\",\"value\":\"${oci_image_tag}\"},
   {\"name\":\"storage\",\"value\":\"${storage}\"}
 ]"
 mkdir -p "$(dirname "${storagecontext_file}")" 2>/dev/null || true
@@ -386,7 +445,7 @@ cat > "${storagecontext_file}" <<JSON
   },
   "vminstall_${hostname}_lxc-manager": {
     "hostname": "${hostname}",
-    "application": "lxc-manager",
+    "application": "${application_id}",
     "task": "installation",
     "changedParams": ${changed_params_json}
   }

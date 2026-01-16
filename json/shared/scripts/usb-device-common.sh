@@ -745,4 +745,3 @@ is_usb_device_mapped_in_running_containers() {
   return 1  # Device is not mapped
 }
 
-

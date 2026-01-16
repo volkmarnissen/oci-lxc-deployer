@@ -23,11 +23,14 @@ alpine/package/*/
 !alpine/package/generate-ap.sh
 !alpine/package/*.ini
 !alpine/package/README.md
-
 # Alpine local repository (build output)
 alpine/repo/
 #
 test-results/
 **/secret.txt
 **/storagecontext.json
-docker/lxc-manager.tgz
+docker/oci-lxc-deployer.tgz
+**/__pycache__/*
+
+
+**/.unused
