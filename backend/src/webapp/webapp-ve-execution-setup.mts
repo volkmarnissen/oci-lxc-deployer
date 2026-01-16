@@ -1,6 +1,8 @@
-import { IVEContext, IVMContext } from "./backend-types.mjs";
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import { VeExecution, IRestartInfo } from "./ve-execution.mjs";
+
+import { IVEContext, IVMContext } from "@src/backend-types.mjs";
+import { ICommand, IVeExecuteMessage } from "@src/types.mjs";
+import { IRestartInfo } from "@src/ve-execution-constants.mjs";
+import { VeExecution } from "@src/ve-execution.mjs";
 import { WebAppVeMessageManager } from "./webapp-ve-message-manager.mjs";
 import { WebAppVeRestartManager } from "./webapp-ve-restart-manager.mjs";
 

@@ -1,8 +1,5 @@
-import {
-  IVeExecuteMessage,
-  IVeExecuteMessagesResponse,
-  ISingleExecuteMessagesResponse,
-} from "./types.mjs";
+ import { IVeExecuteMessagesResponse, ISingleExecuteMessagesResponse, IVeExecuteMessage } from "@src/types.mjs";
+
 
 const MESSAGE_RETENTION_MS = 30 * 60 * 1000; // 30 minutes
 

@@ -1,5 +1,6 @@
-import { IRestartInfo } from "./ve-execution.mjs";
-import { IPostVeConfigurationBody } from "./types.mjs";
+import { IPostVeConfigurationBody } from "@src/types.mjs";
+import { IRestartInfo } from "@src/ve-execution-constants.mjs";
+
 
 /**
  * Manages restart information for execution retries.

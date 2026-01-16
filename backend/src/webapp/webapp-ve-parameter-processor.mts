@@ -1,9 +1,10 @@
+import { IVEContext } from "@src/backend-types.mjs";
+import { ContextManager } from "@src/context-manager.mjs";
+import { StorageContext } from "@src/storagecontext.mjs";
+import { IPostVeConfigurationBody, IParameter, TaskType } from "@src/types.mjs";
 import fs from "fs";
 import path from "path";
-import { StorageContext } from "./storagecontext.mjs";
-import { IVEContext } from "./backend-types.mjs";
-import { IParameter, IPostVeConfigurationBody, TaskType } from "./types.mjs";
-import { ContextManager } from "./context-manager.mjs";
+
 
 /**
  * Processes parameters for VE configuration, including file uploads and vmInstallContext.

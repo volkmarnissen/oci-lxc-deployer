@@ -1,13 +1,14 @@
-import { IVEContext, IVMInstallContext, VEConfigurationError } from "./backend-types.mjs";
-import { PersistenceManager } from "./persistence/persistence-manager.mjs";
-import { VMInstallContext } from "./context-manager.mjs";
-import { TaskType, IPostVeConfigurationBody, IVeExecuteMessagesResponse, IJsonError } from "./types.mjs";
+
+import { TaskType, IPostVeConfigurationBody, IVeExecuteMessagesResponse, IJsonError } from "@src/types.mjs";
 import { WebAppVeMessageManager } from "./webapp-ve-message-manager.mjs";
 import { WebAppVeRestartManager } from "./webapp-ve-restart-manager.mjs";
 import { WebAppVeParameterProcessor } from "./webapp-ve-parameter-processor.mjs";
 import { WebAppVeExecutionSetup } from "./webapp-ve-execution-setup.mjs";
-import { JsonError } from "./jsonvalidator.mjs";
-import { determineExecutionMode, ExecutionMode } from "./ve-execution-constants.mjs";
+import { VEConfigurationError, IVEContext, IVMInstallContext } from "@src/backend-types.mjs";
+import { JsonError } from "@src/jsonvalidator.mjs";
+import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
+import { VMInstallContext } from "@src/storagecontext.mjs";
+import { determineExecutionMode, ExecutionMode } from "@src/ve-execution-constants.mjs";
 
 /**
  * Route handler logic for VE configuration endpoints.
