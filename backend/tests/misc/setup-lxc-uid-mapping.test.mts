@@ -168,14 +168,10 @@ describe("setup-lxc-uid-mapping.py", () => {
       Volume.LocalRoot,
       "subuid",
     );
-    const subuidLines = subuidContent
-      .split("\n")
-      .filter((l: string) => l.trim());
+    const subuidLines = subuidContent.split("\n").filter(l => l.trim());
     
     // Count occurrences of standard range - should appear only once
-    const standardRangeCount = subuidLines.filter(
-      (l: string) => l === "root:100000:65536",
-    ).length;
+    const standardRangeCount = subuidLines.filter(l => l === "root:100000:65536").length;
     expect(standardRangeCount).toBe(1);
 
     // Should have new specific range for max UID (2000)
@@ -196,9 +192,7 @@ describe("setup-lxc-uid-mapping.py", () => {
     expect(configContent).toContain("lxc.idmap: u 2001 13274737 63535");
 
     // No duplicate idmap entries
-    const idmapLines = configContent
-      .split("\n")
-      .filter((l: string) => l.includes("lxc.idmap:"));
+    const idmapLines = configContent.split("\n").filter(l => l.includes("lxc.idmap:"));
     const uniqueIdmapLines = new Set(idmapLines);
     expect(idmapLines.length).toBe(uniqueIdmapLines.size);
   });

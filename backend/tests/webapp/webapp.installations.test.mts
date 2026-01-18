@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
-import { VEWebApp } from "@src/webapp/webapp.mjs";
 import express from "express";
 import path from "node:path";
 import { ApiUri } from "@src/types.mjs";
-import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import {
+  createWebAppTestSetup,
+  type WebAppTestSetup,
   createTempDir,
   ensureDirs,
   listFilesRecursive,
@@ -14,7 +14,8 @@ import {
 
 describe("WebApp Installations API", () => {
   let app: express.Application;
-  let env: TestEnvironment;
+  let setup: WebAppTestSetup;
+  let env: WebAppTestSetup["env"];
   let tmpPve: string;
   const veContextKey = "ve_testhost";
 
@@ -22,14 +23,15 @@ describe("WebApp Installations API", () => {
     // Ensure VeExecution runs locally (no SSH) for this test
     process.env.LXC_MANAGER_TEST_MODE = "true";
 
-    env = createTestEnvironment(import.meta.url, {
+    setup = createWebAppTestSetup(import.meta.url, {
       // Provide required script for /api/installations via json/ (no manual copying)
       jsonIncludePatterns: [".*list-managed-oci-containers.*"],
       // Schemas are read from repo directly by default (no copying)
     });
+    env = setup.env;
     tmpPve = createTempDir("lxc-pve-");
 
-    const { ctx } = env.initPersistence();
+    const { ctx } = setup;
     // Create VE context used by installations scan
     ctx.setVEContext({
       host: "testhost",
@@ -81,15 +83,11 @@ describe("WebApp Installations API", () => {
     // Point scan logic to our fake dir in tests
     process.env.LXC_MANAGER_PVE_LXC_DIR = lxcDir;
 
-    app = new VEWebApp(ctx as any).app;
+    app = setup.app;
   });
 
   afterEach(() => {
-    try {
-      env.cleanup();
-    } catch {
-      // ignore
-    }
+    setup.cleanup();
   });
 
   it("returns managed OCI containers and does not modify json dir", async () => {

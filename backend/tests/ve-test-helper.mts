@@ -45,7 +45,7 @@ export interface ITemplate {
   outputs?: string[];
 }
 
-export class ProxmoxTestHelper {
+export class VeTestHelper {
   tempDir!: string;
   jsonDir!: string;
   schemaDir!: string;
@@ -56,11 +56,29 @@ export class ProxmoxTestHelper {
     this.jsonDir = path.join(this.tempDir, "json");
     this.schemaDir = path.join(this.tempDir, "schema");
     this.localDir = path.join(this.tempDir, "local/json");
-    await fs.copy(path.join(__dirname, "../../json"), this.jsonDir);
+    const candidates = [
+      path.resolve(process.cwd(), ".."),
+      path.resolve(process.cwd(), "..", ".."),
+      path.resolve(__dirname, "..", "..", ".."),
+    ];
+    let repoRoot: string | undefined;
+    for (const candidate of candidates) {
+      if (
+        (await fs.pathExists(path.join(candidate, "json"))) &&
+        (await fs.pathExists(path.join(candidate, "schemas")))
+      ) {
+        repoRoot = candidate;
+        break;
+      }
+    }
+    if (!repoRoot) {
+      throw new Error("Unable to locate repo root for VeTestHelper");
+    }
+    await fs.copy(path.join(repoRoot, "json"), this.jsonDir);
     await fs.ensureDir(this.schemaDir);
     await fs.ensureDir(this.localDir);
     // Copy real backend schemas so JsonValidator can resolve references
-    const realSchemasDir = path.join(__dirname, "../../schemas");
+    const realSchemasDir = path.join(repoRoot, "schemas");
     const entries = await fs.readdir(realSchemasDir);
     for (const entry of entries) {
       const src = path.join(realSchemasDir, entry);
@@ -99,6 +117,8 @@ export class ProxmoxTestHelper {
   }
 
   writeApplication(appName: string, data: IApplication): void {
+    const appDir = path.join(this.jsonDir, "applications", appName);
+    fs.ensureDirSync(appDir);
     const appPath = path.join(
       this.jsonDir,
       "applications",
@@ -131,13 +151,14 @@ export class ProxmoxTestHelper {
   }
 
   writeTemplate(appName: string, tmplName: string, data: ITemplate): void {
-    const tmplPath = path.join(
+    const tmplDir = path.join(
       this.jsonDir,
       "applications",
       appName,
       "templates",
-      tmplName,
     );
+    fs.ensureDirSync(tmplDir);
+    const tmplPath = path.join(tmplDir, tmplName);
     fs.writeFileSync(tmplPath, JSON.stringify(data, null, 2), "utf-8");
   }
 

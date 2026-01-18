@@ -50,7 +50,7 @@ export class TestPersistenceHelper {
   static getRepoRoot(): string {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
-    return path.resolve(__dirname, "..", "..");
+    return path.resolve(__dirname, "..", "..", "..");
   }
 
   resolve(volume: Volume, key = ""): string {
@@ -167,12 +167,12 @@ export class TestPersistenceHelper {
     fsSync.mkdirSync(target, { recursive: true });
   }
 
-  existsSync(volume: Volume, key = ""): boolean {
+  existsSync(volume: Volume, key: string): boolean {
     const target = this.resolve(volume, key);
     return fsSync.existsSync(target);
   }
 
-  removeSync(volume: Volume, key = ""): void {
+  removeSync(volume: Volume, key: string): void {
     const target = this.resolve(volume, key);
     fsSync.rmSync(target, { recursive: true, force: true });
   }

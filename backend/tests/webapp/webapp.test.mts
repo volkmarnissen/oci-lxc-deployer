@@ -1,38 +1,20 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
-import { VEWebApp } from "@src/webapp/webapp.mjs";
 import express from "express";
-import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
-import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { ApiUri } from "@src/types.mjs";
-
-function createTempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oci-lxc-deployer-test-"));
-  // Prepare json/schema dirs to avoid errors where needed
-  fs.mkdirSync(path.join(dir, "json"), { recursive: true });
-  fs.mkdirSync(path.join(dir, "schemas"), { recursive: true });
-  return dir;
-}
+import { createWebAppTestSetup, type WebAppTestSetup } from "../helper/webapp-test-helper.mjs";
 
 describe("WebApp API", () => {
   let app: express.Application;
-  let tmp: string;
+  let setup: WebAppTestSetup;
 
   beforeEach(() => {
-    tmp = createTempDir();
-    const storageContextFile = path.join(tmp, "storagecontext.json");
-    const secretFile = path.join(tmp, "secret.txt");
-    // Close existing instance if any
-    try {
-      PersistenceManager.getInstance().close();
-    } catch {
-      // Ignore if not initialized
-    }
-    PersistenceManager.initialize(tmp, storageContextFile, secretFile);
-    const contextManager = PersistenceManager.getInstance().getContextManager();
-    app = new VEWebApp(contextManager as any).app;
+    setup = createWebAppTestSetup(import.meta.url);
+    app = setup.app;
+  });
+
+  afterEach(() => {
+    setup.cleanup();
   });
 
   describe("SshConfigs GET", () => {
