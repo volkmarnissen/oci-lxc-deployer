@@ -1,9 +1,9 @@
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import { StorageContext, VMContext } from "./storagecontext.mjs";
+import { ICommand, IVeExecuteMessage } from "../types.mjs";
+import { StorageContext, VMContext } from "../storagecontext.mjs";
 import { VeExecutionConstants } from "./ve-execution-constants.mjs";
 import { VeExecutionSshExecutor } from "./ve-execution-ssh-executor.mjs";
 import { VeExecution } from "./ve-execution.mjs";
-import { IVEContext, IVMContext } from "./backend-types.mjs";
+import { IVEContext, IVMContext } from "../backend-types.mjs";
 
 export interface HostDiscoveryDependencies {
   sshExecutor: VeExecutionSshExecutor;

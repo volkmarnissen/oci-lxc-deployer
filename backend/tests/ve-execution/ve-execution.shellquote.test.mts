@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { VeExecution } from "@src/ve-execution.mjs";
+import { VeExecution } from "@src/ve-execution/ve-execution.mjs";
 import { ICommand } from "@src/types.mjs";
 import { spawnSync } from "child_process";
 import { IVEContext } from "@src/backend-types.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
 describe("ProxmoxExecution shell quoting", () => {

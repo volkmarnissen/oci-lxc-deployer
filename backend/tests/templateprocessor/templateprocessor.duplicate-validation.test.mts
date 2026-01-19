@@ -2,10 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { TemplateProcessor } from "@src/templates/templateprocessor.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 import { ContextManager } from "@src/context-manager.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 describe("TemplateProcessor duplicate validation", () => {
   let env: TestEnvironment;

@@ -8,7 +8,7 @@ import { VEConfigurationError, IVEContext, IVMInstallContext } from "@src/backen
 import { JsonError } from "@src/jsonvalidator.mjs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { VMInstallContext } from "@src/storagecontext.mjs";
-import { determineExecutionMode, ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { determineExecutionMode, ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 /**
  * Route handler logic for VE configuration endpoints.

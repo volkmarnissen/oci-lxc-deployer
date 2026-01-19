@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { VeExecution } from "../../src/ve-execution.mjs";
-import { ExecutionMode } from "../../src/ve-execution-constants.mjs";
-import { resetMessageIndex } from "../../src/ve-execution-constants.mjs";
-import { ICommand } from "../../src/types.mjs";
+import { VeExecution } from "@src/ve-execution/ve-execution.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
+import { resetMessageIndex } from "@src/ve-execution/ve-execution-constants.mjs";
+import { ICommand } from "@src/types.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
+import { VeExecutionCommandProcessor } from "@src/ve-execution/ve-execution-command-processor.mjs";
 
 describe("VeExecution Shebang Support", () => {
   let env: TestEnvironment;
@@ -72,8 +73,7 @@ print(json.dumps(output))
     ];
 
     // Load command content to extract shebang
-    const { VeExecutionCommandProcessor } = await import("../../src/ve-execution-command-processor.mjs");
-    const processor = new VeExecutionCommandProcessor({
+     const processor = new VeExecutionCommandProcessor({
       outputs: new Map(),
       inputs: { test_input: "test_value_123" },
       variableResolver: {} as any,

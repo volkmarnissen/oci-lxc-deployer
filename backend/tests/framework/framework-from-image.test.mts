@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IVEContext } from "@src/backend-types.mjs";
 import { IOciImageAnnotations } from "@src/types.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 import { FrameworkFromImage } from "@src/framework-from-image.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";

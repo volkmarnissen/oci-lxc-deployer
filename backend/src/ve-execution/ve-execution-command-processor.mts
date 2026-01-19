@@ -1,8 +1,8 @@
 import fs from "node:fs";
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
-import { VariableResolver } from "./variable-resolver.mjs";
+import { ICommand, IVeExecuteMessage } from "../types.mjs";
+import { VariableResolver } from "../variable-resolver.mjs";
 import { getNextMessageIndex } from "./ve-execution-constants.mjs";
+import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
 
 export interface CommandProcessorDependencies {
   outputs: Map<string, string | number | boolean>;

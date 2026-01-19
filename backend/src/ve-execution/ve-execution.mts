@@ -1,9 +1,9 @@
 import { EventEmitter } from "events";
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import { IVEContext, IVMContext } from "./backend-types.mjs";
-import { VariableResolver } from "./variable-resolver.mjs";
-import { OutputProcessor } from "./output-processor.mjs";
-import { JsonError } from "./jsonvalidator.mjs";
+import { ICommand, IVeExecuteMessage } from "../types.mjs";
+import { IVEContext, IVMContext } from "../backend-types.mjs";
+import { VariableResolver } from "../variable-resolver.mjs";
+import { OutputProcessor } from "../output-processor.mjs";
+import { JsonError } from "../jsonvalidator.mjs";
 import {
   IProxmoxRunResult,
   IRestartInfo,

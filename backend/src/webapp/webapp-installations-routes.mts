@@ -3,8 +3,8 @@ import path from "path";
 import fs from "fs";
 import { ApiUri, IInstallationsResponse, ICommand } from "@src/types.mjs";
 import { ContextManager } from "../context-manager.mjs";
-import { VeExecution } from "../ve-execution.mjs";
-import { determineExecutionMode } from "../ve-execution-constants.mjs";
+import { VeExecution } from "../ve-execution/ve-execution.mjs";
+import { determineExecutionMode } from "../ve-execution/ve-execution-constants.mjs";
 import { serializeError } from "./webapp-error-utils.mjs";
 
 

@@ -1,9 +1,9 @@
 import { IApplicationDefaults, IFramework } from "./types.mjs";
 import { IVEContext } from "./backend-types.mjs";
 import { IOciImageAnnotations } from "./types.mjs";
-import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
-import { VeExecutionSshExecutor, SshExecutorDependencies } from "./ve-execution-ssh-executor.mjs";
-import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
+import { ExecutionMode, determineExecutionMode } from "./ve-execution/ve-execution-constants.mjs";
+import { VeExecutionSshExecutor, SshExecutorDependencies } from "./ve-execution/ve-execution-ssh-executor.mjs";
+import { VeExecutionMessageEmitter } from "./ve-execution/ve-execution-message-emitter.mjs";
 import { OutputProcessor } from "./output-processor.mjs";
 import { EventEmitter } from "events";
 import path from "path";

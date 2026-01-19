@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import fs from "node:fs";
 import { JsonError } from "@src/jsonvalidator.mjs";
 import {
   IConfiguredPathes,
@@ -22,8 +23,8 @@ import { ScriptValidator } from "@src/scriptvalidator.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { ITemplatePersistence, IApplicationPersistence } from "./persistence/interfaces.mjs";
 import { FileSystemRepositories, type TemplateRef, type ScriptRef, type MarkdownRef } from "./persistence/repositories.mjs";
-import { VeExecution } from "./ve-execution.mjs";
-import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
+import { VeExecution } from "./ve-execution/ve-execution.mjs";
+import { ExecutionMode, determineExecutionMode } from "./ve-execution/ve-execution-constants.mjs";
 // ITemplateReference moved to backend-types.mts
 import { ITemplateReference } from "./backend-types.mjs";
 interface IProcessTemplateOpts {
@@ -514,10 +515,15 @@ export class TemplateProcessor extends EventEmitter {
     ref: TemplateRef,
     sectionName: string,
   ): string | null {
+    if (ref.scope !== "shared" && ref.applicationId === undefined) {
+      return null;
+    }
     const markdownRef: MarkdownRef = {
       templateName: this.normalizeTemplateName(ref.name),
       scope: ref.scope,
-      applicationId: ref.applicationId,
+      ...(ref.applicationId !== undefined
+        ? { applicationId: ref.applicationId }
+        : {}),
     };
     return this.repositories.getMarkdownSection(markdownRef, sectionName);
   }

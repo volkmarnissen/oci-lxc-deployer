@@ -1,7 +1,7 @@
 import { expect, describe, it, beforeEach, afterEach } from "vitest";
 import { VeTestHelper } from "../ve-test-helper.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 describe("ProxmoxConfiguration.loadApplication", () => {
   let helper: VeTestHelper;

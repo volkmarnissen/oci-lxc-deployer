@@ -3,7 +3,7 @@ import path from "node:path";
 import { JsonValidator } from "./jsonvalidator.mjs";
 import { StorageContext } from "./storagecontext.mjs";
 import { ICommand } from "./types.mjs";
-import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
+import { ExecutionMode, determineExecutionMode } from "./ve-execution/ve-execution-constants.mjs";
 
 // IOutput interface moved here to avoid circular dependency
 export interface IOutput {

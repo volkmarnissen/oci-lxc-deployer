@@ -1,5 +1,5 @@
 // Re-export IOutput for backward compatibility
-export type { IOutput } from "./output-processor.mjs";
+export type { IOutput } from "../output-processor.mjs";
 
 export interface IProxmoxRunResult {
   lastSuccessIndex: number;

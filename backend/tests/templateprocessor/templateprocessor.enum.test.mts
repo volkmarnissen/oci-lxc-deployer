@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 // TaskType is a string union; use literal values
 

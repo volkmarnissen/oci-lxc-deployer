@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { VeExecutionCommandProcessor } from "@src/ve-execution-command-processor.mjs";
+import { VeExecutionCommandProcessor } from "@src/ve-execution/ve-execution-command-processor.mjs";
 import { ICommand } from "@src/types.mjs";
-import { VeExecutionMessageEmitter } from "@src/ve-execution-message-emitter.mjs";
+import { VeExecutionMessageEmitter } from "@src/ve-execution/ve-execution-message-emitter.mjs";
 import { VariableResolver } from "@src/variable-resolver.mjs";
 import { EventEmitter } from "events";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";

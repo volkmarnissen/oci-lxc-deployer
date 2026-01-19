@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 describe("Template Parameter Description Validation", () => {
   let tempDir: string;

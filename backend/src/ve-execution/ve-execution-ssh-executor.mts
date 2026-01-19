@@ -1,10 +1,10 @@
-import { ICommand, IVeExecuteMessage } from "./types.mjs";
-import { IVEContext } from "./backend-types.mjs";
-import { spawnAsync } from "./spawn-utils.mjs";
-import { JsonError } from "./jsonvalidator.mjs";
+import { ICommand, IVeExecuteMessage } from "../types.mjs";
+import { IVEContext } from "../backend-types.mjs";
+import { spawnAsync } from "../spawn-utils.mjs";
+import { JsonError } from "../jsonvalidator.mjs";
 import { VeExecutionConstants, getNextMessageIndex, ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
 import { VeExecutionMessageEmitter } from "./ve-execution-message-emitter.mjs";
-import { OutputProcessor } from "./output-processor.mjs";
+import { OutputProcessor } from "../output-processor.mjs";
 
 export interface SshExecutorDependencies {
   veContext: IVEContext | null;

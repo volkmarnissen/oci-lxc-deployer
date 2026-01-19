@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 import type { ContextManager } from "@src/context-manager.mjs";
 import type { IParameter } from "@src/types.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
+import { ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 const veContext = { host: "localhost", port: 22 } as any;
 

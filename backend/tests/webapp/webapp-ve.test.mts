@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { ContextManager } from "@src/context-manager.mjs";
 import { ApiUri, IPostVeConfigurationBody } from "@src/types.mjs";
-import { IRestartInfo } from "@src/ve-execution.mjs";
 import { WebAppVE } from "@src/webapp/webapp-ve.mjs";
 import { createWebAppVETestSetup, type WebAppVETestSetup } from "../helper/webapp-test-helper.mjs";
+import { IRestartInfo } from "@src/ve-execution/ve-execution-constants.mjs";
 
 describe("WebAppVE API", () => {
   let app: WebAppVETestSetup["app"];
@@ -354,7 +354,7 @@ describe("WebAppVE API", () => {
         description: "Test application",
         installation: [],
         "copy-upgrade": ["copy-upgrade.json"],
-      });
+      } as any);
 
       helper.writeTemplate("testapp", "copy-upgrade.json", {
         execute_on: "ve",

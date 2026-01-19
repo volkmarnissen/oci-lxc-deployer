@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
-import { ICommand, IVeExecuteMessage, IJsonError } from "./types.mjs";
-import { JsonError } from "./jsonvalidator.mjs";
+import { ICommand, IVeExecuteMessage, IJsonError } from "../types.mjs";
+import { JsonError } from "../jsonvalidator.mjs";
 
 /**
  * Handles message emission for VeExecution.

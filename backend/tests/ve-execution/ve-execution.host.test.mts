@@ -7,10 +7,10 @@
 // runOnVeHost and runOnLxc will then automatically execute locally (see buildExecutionArgs and runOnLxc).
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { VeExecution } from "@src/ve-execution.mjs";
+import { VeExecution } from "@src/ve-execution/ve-execution.mjs";
 import { ICommand, IVeExecuteMessage } from "@src/types.mjs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { getNextMessageIndex, ExecutionMode } from "@src/ve-execution-constants.mjs";
+import { getNextMessageIndex, ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 
 describe("VeExecution host: flow", () => {

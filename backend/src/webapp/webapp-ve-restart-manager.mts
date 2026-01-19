@@ -1,5 +1,5 @@
 import { IPostVeConfigurationBody } from "@src/types.mjs";
-import { IRestartInfo } from "@src/ve-execution-constants.mjs";
+import { IRestartInfo } from "@src/ve-execution/ve-execution-constants.mjs";
 
 
 /**
