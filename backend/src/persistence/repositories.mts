@@ -6,8 +6,8 @@ import type {
   IReadApplicationOptions,
 } from "../backend-types.mjs";
 import { VEConfigurationError } from "../backend-types.mjs";
-import type {  IApplicationWeb, ITemplate } from "../types.mjs";
-import type { IApplication } from "../../tests/ve-test-helper.mjs";
+import type { IApplicationWeb, ITemplate } from "../types.mjs";
+import type { IApplication } from "../backend-types.mjs";
 import type { IApplicationPersistence, ITemplatePersistence } from "./interfaces.mjs";
 import { TemplatePathResolver } from "../templates/template-path-resolver.mjs";
 import { MarkdownReader } from "../markdown-reader.mjs";
@@ -33,6 +33,10 @@ export interface MarkdownRef {
   applicationId?: string;
 }
 
+export interface LocalResourceRef {
+  path: string;
+}
+
 export interface IApplicationRepository {
   getApplication(applicationId: string): IApplication;
   listApplications(): IApplicationWeb[];
@@ -50,6 +54,7 @@ export interface IResourceRepository {
   resolveLibraryPath(ref: ScriptRef): string | null;
   getMarkdown(ref: MarkdownRef): string | null;
   getMarkdownSection(ref: MarkdownRef, sectionName: string): string | null;
+  getLocalResource(ref: LocalResourceRef): Buffer | null;
 }
 
 export class FileSystemRepositories implements IApplicationRepository, ITemplateRepository, IResourceRepository {
@@ -85,17 +90,21 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
       this.pathes,
     );
     if (!resolved) return null;
-    const origin = resolved.fullPath.startsWith(this.pathes.localPath)
+    const fullPath = this.normalizePath(resolved.fullPath);
+    const localBase = this.normalizePath(this.pathes.localPath) + path.sep;
+    const jsonBase = this.normalizePath(this.pathes.jsonPath) + path.sep;
+    const origin = fullPath.startsWith(localBase)
       ? "local"
-      : resolved.fullPath.startsWith(this.pathes.jsonPath)
+      : fullPath.startsWith(jsonBase)
         ? "json"
         : undefined;
+    if (!origin) return null;
     const name = TemplatePathResolver.normalizeTemplateName(templateName);
     return {
       name,
       scope: resolved.isShared ? "shared" : "application",
-      applicationId: resolved.isShared ? undefined : applicationId,
       origin,
+      ...(resolved.isShared ? {} : { applicationId }),
     };
   }
 
@@ -172,6 +181,12 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
     return MarkdownReader.extractSection(mdPath, sectionName);
   }
 
+  getLocalResource(ref: LocalResourceRef): Buffer | null {
+    const targetPath = path.join(this.pathes.localPath, ref.path);
+    if (!fs.existsSync(targetPath)) return null;
+    return fs.readFileSync(targetPath);
+  }
+
   private resolveTemplatePathForMarkdown(ref: MarkdownRef): string | null {
     if (ref.scope === "shared") {
       return this.persistence.resolveTemplatePath(ref.templateName, true);
@@ -215,5 +230,13 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
     }
 
     return null;
+  }
+
+  private normalizePath(targetPath: string): string {
+    try {
+      return fs.realpathSync(targetPath);
+    } catch {
+      return path.resolve(targetPath);
+    }
   }
 }

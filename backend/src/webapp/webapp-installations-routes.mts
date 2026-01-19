@@ -1,8 +1,7 @@
 import express from "express";
-import path from "path";
-import fs from "fs";
 import { ApiUri, IInstallationsResponse, ICommand } from "@src/types.mjs";
 import { ContextManager } from "../context-manager.mjs";
+import { PersistenceManager } from "../persistence/persistence-manager.mjs";
 import { VeExecution } from "../ve-execution/ve-execution.mjs";
 import { determineExecutionMode } from "../ve-execution/ve-execution-constants.mjs";
 import { serializeError } from "./webapp-error-utils.mjs";
@@ -26,28 +25,12 @@ export function registerInstallationsRoutes(
         return;
       }
 
-      const candidateScriptPaths = [
-        path.join(
-          storageContext.getLocalPath(),
-          "shared",
-          "scripts",
-          "list-managed-oci-containers.py",
-        ),
-        path.join(
-          storageContext.getJsonPath(),
-          "shared",
-          "scripts",
-          "list-managed-oci-containers.py",
-        ),
-      ];
-      const scriptPath = candidateScriptPaths.find((p) => {
-        try {
-          return fs.existsSync(p) && fs.statSync(p).isFile();
-        } catch {
-          return false;
-        }
+      const repositories = PersistenceManager.getInstance().getRepositories();
+      const scriptContent = repositories.getScript({
+        name: "list-managed-oci-containers.py",
+        scope: "shared",
       });
-      if (!scriptPath) {
+      if (!scriptContent) {
         res.status(500).json({
           error:
             "list-managed-oci-containers.py not found (expected in local/shared/scripts or json/shared/scripts)",
@@ -58,7 +41,8 @@ export function registerInstallationsRoutes(
       const cmd: ICommand = {
         name: "List Managed OCI Containers",
         execute_on: "ve",
-        script: scriptPath,
+        script: "list-managed-oci-containers.py",
+        scriptContent,
         outputs: ["containers"],
       };
 

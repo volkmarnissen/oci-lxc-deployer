@@ -34,15 +34,6 @@ describe("VeExecution", () => {
   // Note: Properties command tests are now in ve-execution-command-processor.test.mts
 
   it("should read a script file, replace variables, and execute the replaced content", async () => {
-    const scriptPath = persistenceHelper.resolve(
-      Volume.LocalRoot,
-      "scripts/testscript.sh",
-    );
-    persistenceHelper.writeTextSync(
-      Volume.LocalRoot,
-      "scripts/testscript.sh",
-      "echo {{ myvar }}",
-    );
     class TestExec extends VeExecution {
       public lastCommand = "";
       protected async runOnVeHost(
@@ -60,7 +51,8 @@ describe("VeExecution", () => {
     }
     const commands: ICommand[] = [
       {
-        script: scriptPath,
+        script: "testscript.sh",
+        scriptContent: "echo {{ myvar }}",
         name: "test",
         execute_on: "ve",
       },

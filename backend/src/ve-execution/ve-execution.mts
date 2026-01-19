@@ -19,6 +19,7 @@ import { VeExecutionSshExecutor, SshExecutorDependencies } from "./ve-execution-
 import { VeExecutionHostDiscovery } from "./ve-execution-host-discovery.mjs";
 import { VeExecutionCommandProcessor } from "./ve-execution-command-processor.mjs";
 import { VeExecutionStateManager } from "./ve-execution-state-manager.mjs";
+import { PersistenceManager } from "../persistence/persistence-manager.mjs";
 
 // Re-export for backward compatibility
 export type { IOutput, IProxmoxRunResult, IRestartInfo };
@@ -129,6 +130,8 @@ export class VeExecution extends EventEmitter {
       outputs: this.outputs,
       variableResolver: this.variableResolver,
       runOnLxc: (vm_id, command, tmplCommand, timeoutMs?) => this.runOnLxc(vm_id, command, tmplCommand, timeoutMs),
+      getContextManager: () => (this.veContext ? (this.veContext.getStorageContext() as any) : null),
+      getRepositories: () => this.resolveRepositories(),
     });
   }
 
@@ -141,6 +144,14 @@ export class VeExecution extends EventEmitter {
       () => this.inputs,
       () => this.defaults,
     );
+  }
+
+  private resolveRepositories() {
+    try {
+      return PersistenceManager.getInstance().getRepositories();
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -168,6 +179,8 @@ export class VeExecution extends EventEmitter {
       outputs: this.outputs,
       variableResolver: this.variableResolver,
       runOnLxc: (vm_id, cmd, tmplCmd, timeoutMs?) => this.runOnLxc(vm_id, cmd, tmplCmd, timeoutMs),
+      getContextManager: () => (this.veContext ? (this.veContext.getStorageContext() as any) : null),
+      getRepositories: () => this.resolveRepositories(),
     });
     this.commandProcessor = new VeExecutionCommandProcessor({
       outputs: this.outputs,

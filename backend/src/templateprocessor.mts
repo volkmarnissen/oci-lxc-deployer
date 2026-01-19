@@ -1,5 +1,4 @@
 import { EventEmitter } from "events";
-import fs from "node:fs";
 import { JsonError } from "@src/jsonvalidator.mjs";
 import {
   IConfiguredPathes,
@@ -1121,6 +1120,9 @@ export class TemplateProcessor extends EventEmitter {
         const commandWithLibrary: ICommand = {
           ...cmd,
           script: scriptPath || cmd.script,
+          ...(scriptResolution.content !== null
+            ? { scriptContent: scriptResolution.content }
+            : {}),
           ...(tmplData.execute_on && { execute_on: tmplData.execute_on }),
         };
         
@@ -1134,6 +1136,9 @@ export class TemplateProcessor extends EventEmitter {
             opts.parentTemplate,
           );
           const libraryPath = this.resolveLibraryPath(libraryResolution.ref);
+          if (libraryResolution.content !== null) {
+            commandWithLibrary.libraryContent = libraryResolution.content;
+          }
           if (libraryPath) {
             commandWithLibrary.libraryPath = libraryPath;
           }
@@ -1168,59 +1173,7 @@ export class TemplateProcessor extends EventEmitter {
       }
     }
   }
-  /**
-   * Extracts capabilities from script header comments.
-   * Similar to extractCapabilitiesFromScriptHeader in documentation-generator.
-   */
-  #extractCapabilitiesFromScriptHeader(scriptPath: string): string[] {
-    const capabilities: string[] = [];
-    
-    try {
-      const scriptContent = fs.readFileSync(scriptPath, "utf-8");
-      const lines = scriptContent.split("\n");
-      
-      // Look for "This script" section in header comments
-      let inHeader = false;
-      let foundThisScript = false;
-      
-      for (let i = 0; i < lines.length && i < 50; i++) {
-        const line = lines[i]?.trim() || "";
-        
-        // Start of header (after shebang)
-        if (line.startsWith("#") && !line.startsWith("#!/")) {
-          inHeader = true;
-        }
-        
-        // Look for "This script" or "This library" line
-        if (inHeader && (line.includes("This script") || line.includes("This library"))) {
-          foundThisScript = true;
-        }
-        
-        // Look for numbered list of capabilities (e.g., "# 1. Validates...", "2. Creates...")
-        if (foundThisScript && inHeader) {
-          // Match lines like "# 1. Validates..." or "1. Validates..."
-          const numberedMatch = line.match(/^#*\s*\d+\.\s+(.+)/);
-          if (numberedMatch && numberedMatch[1]) {
-            let capability = numberedMatch[1].trim();
-            // Remove leading # if present
-            capability = capability.replace(/^#+\s*/, "").trim();
-            if (capability.length > 0) {
-              capabilities.push(capability);
-            }
-          }
-        }
-        
-        // Stop at first non-comment line after header
-        if (inHeader && !line.startsWith("#") && line.length > 0 && !line.startsWith("exec >&2")) {
-          break;
-        }
-      }
-    } catch {
-      // Ignore errors reading script
-    }
-    
-    return capabilities;
-  }
+  // NOTE: Script capability extraction moved to resource-based pipeline; no direct file access here.
 
   async getUnresolvedParameters(
     application: string,

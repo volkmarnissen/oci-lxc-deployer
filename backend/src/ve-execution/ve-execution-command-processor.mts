@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import { ICommand, IVeExecuteMessage } from "../types.mjs";
 import { VariableResolver } from "../variable-resolver.mjs";
 import { getNextMessageIndex } from "./ve-execution-constants.mjs";
@@ -108,14 +107,8 @@ export class VeExecutionCommandProcessor {
    * Also extracts interpreter from shebang if present.
    */
   loadCommandContent(cmd: ICommand): string | null {
-    if (cmd.script !== undefined) {
-      // Read script file
-      let scriptContent: string;
-      try {
-        scriptContent = fs.readFileSync(cmd.script, "utf-8");
-      } catch (e) {
-        throw new Error(`Failed to read script file ${cmd.script}: ${e}`);
-      }
+    if (cmd.scriptContent !== undefined) {
+      const scriptContent = cmd.scriptContent;
 
       // Extract interpreter from shebang (first line)
       const lines = scriptContent.split('\n');
@@ -152,18 +145,17 @@ export class VeExecutionCommandProcessor {
       }
 
       // If library is specified, load and prepend it
-      if (cmd.libraryPath !== undefined) {
-        let libraryContent: string;
-        try {
-          libraryContent = fs.readFileSync(cmd.libraryPath, "utf-8");
-        } catch (e) {
-          throw new Error(`Failed to read library file ${cmd.libraryPath}: ${e}`);
-        }
+      if (cmd.libraryContent !== undefined) {
         // Prepend library to script content
-        return `${libraryContent}\n\n# --- Script starts here ---\n${scriptContent}`;
+        return `${cmd.libraryContent}\n\n# --- Script starts here ---\n${scriptContent}`;
+      }
+      if (cmd.library !== undefined || cmd.libraryPath !== undefined) {
+        throw new Error("Library content missing for command");
       }
 
       return scriptContent;
+    } else if (cmd.script !== undefined) {
+      throw new Error(`Script content missing for ${cmd.script}`);
     } else if (cmd.command !== undefined) {
       return cmd.command;
     }

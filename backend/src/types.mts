@@ -51,7 +51,11 @@ export interface ICommand {
   name: string;
   command?: string;
   script?: string;
+  /** Inline script content resolved from resources (preferred over file paths). */
+  scriptContent?: string;
   library?: string;
+  /** Inline library content resolved from resources (preferred over file paths). */
+  libraryContent?: string;
   libraryPath?: string; // Internal: resolved full path to library file
   template?: string;
   properties?: IOutputObject | IOutputObject[];

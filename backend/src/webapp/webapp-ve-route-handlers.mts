@@ -7,7 +7,7 @@ import { WebAppVeExecutionSetup } from "./webapp-ve-execution-setup.mjs";
 import { VEConfigurationError, IVEContext, IVMInstallContext } from "@src/backend-types.mjs";
 import { JsonError } from "@src/jsonvalidator.mjs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { VMInstallContext } from "@src/storagecontext.mjs";
+import { VMInstallContext } from "@src/context-manager.mjs";
 import { determineExecutionMode, ExecutionMode } from "@src/ve-execution/ve-execution-constants.mjs";
 
 /**

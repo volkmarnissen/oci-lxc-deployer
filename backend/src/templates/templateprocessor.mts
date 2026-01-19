@@ -1118,6 +1118,9 @@ export class TemplateProcessor extends EventEmitter {
         const commandWithLibrary: ICommand = {
           ...cmd,
           script: scriptPath || cmd.script,
+          ...(scriptResolution.content !== null
+            ? { scriptContent: scriptResolution.content }
+            : {}),
           ...(tmplData.execute_on && { execute_on: tmplData.execute_on }),
         };
         
@@ -1131,6 +1134,9 @@ export class TemplateProcessor extends EventEmitter {
             opts.parentTemplate,
           );
           const libraryPath = this.resolveLibraryPath(libraryResolution.ref);
+          if (libraryResolution.content !== null) {
+            commandWithLibrary.libraryContent = libraryResolution.content;
+          }
           if (libraryPath) {
             commandWithLibrary.libraryPath = libraryPath;
           }

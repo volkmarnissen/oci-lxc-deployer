@@ -1,5 +1,5 @@
 import { IVMContext } from "../backend-types.mjs";
-import { VMContext } from "../storagecontext.mjs";
+import { VMContext } from "../context-manager.mjs";
 import { IRestartInfo } from "./ve-execution-constants.mjs";
 
 export interface StateManagerDependencies {

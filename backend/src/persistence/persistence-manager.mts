@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "node:fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { JsonValidator } from "../jsonvalidator.mjs";
@@ -59,6 +60,8 @@ export class PersistenceManager {
       schemaPath: schemaPath || path.join(projectRoot, "schemas"),
     };
 
+    this.assertBasePathsExist(this.pathes);
+
     // Create JsonValidator (same logic as StorageContext)
     this.jsonValidator = new JsonValidator(this.pathes.schemaPath, baseSchemas);
 
@@ -85,6 +88,18 @@ export class PersistenceManager {
     );
 
     this.repositories = new FileSystemRepositories(this.pathes, this.persistence);
+  }
+
+  private assertBasePathsExist(pathes: IConfiguredPathes): void {
+    const missing: string[] = [];
+    if (!fs.existsSync(pathes.localPath)) missing.push(`localPath: ${pathes.localPath}`);
+    if (!fs.existsSync(pathes.jsonPath)) missing.push(`jsonPath: ${pathes.jsonPath}`);
+    if (!fs.existsSync(pathes.schemaPath)) missing.push(`schemaPath: ${pathes.schemaPath}`);
+    if (missing.length > 0) {
+      throw new Error(
+        `PersistenceManager initialization failed: missing base paths -> ${missing.join(", ")}`,
+      );
+    }
   }
 
   /**

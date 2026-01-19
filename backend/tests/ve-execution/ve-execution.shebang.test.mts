@@ -32,10 +32,6 @@ describe("VeExecution Shebang Support", () => {
 
   it("should execute Python script with shebang using ExecutionMode.TEST", async () => {
     // Create a Python test script
-    const scriptPath = persistenceHelper.resolve(
-      Volume.LocalRoot,
-      "scripts/test-shebang.py",
-    );
     const pythonScript = `#!/usr/bin/env python3
 import json
 import sys
@@ -63,7 +59,8 @@ print(json.dumps(output))
     // Create command
     const command: ICommand = {
       name: "test-python-shebang",
-      script: scriptPath,
+      script: "test-shebang.py",
+      scriptContent: pythonScript,
       outputs: ["python_executed", "test_input_value", "python_version_major"],
       execute_on: "ve",
     };
@@ -151,10 +148,6 @@ print(json.dumps(output))
 
   it("should fallback to sh for scripts without shebang in TEST mode", async () => {
     // Create a shell script without shebang
-    const scriptPath = persistenceHelper.resolve(
-      Volume.LocalRoot,
-      "scripts/test-no-shebang.sh",
-    );
     const shellScript = `#!/bin/sh
 # No shebang on first line, but this line starts with #
 test_input="{{ test_input }}"
@@ -168,7 +161,8 @@ echo '[{"id": "shell_executed", "value": true}, {"id": "test_input_value", "valu
 
     const command = {
       name: "test-shell-no-shebang",
-      script: scriptPath,
+      script: "test-no-shebang.sh",
+      scriptContent: shellScript,
       outputs: ["shell_executed", "test_input_value"],
       execute_on: "ve",
     };

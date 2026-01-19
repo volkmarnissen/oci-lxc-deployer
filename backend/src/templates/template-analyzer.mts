@@ -6,8 +6,6 @@ import { TemplatePathResolver } from "./template-path-resolver.mjs";
 import type { IApplication, IVEContext, IConfiguredPathes } from "../backend-types.mjs";
 import type { ITemplate, ICommand, TaskType } from "../types.mjs";
 import type { ITemplateReference } from "../backend-types.mjs";
-import fs from "node:fs";
-import path from "node:path";
 
 /**
  * Analyzes templates (skip status, conditional status, usage).
@@ -36,10 +34,12 @@ export class TemplateAnalyzer {
    */
   isTemplateSkipped(
     templateName: string,
-    appPath: string,
+    applicationId: string,
     commands: ICommand[],
   ): boolean {
-    const templateData = this.pathResolver.loadTemplate(templateName, appPath);
+    const repositories = PersistenceManager.getInstance().getRepositories();
+    const templateRef = repositories.resolveTemplateRef(applicationId, templateName);
+    const templateData = templateRef ? repositories.getTemplate(templateRef) : null;
     if (!templateData) {
       return false; // Template not found, can't determine skip status
     }
@@ -124,21 +124,16 @@ export class TemplateAnalyzer {
     try {
       const pm = PersistenceManager.getInstance();
       const storageContext = pm.getContextManager();
+      const repositories = pm.getRepositories();
       const allApps = pm.getApplicationService().getAllAppNames();
       
       // Normalize template name (remove .json extension)
       const normalizedTemplate = this.pathResolver.normalizeTemplateName(templateName);
       
-      for (const [appName, appPath] of allApps) {
-        if (!appPath) continue;
-        
-        const appJsonPath = path.join(appPath, "application.json");
-        if (!fs.existsSync(appJsonPath)) continue;
+      for (const [appName] of allApps) {
         
         try {
-          const appData: IApplication = JSON.parse(
-            fs.readFileSync(appJsonPath, "utf-8"),
-          );
+          const appData: IApplication = repositories.getApplication(appName);
           
           // Check if template is used and not skipped
           if (appData.installation) {
@@ -164,8 +159,14 @@ export class TemplateAnalyzer {
                 const refTemplateName = typeof templateRef === "string"
                   ? templateRef
                   : (templateRef as ITemplateReference).name;
-                
-                const templateData = this.pathResolver.loadTemplate(refTemplateName, appPath);
+
+                const resolvedTemplateRef = repositories.resolveTemplateRef(
+                  appName,
+                  refTemplateName,
+                );
+                const templateData = resolvedTemplateRef
+                  ? repositories.getTemplate(resolvedTemplateRef)
+                  : null;
                 if (templateData) {
                   // Check if this template references the target template
                   const referencedTemplates = TemplatePathResolver.extractTemplateReferences(templateData);
@@ -209,7 +210,7 @@ export class TemplateAnalyzer {
                 const commands = loaded.commands || [];
                 
                 // Check if template is skipped using the same logic as in generateApplicationReadme
-                if (!this.isTemplateSkipped(normalizedTemplate, appPath, commands)) {
+                if (!this.isTemplateSkipped(normalizedTemplate, appName, commands)) {
                   usingApplications.push(appName);
                 }
               } catch {

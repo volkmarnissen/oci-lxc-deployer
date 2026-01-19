@@ -251,10 +251,6 @@ describe("VeExecutionCommandProcessor", () => {
   });
 
   it("should load command content from script file", () => {
-    const scriptPath = persistenceHelper.resolve(
-      Volume.LocalRoot,
-      "scripts/testscript.sh",
-    );
     persistenceHelper.writeTextSync(
       Volume.LocalRoot,
       "scripts/testscript.sh",
@@ -283,9 +279,14 @@ describe("VeExecutionCommandProcessor", () => {
       setOutputsRaw: () => {},
     });
 
+    const scriptContent = persistenceHelper.readTextSync(
+      Volume.LocalRoot,
+      "scripts/testscript.sh",
+    );
     const cmd: ICommand = {
       name: "test",
-      script: scriptPath,
+      script: "testscript.sh",
+      scriptContent,
       execute_on: "ve",
     };
 
@@ -322,7 +323,11 @@ describe("VeExecutionCommandProcessor", () => {
       execute_on: "ve",
     };
 
-    const content = processor.loadCommandContent(cmd);
+      const content = processor.loadCommandContent(cmd);
+      expect(content).toBeTruthy();
+      if (!content) {
+        throw new Error("Expected script content");
+      }
     expect(content).toBe("echo test command");
   });
 
@@ -364,15 +369,6 @@ describe("VeExecutionCommandProcessor", () => {
 
   describe("Library support (Option 3)", () => {
     it("should load script with library prepended", () => {
-      const libraryPath = persistenceHelper.resolve(
-        Volume.LocalRoot,
-        "scripts/test-library.sh",
-      );
-      const scriptPath = persistenceHelper.resolve(
-        Volume.LocalRoot,
-        "scripts/test-script.sh",
-      );
-      
       // Create library with functions
       persistenceHelper.writeTextSync(
         Volume.LocalRoot,
@@ -408,10 +404,20 @@ describe("VeExecutionCommandProcessor", () => {
         setOutputsRaw: () => {},
       });
 
+      const libraryContent = persistenceHelper.readTextSync(
+        Volume.LocalRoot,
+        "scripts/test-library.sh",
+      );
+      const scriptContent = persistenceHelper.readTextSync(
+        Volume.LocalRoot,
+        "scripts/test-script.sh",
+      );
       const cmd: ICommand = {
         name: "test",
-        script: scriptPath,
-        libraryPath: libraryPath,
+        script: "test-script.sh",
+        scriptContent,
+        libraryPath: "test-library.sh",
+        libraryContent,
         execute_on: "ve",
       };
 
@@ -430,10 +436,6 @@ describe("VeExecutionCommandProcessor", () => {
     });
 
     it("should throw error when library file not found", () => {
-      const scriptPath = persistenceHelper.resolve(
-        Volume.LocalRoot,
-        "scripts/test-script.sh",
-      );
       persistenceHelper.writeTextSync(
         Volume.LocalRoot,
         "scripts/test-script.sh",
@@ -462,24 +464,22 @@ describe("VeExecutionCommandProcessor", () => {
         setOutputsRaw: () => {},
       });
 
-      const cmd: ICommand = {
-        name: "test",
-        script: scriptPath,
-        libraryPath: persistenceHelper.resolve(
-          Volume.LocalRoot,
-          "scripts/non-existent-library.sh",
-        ),
-        execute_on: "ve",
-      };
-
-      expect(() => processor.loadCommandContent(cmd)).toThrow(/Failed to read library file/);
-    });
-
-    it("should work without library when libraryPath is not specified", () => {
-      const scriptPath = persistenceHelper.resolve(
+      const scriptContent = persistenceHelper.readTextSync(
         Volume.LocalRoot,
         "scripts/test-script.sh",
       );
+      const cmd: ICommand = {
+        name: "test",
+        script: "test-script.sh",
+        scriptContent,
+        libraryPath: "non-existent-library.sh",
+        execute_on: "ve",
+      };
+
+      expect(() => processor.loadCommandContent(cmd)).toThrow(/Library content missing/);
+    });
+
+    it("should work without library when libraryPath is not specified", () => {
       persistenceHelper.writeTextSync(
         Volume.LocalRoot,
         "scripts/test-script.sh",
@@ -508,9 +508,14 @@ describe("VeExecutionCommandProcessor", () => {
         setOutputsRaw: () => {},
       });
 
+      const scriptContent = persistenceHelper.readTextSync(
+        Volume.LocalRoot,
+        "scripts/test-script.sh",
+      );
       const cmd: ICommand = {
         name: "test",
-        script: scriptPath,
+        script: "test-script.sh",
+        scriptContent,
         execute_on: "ve",
       };
 
@@ -520,15 +525,6 @@ describe("VeExecutionCommandProcessor", () => {
     });
 
     it("should prepend library content before script that calls library function", () => {
-      const libraryPath = persistenceHelper.resolve(
-        Volume.LocalRoot,
-        "scripts/test-library.sh",
-      );
-      const scriptPath = persistenceHelper.resolve(
-        Volume.LocalRoot,
-        "scripts/test-script.sh",
-      );
-      
       // Create library with function
       persistenceHelper.writeTextSync(
         Volume.LocalRoot,
@@ -564,14 +560,28 @@ describe("VeExecutionCommandProcessor", () => {
         setOutputsRaw: () => {},
       });
 
+      const libraryContent = persistenceHelper.readTextSync(
+        Volume.LocalRoot,
+        "scripts/test-library.sh",
+      );
+      const scriptContent = persistenceHelper.readTextSync(
+        Volume.LocalRoot,
+        "scripts/test-script.sh",
+      );
       const cmd: ICommand = {
         name: "test",
-        script: scriptPath,
-        libraryPath: libraryPath,
+        script: "test-script.sh",
+        scriptContent,
+        libraryPath: "test-library.sh",
+        libraryContent,
         execute_on: "ve",
       };
 
       const content = processor.loadCommandContent(cmd);
+      expect(content).toBeTruthy();
+      if (!content) {
+        throw new Error("Expected script content");
+      }
       // Library should be prepended
       expect(content).toContain("my_library_function() { echo 'from library'; }");
       // Script should be after library

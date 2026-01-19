@@ -1,5 +1,6 @@
 import { ICommand, IVeExecuteMessage } from "../types.mjs";
-import { StorageContext, VMContext } from "../storagecontext.mjs";
+import { ContextManager } from "../context-manager.mjs";
+import type { IResourceRepository } from "../persistence/repositories.mjs";
 import { VeExecutionConstants } from "./ve-execution-constants.mjs";
 import { VeExecutionSshExecutor } from "./ve-execution-ssh-executor.mjs";
 import { VeExecution } from "./ve-execution.mjs";
@@ -12,6 +13,8 @@ export interface HostDiscoveryDependencies {
     replaceVarsWithContext: (str: string, ctx: Record<string, any>) => string;
   };
   runOnLxc: (vm_id: string | number, command: string, tmplCommand: ICommand, timeoutMs?: number) => Promise<any>;
+  getContextManager: () => ContextManager | null;
+  getRepositories: () => IResourceRepository | null;
 }
 
 /**
@@ -21,13 +24,18 @@ export class VeExecutionHostDiscovery {
   constructor(private deps: HostDiscoveryDependencies) {}
 
   /**
-   * Gets the path to the write-vmids-json.sh script.
+   * Gets the content of the write-vmids-json.sh script via repositories.
    */
-  private getWriteVmIdsScriptPath(): string {
-    const { join, dirname } = require("node:path");
-    const { fileURLToPath } = require("node:url");
-    const here = dirname(fileURLToPath(import.meta.url));
-    return join(here, "..", "json", "shared", "scripts", "write-vmids-json.sh");
+  private getWriteVmIdsScriptContent(): string {
+    const repos = this.deps.getRepositories();
+    if (!repos) {
+      throw new Error("Repositories not available for write-vmids-json.sh");
+    }
+    const content = repos.getScript({ name: "write-vmids-json.sh", scope: "shared" });
+    if (!content) {
+      throw new Error("write-vmids-json.sh not found in shared scripts");
+    }
+    return content;
   }
 
   /**
@@ -37,13 +45,12 @@ export class VeExecutionHostDiscovery {
     tmplCommand: ICommand,
     eventEmitter: { emit: (event: string, data: any) => void },
   ): Promise<string> {
-    const scriptPath = this.getWriteVmIdsScriptPath();
+    const scriptContent = this.getWriteVmIdsScriptContent();
     const probeMsg = await this.deps.sshExecutor.runOnVeHost(
-      "",
+      scriptContent,
       { ...tmplCommand, name: "write-vmids" } as any,
       VeExecutionConstants.HOST_PROBE_TIMEOUT_MS,
       eventEmitter,
-      [scriptPath],
     );
     
     // Prefer parsed outputsRaw (name/value) if available
@@ -119,8 +126,11 @@ export class VeExecutionHostDiscovery {
     const found = this.findHostnameInVmIds(arr, hostname);
     
     // Get and validate VMContext
-    const storage = StorageContext.getInstance();
-    const vmctx = storage.getVMContextByHostname(hostname);
+    const contextManager = this.deps.getContextManager();
+    if (!contextManager) {
+      throw new Error("ContextManager not available");
+    }
+    const vmctx = contextManager.getVMContextByHostname(hostname);
     if (!vmctx) {
       throw new Error(`VMContext for ${hostname} not found`);
     }
@@ -157,14 +167,17 @@ export class VeExecutionHostDiscovery {
     sshCommand: string = "ssh",
   ): Promise<void> {
     // Get and validate VMContext
-    const storage = StorageContext.getInstance();
-    const vmctx = storage.getVMContextByHostname(hostname);
+    const contextManager = this.deps.getContextManager();
+    if (!contextManager) {
+      throw new Error("ContextManager not available");
+    }
+    const vmctx = contextManager.getVMContextByHostname(hostname);
     if (!vmctx) {
       throw new Error(`VMContext for ${hostname} not found`);
     }
 
     // Get VE context from vmContext.vekey
-    const veContext = storage.getVEContextByKey(vmctx.vekey);
+    const veContext = contextManager.getVEContextByKey(vmctx.vekey);
     if (!veContext) {
       throw new Error(`VE context not found for key: ${vmctx.vekey}`);
     }
@@ -257,13 +270,12 @@ export class VeExecutionHostDiscovery {
     templateExecution.on("finished", (updatedVMContext: IVMContext) => {
       // Merge outputs from template execution back into vmContext.outputs
       const updatedData = { ...vmctx.outputs, ...updatedVMContext.outputs };
-      const mergedVMContext = new VMContext({
+      contextManager.setVMContext({
         vmid: vmctx.vmid,
         vekey: vmctx.vekey,
         outputs: updatedData,
         getKey: () => `vm_${vmctx.vmid}`,
-      } as IVMContext);
-      storage.setVMContext(mergedVMContext);
+      });
     });
 
     // Execute the template
