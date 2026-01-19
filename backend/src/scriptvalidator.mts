@@ -86,6 +86,52 @@ export class ScriptValidator {
   }
 
   /**
+   * Validates a script using its content (no FS access).
+   */
+  validateScriptContent(
+    cmd: ICommand,
+    application: string,
+    errors: IJsonError[],
+    parameters: IParameter[],
+    resolvedParams: IResolvedParam[],
+    scriptContent: string | null,
+    requestedIn?: string,
+    parentTemplate?: string,
+  ): void {
+    if (cmd.script === undefined) {
+      errors.push(
+        new JsonError(
+          `Script command missing 'script' property (requested in: ${requestedIn ?? "unknown"}${parentTemplate ? ", parent template: " + parentTemplate : ""})`,
+        ),
+      );
+      return;
+    }
+    if (!scriptContent) {
+      errors.push(
+        new JsonError(
+          `Script file not found: ${cmd.script} (requested in: ${requestedIn ?? "unknown"}${parentTemplate ? ", parent template: " + parentTemplate : ""})`,
+        ),
+      );
+      return;
+    }
+
+    const vars = this.extractTemplateVariables(scriptContent);
+    for (const v of vars) {
+      if (this.isBuiltInVariable(v)) continue;
+      if (
+        !parameters.some((p) => p.id === v) &&
+        !resolvedParams.some((rp) => rp.id === v)
+      ) {
+        errors.push(
+          new JsonError(
+            `Script ${cmd.script} uses variable '{{ ${v} }}' but no such parameter is defined (requested in: ${requestedIn ?? "unknown"}${parentTemplate ? ", parent template: " + parentTemplate : ""})`,
+          ),
+        );
+      }
+    }
+  }
+
+  /**
    * Checks if all variables in the execute string are defined as parameters.
    */
   validateCommand(
@@ -156,6 +202,35 @@ export class ScriptValidator {
       }
     } catch (e) {
       errors.push(new JsonError(`Failed to read library ${libraryName}: ${e}`));
+    }
+  }
+
+  /**
+   * Validates a library using its content (no FS access).
+   */
+  validateLibraryContent(
+    libraryName: string,
+    errors: IJsonError[],
+    libraryContent: string | null,
+    requestedIn?: string,
+    parentTemplate?: string,
+  ): void {
+    if (!libraryContent) {
+      errors.push(
+        new JsonError(
+          `Library file not found: ${libraryName} (requested in: ${requestedIn ?? "unknown"}${parentTemplate ? ", parent template: " + parentTemplate : ""})`,
+        ),
+      );
+      return;
+    }
+
+    const vars = this.extractTemplateVariables(libraryContent);
+    if (vars.length > 0) {
+      errors.push(
+        new JsonError(
+          `Library ${libraryName} contains template variables ({{ ${vars.join(", ")}} }), which is not allowed. Libraries should only contain function definitions without template variables.`,
+        ),
+      );
     }
   }
 }

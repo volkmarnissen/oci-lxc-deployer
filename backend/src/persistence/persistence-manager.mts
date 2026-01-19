@@ -12,6 +12,7 @@ import {
 import { ApplicationService } from "../services/application-service.mjs";
 import { FrameworkService } from "../services/framework-service.mjs";
 import { ContextManager } from "../context-manager.mjs";
+import { FileSystemRepositories } from "./repositories.mjs";
 
 const baseSchemas: string[] = ["templatelist.schema.json"];
 
@@ -37,6 +38,7 @@ export class PersistenceManager {
   private applicationService: ApplicationService;
   private frameworkService: FrameworkService;
   private contextManager: ContextManager;
+  private repositories: FileSystemRepositories;
 
   private constructor(
     localPath: string,
@@ -81,6 +83,8 @@ export class PersistenceManager {
       this.jsonValidator,
       this.persistence,
     );
+
+    this.repositories = new FileSystemRepositories(this.pathes, this.persistence);
   }
 
   /**
@@ -149,6 +153,10 @@ export class PersistenceManager {
 
   getContextManager(): ContextManager {
     return this.contextManager;
+  }
+
+  getRepositories(): FileSystemRepositories {
+    return this.repositories;
   }
 
   // Alias für Rückwärtskompatibilität (kann später entfernt werden)

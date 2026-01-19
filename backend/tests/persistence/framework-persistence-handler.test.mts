@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, rmSync } from "fs";
 import path from "path";
 import { FrameworkPersistenceHandler } from "@src/persistence/framework-persistence-handler.mjs";
 import { JsonValidator } from "@src/jsonvalidator.mjs";

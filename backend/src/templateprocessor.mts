@@ -1,4 +1,3 @@
-import path from "node:path";
 import { EventEmitter } from "events";
 import { JsonError } from "@src/jsonvalidator.mjs";
 import {
@@ -19,14 +18,12 @@ import {
 } from "@src/types.mjs";
 import { IVEContext } from "@src/backend-types.mjs";
 import { ApplicationLoader } from "@src/apploader.mjs";
-import fs from "fs";
 import { ScriptValidator } from "@src/scriptvalidator.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { ITemplatePersistence, IApplicationPersistence } from "./persistence/interfaces.mjs";
+import { FileSystemRepositories, type TemplateRef, type ScriptRef, type MarkdownRef } from "./persistence/repositories.mjs";
 import { VeExecution } from "./ve-execution.mjs";
-import { TemplatePathResolver } from "./templates/template-path-resolver.mjs";
 import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
-import { MarkdownReader } from "./markdown-reader.mjs";
 // ITemplateReference moved to backend-types.mts
 import { ITemplateReference } from "./backend-types.mjs";
 interface IProcessTemplateOpts {
@@ -40,9 +37,8 @@ interface IProcessTemplateOpts {
   errors?: IJsonError[];
   requestedIn?: string | undefined;
   parentTemplate?: string | undefined;
-  templatePathes: string[];
-  scriptPathes: string[];
   webuiTemplates: string[];
+  templateRef?: TemplateRef;
   veContext?: IVEContext;
   executionMode?: ExecutionMode;  // Execution mode for VeExecution
   enumValueInputs?: { id: string; value: IParameterValue }[];
@@ -124,13 +120,16 @@ export class TemplateProcessor extends EventEmitter {
     string,
     (string | { name: string; value: string | number | boolean })[] | null
   >();
+  private repositories: FileSystemRepositories;
   resolvedParams: IResolvedParam[] = [];
   constructor(
     private pathes: IConfiguredPathes,
     private storageContext: ContextManager,
     private persistence: IApplicationPersistence & ITemplatePersistence,
+    repositories?: FileSystemRepositories,
   ) {
     super();
+    this.repositories = repositories ?? new FileSystemRepositories(this.pathes, this.persistence);
   }
   async loadApplication(
     applicationName: string,
@@ -200,14 +199,6 @@ export class TemplateProcessor extends EventEmitter {
             input.value !== "",
         )
       : undefined;
-    const templatePathes = TemplatePathResolver.buildTemplatePathes(
-      readOpts.applicationHierarchy,
-      this.pathes,
-    );
-    const scriptPathes = TemplatePathResolver.buildScriptPathes(
-      readOpts.applicationHierarchy,
-      this.pathes,
-    );
     // 5. Process each template
     // Start with errors from readApplicationJson (e.g., duplicate templates)
     const errors: IJsonError[] = readOpts.error.details ? [...readOpts.error.details] : [];
@@ -229,8 +220,6 @@ export class TemplateProcessor extends EventEmitter {
         commands: outCommands,
         errors,
         requestedIn: task,
-        templatePathes,
-        scriptPathes,
         webuiTemplates,
         executionMode: executionMode !== undefined ? executionMode : determineExecutionMode(),
         enumValuesRefresh: enumValuesRefresh === true,
@@ -366,7 +355,8 @@ export class TemplateProcessor extends EventEmitter {
   async #validateAndAddParameters(
     opts: IProcessTemplateOpts,
     tmplData: ITemplate,
-    tmplPath: string,
+    templateName: string,
+    templateRef: TemplateRef,
   ): Promise<void> {
     // Custom validation: 'if' must refer to another parameter name, not its own
     if (tmplData.parameters) {
@@ -391,17 +381,14 @@ export class TemplateProcessor extends EventEmitter {
         // Resolve description from markdown if not in JSON
         let description = param.description;
         if (!description || description.trim() === "") {
-          // Try to load from markdown file
-          const mdPath = MarkdownReader.getMarkdownPath(tmplPath);
-
           // Try param.name first, then param.id
-          let mdSection = MarkdownReader.extractSection(
-            mdPath,
+          let mdSection = this.resolveMarkdownSection(
+            templateRef,
             param.name || param.id,
           );
           if (!mdSection && param.name && param.name !== param.id) {
             // Fallback: try param.id if param.name didn't work
-            mdSection = MarkdownReader.extractSection(mdPath, param.id);
+            mdSection = this.resolveMarkdownSection(templateRef, param.id);
           }
 
           if (mdSection) {
@@ -411,7 +398,7 @@ export class TemplateProcessor extends EventEmitter {
             opts.errors?.push(
               new JsonError(
                 `Parameter '${param.id}' in template '${this.extractTemplateName(opts.template)}' has no description. ` +
-                  `Add 'description' in JSON or create '${path.basename(tmplPath, ".json")}.md' with '## ${param.name || param.id}' section.`,
+                  `Add 'description' in JSON or create '${this.normalizeTemplateName(templateName)}.md' with '## ${param.name || param.id}' section.`,
               ),
             );
           }
@@ -460,6 +447,79 @@ export class TemplateProcessor extends EventEmitter {
     } else {
       return template.name;
     }
+  }
+
+  private normalizeTemplateName(templateName: string): string {
+    return templateName.replace(/\.json$/i, "");
+  }
+
+  private buildTemplateTracePath(ref: TemplateRef): string {
+    const normalized = this.normalizeTemplateName(ref.name);
+    const filename = `${normalized}.json`;
+    if (ref.scope === "shared") {
+      const origin = ref.origin ?? "json";
+      return `${origin}/shared/templates/${filename}`;
+    }
+    const origin = ref.origin ?? "json";
+    const appId = ref.applicationId ?? "unknown-app";
+    return `${origin}/applications/${appId}/templates/${filename}`;
+  }
+
+  private resolveTemplate(
+    applicationId: string,
+    templateName: string,
+  ): { template: ITemplate; ref: TemplateRef } | null {
+    const ref = this.repositories.resolveTemplateRef(applicationId, templateName);
+    if (!ref) return null;
+    const template = this.repositories.getTemplate(ref);
+    if (!template) return null;
+    return { template, ref };
+  }
+
+  private resolveScriptContent(
+    applicationId: string,
+    scriptName: string,
+  ): { content: string | null; ref: ScriptRef | null } {
+    const appRef: ScriptRef = { name: scriptName, scope: "application", applicationId };
+    const appContent = this.repositories.getScript(appRef);
+    if (appContent !== null) return { content: appContent, ref: appRef };
+    const sharedRef: ScriptRef = { name: scriptName, scope: "shared" };
+    const sharedContent = this.repositories.getScript(sharedRef);
+    return { content: sharedContent, ref: sharedContent !== null ? sharedRef : null };
+  }
+
+  private resolveScriptPath(ref: ScriptRef | null): string | null {
+    if (!ref) return null;
+    return this.repositories.resolveScriptPath(ref);
+  }
+
+  private resolveLibraryContent(
+    applicationId: string,
+    libraryName: string,
+  ): { content: string | null; ref: ScriptRef | null } {
+    const appRef: ScriptRef = { name: libraryName, scope: "application", applicationId };
+    const appContent = this.repositories.getScript(appRef);
+    if (appContent !== null) return { content: appContent, ref: appRef };
+    const sharedRef: ScriptRef = { name: libraryName, scope: "shared" };
+    const sharedContent = this.repositories.getScript(sharedRef);
+    return { content: sharedContent, ref: sharedContent !== null ? sharedRef : null };
+  }
+
+  private resolveLibraryPath(ref: ScriptRef | null): string | null {
+    if (!ref) return null;
+    return this.repositories.resolveLibraryPath(ref);
+  }
+
+  private resolveMarkdownSection(
+    ref: TemplateRef,
+    sectionName: string,
+  ): string | null {
+    const markdownRef: MarkdownRef = {
+      templateName: this.normalizeTemplateName(ref.name),
+      scope: ref.scope,
+      applicationId: ref.applicationId,
+    };
+    return this.repositories.getMarkdownSection(markdownRef, sectionName);
   }
 
   private normalizeEnumValueInputs(
@@ -595,22 +655,13 @@ export class TemplateProcessor extends EventEmitter {
     processedTemplatesArray: IProcessedTemplate[],
   ): ITemplateTraceEntry[] {
     return processedTemplatesArray.map((templateInfo) => {
-      const isLocal = templateInfo.path.startsWith(this.pathes.localPath);
-      const isJson = templateInfo.path.startsWith(this.pathes.jsonPath);
+      const isLocal = templateInfo.path.startsWith("local/");
+      const isJson = templateInfo.path.startsWith("json/");
       const origin: ITemplateTraceEntry["origin"] = templateInfo.isShared
         ? (isLocal ? "shared-local" : isJson ? "shared-json" : "unknown")
         : (isLocal ? "application-local" : isJson ? "application-json" : "unknown");
 
-      const relativePath = isLocal
-        ? path.relative(this.pathes.localPath, templateInfo.path)
-        : isJson
-          ? path.relative(this.pathes.jsonPath, templateInfo.path)
-          : templateInfo.path;
-      const normalizedPath = relativePath.split(path.sep).join("/");
-      const prefix = templateInfo.isShared
-        ? (isLocal ? "oci-lxc-deployer(local)" : isJson ? "oci-lxc-deployer(shared)" : "oci-lxc-deployer")
-        : (isLocal ? "local" : isJson ? "json" : "unknown");
-      const displayPath = `${prefix}/${normalizedPath}`;
+      const displayPath = templateInfo.path;
 
       return {
         name: templateInfo.name,
@@ -685,15 +736,15 @@ export class TemplateProcessor extends EventEmitter {
     applicationName: string,
     task: TaskType,
   ): ITemplateTraceInfo {
-    const appLocalDir = path.join(this.pathes.localPath, "applications", applicationName);
-    const appJsonDir = path.join(this.pathes.jsonPath, "applications", applicationName);
+    const appLocalDir = `${this.pathes.localPath}/applications/${applicationName}`;
+    const appJsonDir = `${this.pathes.jsonPath}/applications/${applicationName}`;
     return {
       application: applicationName,
       task,
       localDir: this.pathes.localPath,
       jsonDir: this.pathes.jsonPath,
-      ...(fs.existsSync(appLocalDir) ? { appLocalDir } : {}),
-      ...(fs.existsSync(appJsonDir) ? { appJsonDir } : {}),
+      appLocalDir,
+      appJsonDir,
     };
   }
   // Private method to process a template (including nested templates)
@@ -711,14 +762,11 @@ export class TemplateProcessor extends EventEmitter {
     }
     const templateName = this.extractTemplateName(opts.template);
     opts.visitedTemplates.add(templateName);
-    const tmplPath = TemplatePathResolver.findInPathes(
-      opts.templatePathes,
-      templateName,
-    );
-    if (!tmplPath) {
+    const resolvedTemplate = this.resolveTemplate(opts.application, templateName);
+    if (!resolvedTemplate) {
       const msg =
-        `Template file not found: ${opts.template} (searched in: ${opts.templatePathes.join(", ")}` +
-        ', requested in: ${opts.requestedIn ?? "unknown"}${opts.parentTemplate ? ", parent template: " + opts.parentTemplate : ""})';
+        `Template file not found: ${opts.template}` +
+        ` (requested in: ${opts.requestedIn ?? "unknown"}${opts.parentTemplate ? ", parent template: " + opts.parentTemplate : ""})`;
       opts.errors.push(new JsonError(msg));
       this.emit("message", {
         stderr: msg,
@@ -730,40 +778,24 @@ export class TemplateProcessor extends EventEmitter {
       });
       return;
     }
-    let tmplData: ITemplate | null;
-    // Load template using persistence (with caching)
-    try {
-      tmplData = this.persistence.loadTemplate(tmplPath);
-      if (!tmplData) {
-        throw new JsonError(`Failed to load template from ${tmplPath}`);
-      }
-      // Note: outputs on template level are no longer supported
-      // All outputs should be defined on command level
-      // Properties commands will be handled directly in the resolvedParams section below
-      
-      // Validate execute_on: required if template has executable commands (script, command, template)
-      // Optional if template only has properties commands
-      const hasExecutableCommands = tmplData.commands?.some(
-        (cmd) => cmd.script !== undefined || cmd.command !== undefined || cmd.template !== undefined
-      ) ?? false;
-      if (hasExecutableCommands && !tmplData.execute_on) {
-        opts.errors.push(
-          new JsonError(
-            `Template "${this.extractTemplateName(opts.template)}" has executable commands (script, command, or template) but is missing required "execute_on" property.`,
-          ),
-        );
-      }
-    } catch (e: any) {
-      opts.errors.push(e);
-      this.emit("message", {
-        stderr: e?.message ?? String(e),
-        result: null,
-        exitCode: -1,
-        command: String(opts.templatename || opts.template),
-        execute_on: undefined,
-        index: 0,
-      });
-      return;
+    const tmplData = resolvedTemplate.template;
+    const tmplRef = resolvedTemplate.ref;
+    opts.templateRef = tmplRef;
+    // Note: outputs on template level are no longer supported
+    // All outputs should be defined on command level
+    // Properties commands will be handled directly in the resolvedParams section below
+    
+    // Validate execute_on: required if template has executable commands (script, command, template)
+    // Optional if template only has properties commands
+    const hasExecutableCommands = tmplData.commands?.some(
+      (cmd) => cmd.script !== undefined || cmd.command !== undefined || cmd.template !== undefined
+    ) ?? false;
+    if (hasExecutableCommands && !tmplData.execute_on) {
+      opts.errors.push(
+        new JsonError(
+          `Template "${this.extractTemplateName(opts.template)}" has executable commands (script, command, or template) but is missing required "execute_on" property.`,
+        ),
+      );
     }
     
     // Check if template should be skipped due to missing parameters
@@ -778,15 +810,14 @@ export class TemplateProcessor extends EventEmitter {
                           !!tmplData.skip_if_property_set;
     
     // Determine if template is shared or app-specific
-    const sharedTemplatesPath = path.join(this.pathes.jsonPath, "shared", "templates");
-    const isSharedTemplate = tmplPath.startsWith(sharedTemplatesPath);
+    const isSharedTemplate = tmplRef.scope === "shared";
     
     // Store template information
     if (opts.processedTemplates) {
-      const normalizedName = TemplatePathResolver.normalizeTemplateName(templateName);
+      const normalizedName = this.normalizeTemplateName(templateName);
       opts.processedTemplates.set(normalizedName, {
         name: normalizedName,
-        path: tmplPath,
+        path: this.buildTemplateTracePath(tmplRef),
         isShared: isSharedTemplate,
         skipped: shouldSkip,
         conditional: isConditional,
@@ -815,7 +846,7 @@ export class TemplateProcessor extends EventEmitter {
       // Rationale: The UI needs to see these parameters even when inputs start empty,
       // while commands/outputs remain skipped.
       if (skipReason === "all_missing") {
-        await this.#validateAndAddParameters(opts, tmplData, tmplPath);
+        await this.#validateAndAddParameters(opts, tmplData, templateName, tmplRef);
       }
       return; // Exit early, don't process this template further
     }
@@ -941,7 +972,7 @@ export class TemplateProcessor extends EventEmitter {
         let conflictingTemplateIsConditional = false;
         let conflictingTemplateSetsOutput = true; // Default: assume it sets output (since it's in resolvedParams)
         if (opts.processedTemplates) {
-          const normalizedConflictingName = TemplatePathResolver.normalizeTemplateName(conflictingTemplate);
+          const normalizedConflictingName = this.normalizeTemplateName(conflictingTemplate);
           const conflictingTemplateInfo = opts.processedTemplates.get(normalizedConflictingName);
           if (conflictingTemplateInfo) {
             conflictingTemplateIsConditional = conflictingTemplateInfo.conditional || false;
@@ -949,41 +980,40 @@ export class TemplateProcessor extends EventEmitter {
             // Check if the conflicting template actually sets this ID as an output
             // If it only defines it as a parameter (not as output), it's not a conflict
             try {
-              const conflictingTmplPath = conflictingTemplateInfo.path;
-              const conflictingTmplData = this.persistence.loadTemplate(conflictingTmplPath);
+              const conflictingResolved = this.resolveTemplate(opts.application, conflictingTemplate);
+              const conflictingTmplData = conflictingResolved?.template ?? null;
               if (!conflictingTmplData) {
                 // If we can't load the template, assume it sets output (conservative approach)
                 conflictingTemplateSetsOutput = true;
-                continue;
-              }
-              
-              // Check if the conflicting template sets this ID as output (in outputs or properties)
-              conflictingTemplateSetsOutput = false;
-              for (const cmd of conflictingTmplData.commands ?? []) {
-                // Check outputs
-                if (cmd.outputs) {
-                  for (const output of cmd.outputs) {
-                    const id = typeof output === "string" ? output : output.id;
-                    if (id === outputId) {
-                      conflictingTemplateSetsOutput = true;
-                      break;
-                    }
-                  }
-                }
-                // Check properties (properties are automatically outputs)
-                if (cmd.properties !== undefined) {
-                  if (Array.isArray(cmd.properties)) {
-                    for (const prop of cmd.properties) {
-                      if (prop && typeof prop === "object" && prop.id === outputId) {
+              } else {
+                // Check if the conflicting template sets this ID as output (in outputs or properties)
+                conflictingTemplateSetsOutput = false;
+                for (const cmd of conflictingTmplData.commands ?? []) {
+                  // Check outputs
+                  if (cmd.outputs) {
+                    for (const output of cmd.outputs) {
+                      const id = typeof output === "string" ? output : output.id;
+                      if (id === outputId) {
                         conflictingTemplateSetsOutput = true;
                         break;
                       }
                     }
-                  } else if (cmd.properties && typeof cmd.properties === "object" && cmd.properties.id === outputId) {
-                    conflictingTemplateSetsOutput = true;
                   }
+                  // Check properties (properties are automatically outputs)
+                  if (cmd.properties !== undefined) {
+                    if (Array.isArray(cmd.properties)) {
+                      for (const prop of cmd.properties) {
+                        if (prop && typeof prop === "object" && prop.id === outputId) {
+                          conflictingTemplateSetsOutput = true;
+                          break;
+                        }
+                      }
+                    } else if (cmd.properties && typeof cmd.properties === "object" && cmd.properties.id === outputId) {
+                      conflictingTemplateSetsOutput = true;
+                    }
+                  }
+                  if (conflictingTemplateSetsOutput) break;
                 }
-                if (conflictingTemplateSetsOutput) break;
               }
             } catch {
               // If we can't load the template, assume it sets output (conservative approach)
@@ -1039,7 +1069,7 @@ export class TemplateProcessor extends EventEmitter {
       }
     }
 
-    await this.#validateAndAddParameters(opts, tmplData, tmplPath);
+    await this.#validateAndAddParameters(opts, tmplData, templateName, tmplRef);
 
     // Add commands or process nested templates
 
@@ -1053,8 +1083,8 @@ export class TemplateProcessor extends EventEmitter {
       if (cmd.template !== undefined) {
         // Track template reference
         if (opts.templateReferences) {
-          const currentTemplateName = TemplatePathResolver.normalizeTemplateName(templateName);
-          const referencedTemplateName = TemplatePathResolver.normalizeTemplateName(cmd.template);
+          const currentTemplateName = this.normalizeTemplateName(templateName);
+          const referencedTemplateName = this.normalizeTemplateName(cmd.template);
           if (!opts.templateReferences.has(currentTemplateName)) {
             opts.templateReferences.set(currentTemplateName, new Set());
           }
@@ -1068,17 +1098,18 @@ export class TemplateProcessor extends EventEmitter {
         });
       } else if (cmd.script !== undefined) {
         const scriptValidator = new ScriptValidator();
-        scriptValidator.validateScript(
+        const scriptResolution = this.resolveScriptContent(opts.application, cmd.script);
+        scriptValidator.validateScriptContent(
           cmd,
           opts.application,
           opts.errors,
           opts.parameters,
           opts.resolvedParams,
+          scriptResolution.content,
           opts.requestedIn,
           opts.parentTemplate,
-          opts.scriptPathes,
         );
-        const scriptPath = TemplatePathResolver.findInPathes(opts.scriptPathes, cmd.script);
+        const scriptPath = this.resolveScriptPath(scriptResolution.ref);
         
         // Validate and resolve library path if specified
         const commandWithLibrary: ICommand = {
@@ -1088,21 +1119,16 @@ export class TemplateProcessor extends EventEmitter {
         };
         
         if (cmd.library !== undefined) {
-          scriptValidator.validateLibrary(
+          const libraryResolution = this.resolveLibraryContent(opts.application, cmd.library);
+          scriptValidator.validateLibraryContent(
             cmd.library,
             opts.errors,
+            libraryResolution.content,
             opts.requestedIn,
             opts.parentTemplate,
-            opts.scriptPathes,
           );
-          const libraryPath = TemplatePathResolver.findInPathes(opts.scriptPathes, cmd.library);
-          if (!libraryPath) {
-            opts.errors.push(
-              new JsonError(
-                `Library file not found: ${cmd.library} (for script: ${cmd.script}, requested in: ${opts.requestedIn ?? "unknown"}${opts.parentTemplate ? ", parent template: " + opts.parentTemplate : ""})`,
-              ),
-            );
-          } else {
+          const libraryPath = this.resolveLibraryPath(libraryResolution.ref);
+          if (libraryPath) {
             commandWithLibrary.libraryPath = libraryPath;
           }
         }
@@ -1190,7 +1216,6 @@ export class TemplateProcessor extends EventEmitter {
     return capabilities;
   }
 
-  // Removed findInPathes - now using TemplatePathResolver.findInPathes
   async getUnresolvedParameters(
     application: string,
     task: TaskType,
