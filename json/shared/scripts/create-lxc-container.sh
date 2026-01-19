@@ -20,6 +20,9 @@
 
 # First, check if rootfs_storage is provided
 ROOTFS_STORAGE="{{ rootfs_storage }}"
+case "$ROOTFS_STORAGE" in
+  *"{{"*"}}"*) ROOTFS_STORAGE="" ;;
+esac
 PREFERRED_STORAGE=""
 if [ -n "$ROOTFS_STORAGE" ] && [ "$ROOTFS_STORAGE" != "NOT_DEFINED" ]; then
   PREFERRED_STORAGE="$ROOTFS_STORAGE"
