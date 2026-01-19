@@ -61,9 +61,11 @@ export class TemplatePersistenceHandler {
     }
 
     const mtime = fs.statSync(templatePath).mtimeMs;
-    const cached = this.templateCache.get(templatePath);
-    if (cached && cached.mtime === mtime) {
-      return cached.data;
+    if (this.enableCache) {
+      const cached = this.templateCache.get(templatePath);
+      if (cached && cached.mtime === mtime) {
+        return cached.data;
+      }
     }
 
     // Load and validate
@@ -74,7 +76,9 @@ export class TemplatePersistenceHandler {
       );
 
       // Cache it
-      this.templateCache.set(templatePath, { data: templateData, mtime });
+      if (this.enableCache) {
+        this.templateCache.set(templatePath, { data: templateData, mtime });
+      }
 
       return templateData;
     } catch (e: Error | any) {

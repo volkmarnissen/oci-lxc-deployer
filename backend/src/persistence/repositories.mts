@@ -250,9 +250,11 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
   constructor(
     private pathes: IConfiguredPathes,
     private persistence: IApplicationPersistence & ITemplatePersistence,
+    private enableCache: boolean = true,
   ) {}
 
   preloadJsonResources(): void {
+    if (!this.enableCache) return;
     const jsonRoot = this.pathes.jsonPath;
 
     // Shared templates
@@ -328,7 +330,7 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
 
   getTemplate(ref: TemplateRef): ITemplate | null {
     const cacheKey = this.getTemplateCacheKey(ref);
-    if (ref.origin === "json") {
+    if (this.enableCache && ref.origin === "json") {
       const cached = this.templateCache.get(cacheKey);
       if (cached) return cached;
     }
@@ -336,7 +338,7 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
       const templatePath = this.persistence.resolveTemplatePath(ref.name, true);
       if (!templatePath) return null;
       const template = this.persistence.loadTemplate(templatePath);
-      if (template && ref.origin === "json") {
+      if (this.enableCache && template && ref.origin === "json") {
         this.templateCache.set(cacheKey, template);
       }
       return template;
@@ -351,7 +353,7 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
     );
     if (!resolved) return null;
     const template = this.persistence.loadTemplate(resolved.fullPath);
-    if (template && ref.origin === "json") {
+    if (this.enableCache && template && ref.origin === "json") {
       this.templateCache.set(cacheKey, template);
     }
     return template;
@@ -359,12 +361,14 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
 
   getScript(ref: ScriptRef): string | null {
     const cacheKey = this.getScriptCacheKey(ref);
-    const cached = this.scriptCache.get(cacheKey);
-    if (cached) return cached;
+    if (this.enableCache) {
+      const cached = this.scriptCache.get(cacheKey);
+      if (cached) return cached;
+    }
     const scriptPath = this.resolveScriptPath(ref);
     if (!scriptPath || !fs.existsSync(scriptPath)) return null;
     const content = fs.readFileSync(scriptPath, "utf-8");
-    if (scriptPath.startsWith(this.pathes.jsonPath + path.sep)) {
+    if (this.enableCache && scriptPath.startsWith(this.pathes.jsonPath + path.sep)) {
       this.scriptCache.set(cacheKey, content);
     }
     return content;
@@ -406,14 +410,16 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
 
   getMarkdown(ref: MarkdownRef): string | null {
     const cacheKey = this.getMarkdownCacheKey(ref);
-    const cached = this.markdownCache.get(cacheKey);
-    if (cached) return cached;
+    if (this.enableCache) {
+      const cached = this.markdownCache.get(cacheKey);
+      if (cached) return cached;
+    }
     const templatePath = this.resolveTemplatePathForMarkdown(ref);
     if (!templatePath) return null;
     const mdPath = MarkdownReader.getMarkdownPath(templatePath);
     if (!fs.existsSync(mdPath)) return null;
     const content = fs.readFileSync(mdPath, "utf-8");
-    if (mdPath.startsWith(this.pathes.jsonPath + path.sep)) {
+    if (this.enableCache && mdPath.startsWith(this.pathes.jsonPath + path.sep)) {
       this.markdownCache.set(cacheKey, content);
     }
     return content;
@@ -421,9 +427,11 @@ export class FileSystemRepositories implements IApplicationRepository, ITemplate
 
   getMarkdownSection(ref: MarkdownRef, sectionName: string): string | null {
     const cacheKey = this.getMarkdownCacheKey(ref);
-    const cached = this.markdownCache.get(cacheKey);
-    if (cached) {
-      return FileSystemRepositories.extractSectionFromContent(cached, sectionName);
+    if (this.enableCache) {
+      const cached = this.markdownCache.get(cacheKey);
+      if (cached) {
+        return FileSystemRepositories.extractSectionFromContent(cached, sectionName);
+      }
     }
     const templatePath = this.resolveTemplatePathForMarkdown(ref);
     if (!templatePath) return null;

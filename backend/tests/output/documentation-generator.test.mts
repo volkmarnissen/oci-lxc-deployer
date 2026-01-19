@@ -92,7 +92,7 @@ describe("DocumentationGenerator", () => {
           script: "test-script.sh",
           outputs: [
             { id: "output1" },
-            { id: "output2", default: "default_value" },
+            { id: "output2", default: true },
           ],
         },
       ],
@@ -343,7 +343,7 @@ echo "Shared script"
       expect(content).toContain("| Output ID | Default | Description |");
       expect(content).toContain("`output1`");
       expect(content).toContain("`output2`");
-      expect(content).toContain("default_value");
+      expect(content).toContain("true");
     });
 
     it("should show properties table for properties-only template", async () => {

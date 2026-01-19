@@ -9,7 +9,7 @@ import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-he
 describe("TemplateProcessor skip_if_all_missing", () => {
   let env: TestEnvironment;
   let persistenceHelper: TestPersistenceHelper;
-  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
+  let contextManager: ReturnType<ReturnType<typeof PersistenceManager.getInstance>["getContextManager"]>;
   let tp: TemplateProcessor;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -122,7 +122,7 @@ describe("TemplateProcessor skip_if_all_missing", () => {
     };
     persistenceHelper.writeJsonSync(Volume.JsonApplications, "test-skip-app/templates/optional-template-multiple.json", optionalTemplateMultiple);
 
-    const { ctx } = env.initPersistence();
+    const { ctx } = env.initPersistence({ enableCache: false });
     contextManager = ctx;
     tp = contextManager.getTemplateProcessor();
   });
@@ -275,9 +275,20 @@ describe("TemplateProcessor skip_if_all_missing", () => {
   });
 
   it("should NOT skip template with multiple parameters when at least one is present", async () => {
-    // We need to create a template that provides param1
-    // Let's modify set-parameters.json to also output param1
-    // Update set-parameters.json to also output param1
+    const appId = "test-skip-app-3";
+    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/templates`);
+    fs.mkdirSync(templatesDir, { recursive: true });
+
+    const applicationJson = {
+      "name": "Test Skip Application 3",
+      "description": "Test application for skip_if_all_missing - at least one present",
+      "installation": [
+        "set-parameters.json",
+        "optional-template-multiple.json"
+      ]
+    };
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/application.json`, applicationJson);
+
     const setParametersTemplate = {
       "execute_on": "ve",
       "name": "Set Parameters",
@@ -309,12 +320,46 @@ describe("TemplateProcessor skip_if_all_missing", () => {
     };
     persistenceHelper.writeJsonSync(
       Volume.JsonApplications,
-      "test-skip-app/templates/set-parameters.json",
+      `${appId}/templates/set-parameters.json`,
       setParametersTemplate,
     );
 
+    const optionalTemplateMultiple = {
+      "execute_on": "ve",
+      "name": "Optional Template Multiple",
+      "description": "Optional template with multiple parameters",
+      "skip_if_all_missing": ["param1", "param2"],
+      "parameters": [
+        {
+          "id": "param1",
+          "name": "Parameter 1",
+          "type": "string",
+          "required": false,
+          "description": "First parameter"
+        },
+        {
+          "id": "param2",
+          "name": "Parameter 2",
+          "type": "string",
+          "required": false,
+          "description": "Second parameter"
+        }
+      ],
+      "commands": [
+        {
+          "name": "Test Command Multiple",
+          "command": "echo 'test command multiple executed'"
+        }
+      ]
+    };
+    persistenceHelper.writeJsonSync(
+      Volume.JsonApplications,
+      `${appId}/templates/optional-template-multiple.json`,
+      optionalTemplateMultiple,
+    );
+
     const loaded = await tp.loadApplication(
-      "test-skip-app",
+      appId,
       "installation",
       veContext,
       ExecutionMode.TEST,

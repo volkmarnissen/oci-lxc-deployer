@@ -88,7 +88,7 @@ export class PersistenceManager {
       this.persistence,
     );
 
-    this.repositories = repositories ?? new FileSystemRepositories(this.pathes, this.persistence);
+    this.repositories = repositories ?? new FileSystemRepositories(this.pathes, this.persistence, enableCache);
     const reposWithPreload = this.repositories as IRepositories & {
       preloadJsonResources?: () => void;
     };

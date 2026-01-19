@@ -9,7 +9,7 @@ import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-he
 describe("TemplateProcessor - Library support", () => {
   let env: TestEnvironment;
   let persistenceHelper: TestPersistenceHelper;
-  let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
+  let contextManager: ReturnType<ReturnType<typeof PersistenceManager.getInstance>["getContextManager"]>;
   let tp: TemplateProcessor;
   const veContext = { host: "localhost", port: 22 } as any;
 
@@ -23,7 +23,7 @@ describe("TemplateProcessor - Library support", () => {
       jsonRoot: env.jsonDir,
       schemasRoot: env.schemaDir,
     });
-    const { ctx } = env.initPersistence();
+    const { ctx } = env.initPersistence({ enableCache: false });
     contextManager = ctx;
     tp = contextManager.getTemplateProcessor();
   });
@@ -33,8 +33,9 @@ describe("TemplateProcessor - Library support", () => {
   });
 
   it("should error when library file not found", async () => {
-    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/templates");
-    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/scripts");
+    const appId = "test-library-app-missing";
+    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/templates`);
+    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/scripts`);
 
     fs.mkdirSync(templatesDir, { recursive: true });
     fs.mkdirSync(scriptsDir, { recursive: true });
@@ -45,10 +46,10 @@ describe("TemplateProcessor - Library support", () => {
       "description": "Test application for library support",
       "installation": ["test-template.json"]
     };
-    persistenceHelper.writeJsonSync(Volume.JsonApplications, "test-library-app/application.json", applicationJson);
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/application.json`, applicationJson);
 
     // Create script
-    persistenceHelper.writeTextSync(Volume.JsonApplications, "test-library-app/scripts/test-script.sh", "echo test");
+    persistenceHelper.writeTextSync(Volume.JsonApplications, `${appId}/scripts/test-script.sh`, "echo test");
 
     // Create template with non-existent library
     const template = {
@@ -62,10 +63,10 @@ describe("TemplateProcessor - Library support", () => {
         }
       ]
     };
-    persistenceHelper.writeJsonSync(Volume.JsonApplications, "test-library-app/templates/test-template.json", template);
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/templates/test-template.json`, template);
 
     try {
-      await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
+      await tp.loadApplication(appId, "installation", veContext, ExecutionMode.TEST);
       expect.fail("Should have thrown an error");
     } catch (e: any) {
       // VEConfigurationError contains details array
@@ -77,17 +78,18 @@ describe("TemplateProcessor - Library support", () => {
   });
 
   it("should error when library contains template variables", async () => {
-    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/templates");
-    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/scripts");
+    const appId = "test-library-app-variables";
+    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/templates`);
+    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/scripts`);
 
     fs.mkdirSync(templatesDir, { recursive: true });
     fs.mkdirSync(scriptsDir, { recursive: true });
 
     // Create library with template variable
-    persistenceHelper.writeTextSync(Volume.JsonApplications, "test-library-app/scripts/test-library.sh", "function test() { echo '{{ variable }}'; }");
+    persistenceHelper.writeTextSync(Volume.JsonApplications, `${appId}/scripts/test-library.sh`, "function test() { echo '{{ variable }}'; }");
 
     // Create script
-    persistenceHelper.writeTextSync(Volume.JsonApplications, "test-library-app/scripts/test-script.sh", "test");
+    persistenceHelper.writeTextSync(Volume.JsonApplications, `${appId}/scripts/test-script.sh`, "test");
 
     // Create template
     const template = {
@@ -101,10 +103,16 @@ describe("TemplateProcessor - Library support", () => {
         }
       ]
     };
-    persistenceHelper.writeJsonSync(Volume.JsonApplications, "test-library-app/templates/test-template.json", template);
+    const applicationJson = {
+      "name": "Test Library App",
+      "description": "Test application for library support",
+      "installation": ["test-template.json"],
+    };
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/application.json`, applicationJson);
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/templates/test-template.json`, template);
 
     try {
-      await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
+      await tp.loadApplication(appId, "installation", veContext, ExecutionMode.TEST);
       expect.fail("Should have thrown an error");
     } catch (e: any) {
       const errorMessage = e.message || String(e) || JSON.stringify(e);
@@ -113,17 +121,18 @@ describe("TemplateProcessor - Library support", () => {
   });
 
   it("should successfully load template with valid library", async () => {
-    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/templates");
-    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/scripts");
+    const appId = "test-library-app-valid";
+    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/templates`);
+    const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, `${appId}/scripts`);
 
     fs.mkdirSync(templatesDir, { recursive: true });
     fs.mkdirSync(scriptsDir, { recursive: true });
 
     // Create valid library (no template variables)
-    persistenceHelper.writeTextSync(Volume.JsonApplications, "test-library-app/scripts/test-library.sh", "function test_function() { echo 'library function'; }");
+    persistenceHelper.writeTextSync(Volume.JsonApplications, `${appId}/scripts/test-library.sh`, "function test_function() { echo 'library function'; }");
 
     // Create script that uses library function
-    persistenceHelper.writeTextSync(Volume.JsonApplications, "test-library-app/scripts/test-script.sh", "test_function");
+    persistenceHelper.writeTextSync(Volume.JsonApplications, `${appId}/scripts/test-script.sh`, "test_function");
 
     // Create template
     const template = {
@@ -137,14 +146,21 @@ describe("TemplateProcessor - Library support", () => {
         }
       ]
     };
-    persistenceHelper.writeJsonSync(Volume.JsonApplications, "test-library-app/templates/test-template.json", template);
+    const applicationJson = {
+      "name": "Test Library App",
+      "description": "Test application for library support",
+      "installation": ["test-template.json"],
+    };
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/application.json`, applicationJson);
+    persistenceHelper.writeJsonSync(Volume.JsonApplications, `${appId}/templates/test-template.json`, template);
 
-    const result = await tp.loadApplication("test-library-app", "installation", veContext, ExecutionMode.TEST);
+    const result = await tp.loadApplication(appId, "installation", veContext, ExecutionMode.TEST);
     
     expect(result.commands.length).toBe(1);
-    expect(result.commands[0].script).toBeDefined();
-    expect(result.commands[0].libraryPath).toBeDefined();
-    expect(result.commands[0].libraryPath).toContain("test-library.sh");
+    expect(result.commands[0]).toBeDefined();
+    expect(result.commands[0]!.script).toBeDefined();
+    expect(result.commands[0]!.libraryPath).toBeDefined();
+    expect(result.commands[0]!.libraryPath).toContain("test-library.sh");
   });
 });
 
