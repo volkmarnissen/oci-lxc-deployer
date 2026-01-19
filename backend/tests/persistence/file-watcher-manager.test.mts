@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { FileWatcherManager } from "@src/persistence/file-watcher-manager.mjs";
@@ -65,7 +65,7 @@ describe("FileWatcherManager", () => {
    * Helper to manually trigger watch callbacks by simulating fs.watch events
    * This tests the callback logic deterministically without relying on actual fs.watch
    */
-  function triggerApplicationWatch(filename: string, eventType: string = "change"): void {
+  function triggerApplicationWatch(filename: string): void {
     // Access private method isApplicationChange via reflection
     const watcherAny = watcher as any;
     if (watcherAny.isApplicationChange && watcherAny.isApplicationChange(filename)) {

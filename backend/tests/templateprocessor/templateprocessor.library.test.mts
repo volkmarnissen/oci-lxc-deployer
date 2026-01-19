@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "fs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { TemplateProcessor } from "@src/templates/templateprocessor.mjs";
 import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
 
 describe("TemplateProcessor - Library support", () => {
-  let testDir: string;
   let env: TestEnvironment;
   let persistenceHelper: TestPersistenceHelper;
   let contextManager: ReturnType<typeof PersistenceManager.getInstance>["getContextManager"];
@@ -34,7 +33,6 @@ describe("TemplateProcessor - Library support", () => {
   });
 
   it("should error when library file not found", async () => {
-    const testAppDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app");
     const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/templates");
     const scriptsDir = persistenceHelper.resolve(Volume.JsonApplications, "test-library-app/scripts");
 

@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "lint": "ng lint",
+    "lint:all": "eslint \"src/**/*.{ts,tsx,js}\" \"tests/**/*.{ts,tsx,js}\" \"cypress/**/*.{ts,tsx,js}\"",
     "prettier": "prettier --write ."
   },
   "prettier": {

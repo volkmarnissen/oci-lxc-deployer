@@ -369,6 +369,7 @@ describe("VeExecution host: flow", () => {
         tmplCommand: ICommand,
         timeoutMs?: number,
       ): Promise<IVeExecuteMessage> {
+        void timeoutMs;
         this.capturedVmId = Number(vmid);
         this.capturedCommands.push(command);
         // Capture inputs from the nested VeExecution instance

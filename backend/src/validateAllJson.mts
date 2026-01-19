@@ -7,7 +7,7 @@ import { ApplicationLoader } from "./apploader.mjs";
 import { IReadApplicationOptions } from "./backend-types.mjs";
 import { TaskType } from "./types.mjs";
 import { VEConfigurationError, VELoadApplicationError, IVEContext } from "./backend-types.mjs";
-import { TemplateProcessor } from "./templateprocessor.mjs";
+import { TemplateProcessor } from "./templates/templateprocessor.mjs";
 import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 import { ExecutionMode } from "./ve-execution-constants.mjs";
 

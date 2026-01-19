@@ -51,27 +51,29 @@ export class VeTestHelper {
   schemaDir!: string;
   localDir!: string;
 
-  private async findRepoRoot(startDir: string): Promise<string> {
-    let dir = startDir;
-    for (let i = 0; i < 12; i++) {
-      const jsonDir = path.join(dir, "json");
-      const schemasDir = path.join(dir, "schemas");
-      if ((await fs.pathExists(jsonDir)) && (await fs.pathExists(schemasDir))) {
-        return dir;
-      }
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-    throw new Error("Unable to locate repo root for VeTestHelper");
-  }
-
   async setup(): Promise<void> {
     this.tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "proxmox-test-"));
     this.jsonDir = path.join(this.tempDir, "json");
     this.schemaDir = path.join(this.tempDir, "schema");
     this.localDir = path.join(this.tempDir, "local/json");
-    const repoRoot = await this.findRepoRoot(__dirname);
+    const candidates = [
+      path.resolve(process.cwd(), ".."),
+      path.resolve(process.cwd(), "..", ".."),
+      path.resolve(__dirname, "..", "..", ".."),
+    ];
+    let repoRoot: string | undefined;
+    for (const candidate of candidates) {
+      if (
+        (await fs.pathExists(path.join(candidate, "json"))) &&
+        (await fs.pathExists(path.join(candidate, "schemas")))
+      ) {
+        repoRoot = candidate;
+        break;
+      }
+    }
+    if (!repoRoot) {
+      throw new Error("Unable to locate repo root for VeTestHelper");
+    }
     await fs.copy(path.join(repoRoot, "json"), this.jsonDir);
     await fs.ensureDir(this.schemaDir);
     await fs.ensureDir(this.localDir);

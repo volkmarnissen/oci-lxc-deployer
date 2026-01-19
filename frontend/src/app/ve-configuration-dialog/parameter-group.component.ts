@@ -1,5 +1,5 @@
 import { Component, Input, inject } from '@angular/core';
-import { FormGroup, ReactiveFormsModule, FormControl } from '@angular/forms';
+import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';

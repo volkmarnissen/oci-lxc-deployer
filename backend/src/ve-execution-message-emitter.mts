@@ -1,7 +1,5 @@
 import { EventEmitter } from "events";
 import { ICommand, IVeExecuteMessage, IJsonError } from "./types.mjs";
-import { VeExecutionConstants } from "./ve-execution-constants.mjs";
-import { getNextMessageIndex } from "./ve-execution-constants.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
 
 /**

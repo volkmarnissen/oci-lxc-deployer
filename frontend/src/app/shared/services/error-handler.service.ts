@@ -14,7 +14,7 @@ export class ErrorHandlerService {
    * @param showDialog Whether to automatically show the error dialog (default: true)
    * @returns Array of IJsonError objects
    */
-  handleError(prefix: string, err: unknown, showDialog: boolean = true): IJsonError[] {
+  handleError(prefix: string, err: unknown, showDialog = true): IJsonError[] {
     const errors = this.convertErrorToJsonErrors(prefix, err);
     if (showDialog) {
       this.showErrorDialog(errors);

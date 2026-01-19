@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { TemplateProcessor } from "@src/templates/templateprocessor.mjs";
 import { VEConfigurationError } from "@src/backend-types.mjs";
 import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 import { ContextManager } from "@src/context-manager.mjs";
@@ -102,9 +102,6 @@ describe("TemplateProcessor duplicate validation", () => {
   });
 
   it("should detect duplicate output IDs from different templates in the same task", async () => {
-    const testAppDir = persistenceHelper.resolve(Volume.JsonApplications, "test-duplicate-app");
-    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-duplicate-app/templates");
-
     // Create application.json with two templates that set the same output IDs
     const applicationJson = {
       "name": "Test Duplicate Output IDs Application",

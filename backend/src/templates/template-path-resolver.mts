@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import path from "node:path";
 import fs from "node:fs";
-import type { IConfiguredPathes } from "./backend-types.mjs";
-import type { ITemplate } from "./types.mjs";
+import type { IConfiguredPathes } from "../backend-types.mjs";
+import type { ITemplate } from "../types.mjs";
 
 /**
  * Utility class for resolving template and script paths.

@@ -411,11 +411,12 @@ describe("WebAppVE API", () => {
         .replace(":application", "testapp")
         .replace(":veContext", veContextKey);
 
-      await request(app).post(url).send({}).expect(400);
-      await request(app)
+      const res1 = await request(app).post(url).send({});
+      expect(res1.status).toBe(400);
+      const res2 = await request(app)
         .post(url)
-        .send({ oci_image: "docker://alpine:3.19" })
-        .expect(400);
+        .send({ oci_image: "docker://alpine:3.19" });
+      expect(res2.status).toBe(400);
     });
   });
 });

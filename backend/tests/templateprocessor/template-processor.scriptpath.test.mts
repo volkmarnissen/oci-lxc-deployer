@@ -12,9 +12,6 @@ describe("ProxmoxConfiguration script path resolution", () => {
   let persistenceHelper: TestPersistenceHelper;
   let appDir: string;
   let scriptsDir: string;
-  let appJsonPath: string;
-  let templateDir: string;
-  let templatePath: string;
   let scriptPath: string;
 
   beforeAll(async () => {
@@ -30,9 +27,6 @@ describe("ProxmoxConfiguration script path resolution", () => {
     // Create application structure in localDir first (before any watchers start)
     appDir = path.join(helper.localDir, "applications", appName);
     scriptsDir = path.join(appDir, "scripts");
-    appJsonPath = path.join(appDir, "application.json");
-    templateDir = path.join(appDir, "templates");
-    templatePath = path.join(templateDir, "install.json");
     scriptPath = path.join(scriptsDir, scriptName);
 
     // Write all files via helper (ensures dirs are created)

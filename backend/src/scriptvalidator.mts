@@ -1,9 +1,8 @@
 import { ICommand, IJsonError, IParameter } from "@src/types.mjs";
 import fs from "fs";
-import path from "path";
 import { JsonError } from "./jsonvalidator.mjs";
 import { IResolvedParam } from "./backend-types.mjs";
-import { TemplatePathResolver } from "./template-path-resolver.mjs";
+import { TemplatePathResolver } from "./templates/template-path-resolver.mjs";
 
 export class ScriptValidator {
   /**

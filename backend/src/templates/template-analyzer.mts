@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { TemplateProcessor } from "./templateprocessor.mjs";
-import { PersistenceManager } from "./persistence/persistence-manager.mjs";
-import { DocumentationPathResolver } from "./documentation-path-resolver.mjs";
+import { TemplateProcessor } from "../templateprocessor.mjs";
+import { PersistenceManager } from "../persistence/persistence-manager.mjs";
+import { DocumentationPathResolver } from "../documentation-path-resolver.mjs";
 import { TemplatePathResolver } from "./template-path-resolver.mjs";
-import type { IApplication, IVEContext, IConfiguredPathes } from "./backend-types.mjs";
-import type { ITemplate, ICommand, TaskType } from "./types.mjs";
-import type { ITemplateReference } from "./backend-types.mjs";
+import type { IApplication, IVEContext, IConfiguredPathes } from "../backend-types.mjs";
+import type { ITemplate, ICommand, TaskType } from "../types.mjs";
+import type { ITemplateReference } from "../backend-types.mjs";
 import fs from "node:fs";
 import path from "node:path";
 

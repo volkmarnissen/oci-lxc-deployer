@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
-import { tmpdir } from "os";
+import { mkdirSync } from "fs";
 import path from "path";
 import { FileSystemPersistence } from "@src/persistence/filesystem-persistence.mjs";
 import { JsonValidator } from "@src/jsonvalidator.mjs";

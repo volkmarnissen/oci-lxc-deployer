@@ -10,10 +10,9 @@ import { IFramework } from "./types.mjs";
 import { StorageContext } from "./storagecontext.mjs";
 import { ContextManager } from "./context-manager.mjs";
 import { JsonError } from "./jsonvalidator.mjs";
-import { TemplateProcessor } from "./templateprocessor.mjs";
+import { TemplateProcessor } from "./templates/templateprocessor.mjs";
 import { TaskType, IParameter, IPostFrameworkCreateApplicationBody } from "./types.mjs";
 import { IVEContext } from "./backend-types.mjs";
-import { FileSystemPersistence } from "./persistence/filesystem-persistence.mjs";
 import { IFrameworkPersistence, IApplicationPersistence, ITemplatePersistence } from "./persistence/interfaces.mjs";
 import { PersistenceManager } from "./persistence/persistence-manager.mjs";
 

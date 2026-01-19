@@ -1,13 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs, {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-  mkdirSync,
-  existsSync,
-  readFileSync,
-} from "fs";
-import { tmpdir } from "os";
+import { rmSync, mkdirSync, existsSync } from "fs";
 import path from "path";
 import { TemplatePersistenceHandler } from "@src/persistence/template-persistence-handler.mjs";
 import { JsonValidator } from "@src/jsonvalidator.mjs";
@@ -218,9 +210,10 @@ describe("TemplatePersistenceHandler", () => {
         commands: [],
       } as any, true);
 
-      // Cache should be cleared
-      // (We can't directly test this, but it's verified by the fact that
-      // writeTemplate calls invalidateCache internally)
+      // Cache should be cleared: deleting the file should return null on load
+      rmSync(templateFile, { force: true });
+      const afterDelete = handler.loadTemplate(templateFile);
+      expect(afterDelete).toBeNull();
     });
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import {
   createWebAppStaticTestSetup,
@@ -17,9 +17,9 @@ describe("WebApp serves index.html", () => {
   });
 
   it("GET / returns 200 and HTML", async () => {
-    await request(setup.app)
+    const res = await request(setup.app)
       .get("/")
-      .expect(200)
       .expect("Content-Type", /html/);
+    expect(res.status).toBe(200);
   });
 });

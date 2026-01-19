@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { JsonError } from "./jsonvalidator.mjs";
-import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { TemplateProcessor } from "@src/templates/templateprocessor.mjs";
 import { promises, writeFileSync } from "node:fs";
 import { PersistenceManager } from "./persistence/persistence-manager.mjs";
 function printUsageAndExit() {

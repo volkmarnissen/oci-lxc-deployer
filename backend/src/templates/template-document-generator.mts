@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-import { DocumentationPathResolver } from "./documentation-path-resolver.mjs";
+import { DocumentationPathResolver } from "../documentation-path-resolver.mjs";
 import { TemplateAnalyzer } from "./template-analyzer.mjs";
-import type { IProcessedTemplate } from "./templateprocessor.mjs";
-import type { IParameter, ITemplate } from "./types.mjs";
+import type { IProcessedTemplate } from "../templateprocessor.mjs";
+import type { IParameter, ITemplate } from "../types.mjs";
 
 /**
  * Generates Markdown documentation for templates.

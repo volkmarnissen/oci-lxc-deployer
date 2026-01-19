@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { ExecutionMode } from "@src/ve-execution-constants.mjs";
+import type { ContextManager } from "@src/context-manager.mjs";
+import type { IParameter } from "@src/types.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
 
@@ -9,7 +10,7 @@ const veContext = { host: "localhost", port: 22 } as any;
 describe("TemplateProcessor unresolved + enum variants", () => {
   let env: TestEnvironment;
   let persistenceHelper: TestPersistenceHelper;
-  let tp: ReturnType<ReturnType<typeof PersistenceManager.getInstance>["getContextManager"]>["getTemplateProcessor"];
+  let tp: ReturnType<ContextManager["getTemplateProcessor"]>;
 
   beforeAll(() => {
     env = createTestEnvironment(import.meta.url, {
@@ -218,7 +219,7 @@ describe("TemplateProcessor unresolved + enum variants", () => {
       "installation",
       veContext,
     );
-    const unresolvedIds = unresolved.map((p) => p.id);
+    const unresolvedIds = unresolved.map((p: IParameter) => p.id);
     expect(unresolvedIds).not.toContain("oci_image");
   });
 
@@ -230,9 +231,9 @@ describe("TemplateProcessor unresolved + enum variants", () => {
       ExecutionMode.TEST,
     );
 
-    const enumZero = loaded.parameters.find((p) => p.id === "enum_zero");
-    const enumOne = loaded.parameters.find((p) => p.id === "enum_one");
-    const enumMany = loaded.parameters.find((p) => p.id === "enum_many");
+    const enumZero = loaded.parameters.find((p: IParameter) => p.id === "enum_zero");
+    const enumOne = loaded.parameters.find((p: IParameter) => p.id === "enum_one");
+    const enumMany = loaded.parameters.find((p: IParameter) => p.id === "enum_many");
 
     expect(enumZero).toBeDefined();
     expect(enumOne).toBeDefined();
@@ -253,7 +254,7 @@ describe("TemplateProcessor unresolved + enum variants", () => {
       "installation",
       veContext,
     );
-    const unresolvedIds = unresolved.map((p) => p.id);
+    const unresolvedIds = unresolved.map((p: IParameter) => p.id);
     expect(unresolvedIds).toContain("enum_zero");
     expect(unresolvedIds).toContain("enum_many");
     expect(unresolvedIds).not.toContain("enum_one");
@@ -267,9 +268,9 @@ describe("TemplateProcessor unresolved + enum variants", () => {
       ExecutionMode.TEST,
     );
 
-    const enumZero = loaded.parameters.find((p) => p.id === "enum_zero");
-    const enumOne = loaded.parameters.find((p) => p.id === "enum_one");
-    const enumMany = loaded.parameters.find((p) => p.id === "enum_many");
+    const enumZero = loaded.parameters.find((p: IParameter) => p.id === "enum_zero");
+    const enumOne = loaded.parameters.find((p: IParameter) => p.id === "enum_one");
+    const enumMany = loaded.parameters.find((p: IParameter) => p.id === "enum_many");
 
     expect(enumZero?.default).toBeUndefined();
     expect(enumOne?.default).toBeUndefined();
@@ -280,7 +281,7 @@ describe("TemplateProcessor unresolved + enum variants", () => {
       "installation",
       undefined,
     );
-    const unresolvedIds = unresolved.map((p) => p.id);
+    const unresolvedIds = unresolved.map((p: IParameter) => p.id);
     expect(unresolvedIds).toContain("enum_zero");
     expect(unresolvedIds).toContain("enum_one");
     expect(unresolvedIds).toContain("enum_many");

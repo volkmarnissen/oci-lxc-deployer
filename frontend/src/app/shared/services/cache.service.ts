@@ -1,8 +1,8 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { VeConfigurationService } from '../../ve-configuration.service';
-import { IFrameworkName, IApplicationWeb } from '../../../shared/types';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { catchError, tap, map } from 'rxjs/operators';
+import { IFrameworkName } from '../../../shared/types';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 export interface CacheData {
   frameworks: IFrameworkName[];
@@ -136,13 +136,15 @@ export class CacheService {
     
     // Load all data in parallel
     this.getFrameworks().subscribe({
-      next: () => {},
-      error: () => {}
+      error: () => {
+        this.loading.set(false);
+      }
     });
     
     this.getApplicationIds().subscribe({
-      next: () => {},
-      error: () => {}
+      error: () => {
+        this.loading.set(false);
+      }
     });
     
     this.getHostnames().subscribe({

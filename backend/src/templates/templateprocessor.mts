@@ -21,14 +21,14 @@ import { IVEContext } from "@src/backend-types.mjs";
 import { ApplicationLoader } from "@src/apploader.mjs";
 import fs from "fs";
 import { ScriptValidator } from "@src/scriptvalidator.mjs";
-import { ContextManager } from "./context-manager.mjs";
-import { ITemplatePersistence, IApplicationPersistence } from "./persistence/interfaces.mjs";
-import { VeExecution } from "./ve-execution.mjs";
-import { TemplatePathResolver } from "./templates/template-path-resolver.mjs";
-import { ExecutionMode, determineExecutionMode } from "./ve-execution-constants.mjs";
-import { MarkdownReader } from "./markdown-reader.mjs";
+import { ContextManager } from "../context-manager.mjs";
+import { ITemplatePersistence, IApplicationPersistence } from "../persistence/interfaces.mjs";
+import { VeExecution } from "../ve-execution.mjs";
+import { TemplatePathResolver } from "./template-path-resolver.mjs";
+import { ExecutionMode, determineExecutionMode } from "../ve-execution-constants.mjs";
+import { MarkdownReader } from "../markdown-reader.mjs";
 // ITemplateReference moved to backend-types.mts
-import { ITemplateReference } from "./backend-types.mjs";
+import { ITemplateReference } from "../backend-types.mjs";
 interface IProcessTemplateOpts {
   application: string;
   template: ITemplateReference | string;
@@ -233,14 +233,12 @@ export class TemplateProcessor extends EventEmitter {
         scriptPathes,
         webuiTemplates,
         executionMode: executionMode !== undefined ? executionMode : determineExecutionMode(),
+        enumValueInputs: enumValueInputs && enumValueInputs.length > 0 ? enumValueInputs : undefined,
         enumValuesRefresh: enumValuesRefresh === true,
         processedTemplates,
         templateReferences,
         outputSources,
       };
-      if (enumValueInputs && enumValueInputs.length > 0) {
-        ptOpts.enumValueInputs = enumValueInputs;
-      }
       if (veContext !== undefined) {
         ptOpts.veContext = veContext;
       }

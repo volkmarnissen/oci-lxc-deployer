@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
 import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
-import { TemplateProcessor } from "@src/templateprocessor.mjs";
+import { TemplateProcessor } from "@src/templates/templateprocessor.mjs";
 import { ExecutionMode } from "@src/ve-execution-constants.mjs";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
@@ -277,8 +277,6 @@ describe("TemplateProcessor skip_if_all_missing", () => {
   it("should NOT skip template with multiple parameters when at least one is present", async () => {
     // We need to create a template that provides param1
     // Let's modify set-parameters.json to also output param1
-    const templatesDir = persistenceHelper.resolve(Volume.JsonApplications, "test-skip-app/templates");
-
     // Update set-parameters.json to also output param1
     const setParametersTemplate = {
       "execute_on": "ve",

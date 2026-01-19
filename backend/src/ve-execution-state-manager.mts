@@ -1,7 +1,6 @@
 import { IVMContext } from "./backend-types.mjs";
 import { VMContext } from "./storagecontext.mjs";
 import { IRestartInfo } from "./ve-execution-constants.mjs";
-import { VariableResolver } from "./variable-resolver.mjs";
 
 export interface StateManagerDependencies {
   outputs: Map<string, string | number | boolean>;

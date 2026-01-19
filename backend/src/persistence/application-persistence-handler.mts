@@ -445,8 +445,6 @@ export class ApplicationPersistenceHandler {
     const cx = size / 2;
     const cy = size / 2;
     const r = size / 3;
-    const rect = `${pad},${pad} ${size - pad * 2},${size - pad * 2}`;
-
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`,
       `<rect width="${size}" height="${size}" rx="18" ry="18" fill="${bg}"/>`,

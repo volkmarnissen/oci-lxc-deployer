@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { DocumentationGenerator } from "@src/documentation-generator.mjs";
-import path from "node:path";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
 
@@ -195,8 +194,6 @@ echo "Shared script"
     it("should generate application.md with correct structure", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const appMdPath = path.join(htmlPath, "test-app.md");
       expect(() =>
         persistenceHelper.readTextSync(
           Volume.LocalRoot,
@@ -264,8 +261,6 @@ echo "Shared script"
     it("should generate template.md with correct structure", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
       expect(() =>
         persistenceHelper.readTextSync(
           Volume.LocalRoot,
@@ -310,8 +305,6 @@ echo "Shared script"
     it("should extract capabilities from script headers", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
       const content = persistenceHelper.readTextSync(
         Volume.LocalRoot,
         "html/json/applications/test-app/templates/test-template.md",
@@ -327,8 +320,6 @@ echo "Shared script"
     it("should include parameters table in template.md", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
       const content = persistenceHelper.readTextSync(
         Volume.LocalRoot,
         "html/json/applications/test-app/templates/test-template.md",
@@ -343,8 +334,6 @@ echo "Shared script"
     it("should include outputs table in template.md", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const templateMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "test-template.md");
       const content = persistenceHelper.readTextSync(
         Volume.LocalRoot,
         "html/json/applications/test-app/templates/test-template.md",
@@ -360,8 +349,6 @@ echo "Shared script"
     it("should show properties table for properties-only template", async () => {
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("test-app");
-
-      const setParamsMdPath = path.join(htmlPath, "json", "applications", "test-app", "templates", "set-parameters.md");
       const content = persistenceHelper.readTextSync(
         Volume.LocalRoot,
         "html/json/applications/test-app/templates/set-parameters.md",
@@ -417,8 +404,6 @@ echo "Shared script"
 
       const generator = new DocumentationGenerator(jsonPath, localPath, schemaPath, htmlPath);
       await generator.generateDocumentation("other-app");
-
-      const sharedTemplateMdPath = path.join(htmlPath, "json", "shared", "templates", "shared-template.md");
       
       // Wait a bit for async operations
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -469,8 +454,6 @@ echo "Shared script"
 
       // Wait a bit for async operations
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const sharedTemplateMdPath = path.join(htmlPath, "json", "shared", "templates", "shared-template.md");
 
       // If the file exists, check that test-app is not in the list if it skips
       try {

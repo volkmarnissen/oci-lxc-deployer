@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { DocumentationGenerator } from "@src/documentation-generator.mjs";
-import path from "node:path";
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "@tests/helper/test-persistence-helper.mjs";
 
@@ -113,11 +112,6 @@ describe("DocumentationGenerator skip_if_property_set", () => {
     await generator.generateDocumentation("test-skip-property-set-doc-app");
     
     // Read the generated README.md (it's generated in htmlPath, not in jsonPath)
-    const readmePath = path.join(
-      htmlPath,
-      "test-skip-property-set-doc-app.md",
-    );
-
     expect(() =>
       persistenceHelper.readTextSync(
         Volume.LocalRoot,
@@ -153,7 +147,7 @@ describe("DocumentationGenerator skip_if_property_set", () => {
   });
 
   it("should recognize skip_if_property_set as conditional in template analyzer", async () => {
-    const { TemplateAnalyzer } = await import("@src/template-analyzer.mjs");
+    const { TemplateAnalyzer } = await import("@src/templates/template-analyzer.mjs");
     const { DocumentationPathResolver } = await import("@src/documentation-path-resolver.mjs");
     
     const pathResolver = new DocumentationPathResolver(jsonPath, localPath);
@@ -163,14 +157,6 @@ describe("DocumentationGenerator skip_if_property_set", () => {
       localPath,
     });
     
-    const templatePath = path.join(
-      jsonPath,
-      "applications",
-      "test-skip-property-set-doc-app",
-      "templates",
-      "skip-if-property-set-template.json",
-    );
-
     const templateData = persistenceHelper.readJsonSync(
       Volume.JsonApplications,
       "test-skip-property-set-doc-app/templates/skip-if-property-set-template.json",

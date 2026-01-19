@@ -1,13 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs, {
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-  mkdirSync,
-  existsSync,
-  readFileSync,
-} from "fs";
-import { tmpdir } from "os";
+import { mkdirSync, existsSync } from "fs";
 import path from "path";
 import { FrameworkPersistenceHandler } from "@src/persistence/framework-persistence-handler.mjs";
 import { JsonValidator } from "@src/jsonvalidator.mjs";
@@ -197,7 +189,6 @@ describe("FrameworkPersistenceHandler", () => {
       // Setup: Framework in local erstellen
       const frameworksDir = persistenceHelper.resolve(Volume.LocalRoot, "frameworks");
       mkdirSync(frameworksDir, { recursive: true });
-      const frameworkFile = path.join(frameworksDir, "cachedframework.json");
       persistenceHelper.writeJsonSync(Volume.LocalRoot, "frameworks/cachedframework.json", {
         id: "cachedframework",
         name: "Cached Framework",

@@ -9,7 +9,7 @@ import {
 } from "@src/types.mjs";
 import { ContextManager } from "../context-manager.mjs";
 import { PersistenceManager } from "../persistence/persistence-manager.mjs";
-import { ITemplateProcessorLoadResult } from "../templateprocessor.mjs";
+import { ITemplateProcessorLoadResult } from "../templates/templateprocessor.mjs";
 import { getErrorStatusCode, serializeError } from "./webapp-error-utils.mjs";
 
 type ReturnResponse = <T>(
@@ -26,7 +26,6 @@ export function registerApplicationRoutes(
   app.get(ApiUri.UnresolvedParameters, async (req, res) => {
     try {
       const application: string = req.params.application;
-      const task: string = req.params.task;
       const taskKey: string = req.params.task;
       const veContextKey: string = req.params.veContext;
       if (!taskKey) {

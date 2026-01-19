@@ -1,11 +1,9 @@
 import {
   IApplication,
-  IConfiguredPathes,
   IReadApplicationOptions,
   VEConfigurationError,
 } from "../backend-types.mjs";
 import { IFramework, ITemplate, IApplicationWeb } from "../types.mjs";
-import { JsonValidator } from "../jsonvalidator.mjs";
 
 /**
  * Base interface for all persistence implementations

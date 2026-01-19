@@ -1,33 +1,8 @@
 import { ApplicationLoader } from "@src/apploader.mjs";
-import { PersistenceManager } from "@src/persistence/persistence-manager.mjs";
 import { FileSystemPersistence } from "@src/persistence/filesystem-persistence.mjs";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-<<<<<<<< HEAD:backend/tests/applicationloader.readApplicationJson.test.mts
-import { IReadApplicationOptions } from "@src/backend-types.mjs";
-
-const tmpDir = path.join(__dirname, "__apptest__");
-const localPath = path.join(tmpDir, "local");
-const jsonPath = path.join(tmpDir, "json");
-const schemaPath = path.join(__dirname, "../schemas");
-
-const storageContextFilePath = path.join(localPath, "storagecontext.json");
-const secretFilePath = path.join(localPath, "secret.txt");
-// Close existing instance if any
-try {
-  PersistenceManager.getInstance().close();
-} catch {
-  // Ignore if not initialized
-}
-PersistenceManager.initialize(localPath, storageContextFilePath, secretFilePath, false); // Disable cache for tests
-
-function writeJson(filePath: string, data: any) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-========
 import { createTestEnvironment, type TestEnvironment } from "../helper/test-environment.mjs";
 import { TestPersistenceHelper, Volume } from "../helper/test-persistence-helper.mjs";
->>>>>>>> 6c3e9cd (Refactored webapp.mts and all tests):backend/tests/misc/applicationloader.readApplicationJson.test.mts
 
 describe("ApplicationLoader.readApplicationJson", () => {
   let env: TestEnvironment;
