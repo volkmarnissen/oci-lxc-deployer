@@ -7,13 +7,13 @@
       "id": "vm_id",
       "name": "ID of the LXC Container",
       "type": "string",
-      "required": true
+      "description": "Optional. If set, volumes are attached to the container."
     },
     {
       "id": "hostname",
       "name": "Hostname",
       "type": "string",
-      "required": true
+      "description": "Optional. Used for per-host volume subdirectories."
     },
     {
       "id": "volumes",
@@ -42,7 +42,7 @@
       "id": "volume_backup",
       "name": "Include in Backup",
       "type": "boolean",
-      "default": true,
+      "default": false,
       "advanced": true,
       "description": "Whether the volume should be included in Proxmox backups"
     },
