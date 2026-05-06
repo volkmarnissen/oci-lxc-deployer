@@ -19,6 +19,14 @@ export interface TestScenario {
   cli_timeout?: number;
   verify?: Record<string, boolean | number | string>;
   cleanup?: Record<string, string>;
+  /**
+   * Templates that are expected to fail with a specific exit code in this
+   * scenario. Keys are template filenames (e.g. "342-foo.json"), values are
+   * the expected non-zero exit code. The test passes for that entry only if
+   * the template ran AND exited with exactly that code. A different exit
+   * code (including 0) or "never ran" both fail the test.
+   */
+  expect2fail?: Record<string, number>;
 }
 
 /** Discovered scenario with resolved identity */
