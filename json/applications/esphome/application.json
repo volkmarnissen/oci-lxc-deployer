@@ -9,6 +9,7 @@
     { "id": "hostname", "default": "esphome" },
     { "id": "volumes", "default": "config=/config,size=4G" },
     { "id": "envs", "default": "TZ=Europe/Berlin" },
+    { "id": "disk_size", "default": "8" },
     { "id": "rootfs_storage", "default": "local-zfs" },
     { "id": "volume_storage", "default": "local-zfs", "required": true },
     { "id": "oci_image", "value": "ghcr.io/esphome/esphome:{{oci_image_tag}}" },

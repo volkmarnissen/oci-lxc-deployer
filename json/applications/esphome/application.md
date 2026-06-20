@@ -27,6 +27,11 @@ manage devices over-the-air (OTA).
 
 ## Storage
 
+The ESPHome image bakes the PlatformIO toolchains/libraries into `/root/.platformio`,
+so the **rootfs** must be large enough to extract them — `disk_size` defaults to
+**8 GB** for this app (the global 0.5 GB default is far too small and makes
+`pct create` fail with "Disk quota exceeded" mid-extraction).
+
 The `config` volume (mounted at `/config`, default 4 GB) holds your device
-YAML **and** the PlatformIO build cache / downloaded toolchains, which grow
-over time — size it generously.
+YAML **and** the per-build cache under `/config/.esphome`, which grows over
+time — size it generously.
